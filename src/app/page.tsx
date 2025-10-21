@@ -1,8 +1,58 @@
 import Link from "next/link";
 import Image from "next/image";
 import CurrentWeekCard from "./components/CurrentWeekCard";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { getSheets } from "@/lib/googleSheets";
+
+function normalizeDiscordId(v: unknown): string {
+  return String(v ?? "")
+    .trim()
+    .replace(/[<@!>]/g, "")
+    .replace(/\D/g, ""); // keep only digits
+}
 
 export default async function HomePage() {
+  const session = await getServerSession(authOptions);
+  let message = "Please log in with your Discord.";
+
+  if (session?.user) {
+    try {
+      const rawSessionId =
+        (session.user as any).discordId ??
+        (session.user as any).id;
+
+      const sessionId = normalizeDiscordId(rawSessionId);
+
+      if (sessionId) {
+        const sheets = await getSheets();
+        const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
+        const range = "Discord_ID!A:D";
+
+        const res = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range,
+          valueRenderOption: "FORMATTED_VALUE",
+        });
+
+        const rows = res.data.values || [];
+        const match = rows.find((r) => normalizeDiscordId(r?.[3]) === sessionId);
+
+        if (match) {
+          const [ncxid, first, last] = match;
+          message = `Welcome ${first} ${last}! – ${ncxid}`;
+        } else {
+          message = `Welcome ${session.user.name ?? "Pilot"}! – No NCXID Found.`;
+        }
+      } else {
+        message = `Welcome ${session.user.name ?? "Pilot"}! – No Discord ID found`;
+      }
+    } catch (err) {
+      console.error("Error fetching NCX info:", err);
+      message = `Welcome ${session.user.name ?? "Pilot"}! – (Error fetching NCXID)`;
+    }
+  }
+
   return (
     <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
       {/* Subtle animated glow background */}
@@ -12,9 +62,8 @@ export default async function HomePage() {
       </div>
 
       {/* Hero Section */}
-      <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-8 text-center">
-
-        <div className="flex flex-col items-center space-y-8">
+      <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-6 text-center">
+        <div className="flex flex-col items-center space-y-6">
           <Image
             src="/logo.png"
             alt="NCX Draft League Season 8"
@@ -23,11 +72,15 @@ export default async function HomePage() {
             priority
             className="drop-shadow-[0_0_30px_rgba(255,0,150,0.5)] hover:scale-105 transition-transform duration-500"
           />
+
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
             DRAFT LEAGUE • SEASON 8
           </h1>
 
-          <div className="flex flex-wrap justify-center gap-4 mt-2">
+          {/* Dynamic greeting */}
+          <p className="text-zinc-300 text-lg font-medium">{message}</p>
+
+          <div className="flex flex-wrap justify-center gap-4 mt-3">
             <Link
               href="/standings"
               className="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 text-white font-semibold shadow-lg shadow-pink-600/30 hover:scale-105 transition-transform duration-300"
@@ -44,30 +97,10 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Info Grid */}
-        <section className="relative max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 px-6 pb-24">
-          {/* 🟣 Current Week: full width */}
-          <div className="md:col-span-3">
-            <CurrentWeekCard />
-          </div>
-
-          {/* The other two cards below it */}
-          <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 hover:border-purple-500/40 transition">
-            <h2 className="text-xl font-semibold text-cyan-400">Top Players</h2>
-            <ul className="mt-3 text-zinc-300 text-sm space-y-1">
-              <li>🏆 Kester — 17 pts</li>
-              <li>🔥 Walter — 15 pts</li>
-              <li>🚀 Nash — 13 pts</li>
-            </ul>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 hover:border-purple-500/40 transition">
-            <h2 className="text-xl font-semibold text-purple-400">Next Event</h2>
-            <p className="mt-2 text-zinc-300">
-              Sunday, Oct 27 • League Week 6 • Nickel City Games
-            </p>
-          </div>
-        </section>
+      {/* Current Week only */}
+      <section className="relative max-w-6xl mx-auto px-6 pb-24">
+        <CurrentWeekCard />
+      </section>
     </main>
   );
 }
