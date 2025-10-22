@@ -129,8 +129,8 @@ export default async function CurrentWeekCard() {
         <ul className="mt-3 space-y-3 text-base">
           {items.map((m, i) => {
             // pick colors based on winner
-            const leftColor = m.awayWinner ? GREEN : m.homeWinner ? RED : "0,0,0";
-            const rightColor = m.homeWinner ? GREEN : m.awayWinner ? RED : "0,0,0";
+            const leftColor  = m.awayWinner ? RED : m.homeWinner ? GREEN : "0,0,0";
+            const rightColor = m.homeWinner ? RED : m.awayWinner ? GREEN : "0,0,0";
 
             const gradientStyle: React.CSSProperties = {
               backgroundImage: `

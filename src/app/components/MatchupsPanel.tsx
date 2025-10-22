@@ -97,22 +97,23 @@ export default function MatchupsPanel({
           // Gradient colors (TW palette equivalents):
           // green-500 = rgb(34,197,94), red-500 = rgb(239,68,68)
           // neutral tie color (indigo-500-ish) = rgb(99,102,241)
-          const GREEN = "34,197,94";
-          const RED   = "239,68,68";
-          const TIE   = "99,102,241";
+          // After: const winner = awayScore > homeScore ? "away" : homeScore > awayScore ? "home" : "tie";
 
-          const leftColor = winner === "away" ? GREEN : winner === "home" ? RED : TIE;
-          const rightColor = winner === "home" ? GREEN : winner === "away" ? RED : TIE;
+          const GREEN = "34,197,94"; // tailwind green-500
+          const RED   = "239,68,68"; // tailwind red-500
+          const TIE   = "99,102,241"; // optional neutral
 
-          // Two opposing gradients from center outward.
-          // Each fades to transparent a little past halfway, so “black hits about halfway”.
+          // 🔄 Reversed: (opposite of your snippet)
+          const leftColor  = winner === "away" ? RED : winner === "home" ? GREEN : TIE;
+          const rightColor = winner === "home" ? RED : winner === "away" ? GREEN : TIE;
+
           const gradientStyle: React.CSSProperties = {
             backgroundImage: `
-              linear-gradient(to left, rgba(${leftColor},0.4), rgba(0,0,0,0) 45%),
-              linear-gradient(to right, rgba(${rightColor},0.4), rgba(0,0,0,0) 45%)
+              linear-gradient(to left, rgba(${leftColor},0.35), rgba(0,0,0,0) 35%),
+              linear-gradient(to right, rgba(${rightColor},0.35), rgba(0,0,0,0) 35%)
             `,
-            backgroundBlendMode: "normal",
           };
+
 
           return (
             <div
