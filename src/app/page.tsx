@@ -1,15 +1,15 @@
-import Link from "next/link";
 import Image from "next/image";
 import CurrentWeekCard from "./components/CurrentWeekCard";
+import StandingsPanel from "./components/StandingsPanel";
+import MatchupsPanel from "./components/MatchupsPanel";
+import HomeTabs from "./components/HomeTabs";
+
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getSheets } from "@/lib/googleSheets";
+import { getSheets, fetchMatchupsData } from "@/lib/googleSheets";
 
 function normalizeDiscordId(v: unknown): string {
-  return String(v ?? "")
-    .trim()
-    .replace(/[<@!>]/g, "")
-    .replace(/\D/g, ""); // keep only digits
+  return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
 }
 
 export default async function HomePage() {
@@ -18,10 +18,7 @@ export default async function HomePage() {
 
   if (session?.user) {
     try {
-      const rawSessionId =
-        (session.user as any).discordId ??
-        (session.user as any).id;
-
+      const rawSessionId = (session.user as any).discordId ?? (session.user as any).id;
       const sessionId = normalizeDiscordId(rawSessionId);
 
       if (sessionId) {
@@ -53,6 +50,9 @@ export default async function HomePage() {
     }
   }
 
+  // 🔹 Fetch matchups on the server and pass as plain JSON to the client panel
+  const { weekTab, matches } = await fetchMatchupsData();
+
   return (
     <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
       {/* Subtle animated glow background */}
@@ -80,37 +80,13 @@ export default async function HomePage() {
           {/* Dynamic greeting */}
           <p className="text-zinc-300 text-lg font-medium">{message}</p>
 
-          <div className="flex flex-wrap justify-center gap-4 mt-3">
-      
-            {/* Reusable ghost → gradient button */}
-            <Link
-              href="/standings"
-              className="group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
-            >
-              {/* Gradient layer (hidden until hover) */}
-              <span className="pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500"></span>
-              {/* Make the border fade out on hover so the gradient is clean */}
-              <span className="pointer-events-none absolute inset-0 rounded-xl transition-colors duration-300 group-hover:border-transparent"></span>
-              {/* Label stays above gradient */}
-              <span className="relative z-10">View Standings</span>
-            </Link>
-
-            <Link
-              href="/report"
-              className="group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
-            >
-              <span className="pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500"></span>
-              <span className="pointer-events-none absolute inset-0 rounded-xl transition-colors duration-300 group-hover:border-transparent"></span>
-              <span className="relative z-10">Report a Game</span>
-            </Link>
-          </div>
-
+          {/* Tabs + Panels */}
+          <HomeTabs
+            currentWeekPanel={<CurrentWeekCard />}
+            matchupsPanel={<MatchupsPanel data={matches} weekLabel={weekTab} />}
+            standingsPanel={<StandingsPanel />}
+          />
         </div>
-      </section>
-
-      {/* Current Week only */}
-      <section className="relative max-w-6xl mx-auto px-6 pb-24">
-        <CurrentWeekCard />
       </section>
     </main>
   );
