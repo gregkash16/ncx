@@ -93,22 +93,26 @@ export default function MatchupsPanel({
           const awayLogo = `/logos/${teamSlug(row.awayTeam)}.png`;
           const homeLogo = `/logos/${teamSlug(row.homeTeam)}.png`;
 
+          // Points instead of wins
+          const awayScore = parseIntSafe(row.awayPts);
+          const homeScore = parseIntSafe(row.homePts);
+
           return (
             <div
               key={`${row.game}-${i}`}
               className="relative p-5 rounded-xl bg-zinc-950/50 border border-zinc-800 hover:border-purple-500/40 transition"
             >
-              {/* Game # badge (top-left corner) */}
+              {/* Game # badge */}
               <div className="absolute -top-3 -left-3">
                 <span
-                    className={[
+                  className={[
                     "inline-flex items-center rounded-lg text-white text-xs font-bold px-2 py-1 shadow-lg",
                     isDone
-                        ? "bg-cyan-500/90 shadow-cyan-500/30" // vaporwave blue for completed
-                        : "bg-pink-600/80 shadow-pink-600/30", // default for pending
-                    ].join(" ")}
+                      ? "bg-cyan-500/90 shadow-cyan-500/30"
+                      : "bg-pink-600/80 shadow-pink-600/30",
+                  ].join(" ")}
                 >
-                    GAME {row.game}
+                  GAME {row.game}
                 </span>
               </div>
 
@@ -126,24 +130,36 @@ export default function MatchupsPanel({
                       unoptimized
                     />
                   </div>
-                  <span className={`truncate ${awayWinner ? "text-pink-400 font-bold" : "text-zinc-300"}`}>
+                  <span
+                    className={`truncate ${
+                      awayScore > homeScore
+                        ? "text-pink-400 font-bold"
+                        : "text-zinc-300"
+                    }`}
+                  >
                     {row.awayTeam || "TBD"}
                   </span>
                 </div>
 
-                {/* Scenario + Score */}
+                {/* Scenario + Points */}
                 <div className="flex flex-col items-center w-1/3">
                   <span className="text-sm text-zinc-400 mb-1 italic">
                     {row.scenario || "No Scenario"}
                   </span>
                   <div className="text-xl font-mono">
-                    {awayWins}:{homeWins}
+                    {awayScore}:{homeScore}
                   </div>
                 </div>
 
                 {/* Home */}
                 <div className="flex items-center gap-3 justify-end w-1/3 min-w-0">
-                  <span className={`truncate text-right ${homeWinner ? "text-cyan-400 font-bold" : "text-zinc-300"}`}>
+                  <span
+                    className={`truncate text-right ${
+                      homeScore > awayScore
+                        ? "text-cyan-400 font-bold"
+                        : "text-zinc-300"
+                    }`}
+                  >
                     {row.homeTeam || "TBD"}
                   </span>
                   <div className="w-[32px] h-[32px] rounded-md overflow-hidden bg-zinc-800 border border-zinc-700 flex items-center justify-center">
@@ -159,10 +175,12 @@ export default function MatchupsPanel({
                 </div>
               </div>
 
-              {/* Player names + prominent NCX IDs */}
+              {/* Player names */}
               <div className="mt-2 text-sm text-zinc-200 grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-pink-400 font-semibold">{row.awayName || "—"}</span>
+                  <span className="text-pink-400 font-semibold">
+                    {row.awayName || "—"}
+                  </span>
                   {row.awayId ? (
                     <span className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono">
                       {row.awayId}
@@ -175,23 +193,49 @@ export default function MatchupsPanel({
                       {row.homeId}
                     </span>
                   ) : null}
-                  <span className="text-cyan-400 font-semibold text-right">{row.homeName || "—"}</span>
+                  <span className="text-cyan-400 font-semibold text-right">
+                    {row.homeName || "—"}
+                  </span>
                 </div>
               </div>
 
               {/* Full stats line */}
               <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-zinc-400">
                 <div className="bg-zinc-800/60 rounded-lg px-3 py-2">
-                  <div>W: <span className="text-zinc-100">{row.awayW || "0"}</span></div>
-                  <div>L: <span className="text-zinc-100">{row.awayL || "0"}</span></div>
-                  <div>PTS: <span className="text-zinc-100">{row.awayPts || "0"}</span></div>
-                  <div>PL/MS: <span className="text-zinc-100">{row.awayPLMS || "0"}</span></div>
+                  <div>
+                    W: <span className="text-zinc-100">{row.awayW || "0"}</span>
+                  </div>
+                  <div>
+                    L: <span className="text-zinc-100">{row.awayL || "0"}</span>
+                  </div>
+                  <div>
+                    PTS:{" "}
+                    <span className="text-zinc-100">{row.awayPts || "0"}</span>
+                  </div>
+                  <div>
+                    PL/MS:{" "}
+                    <span className="text-zinc-100">
+                      {row.awayPLMS || "0"}
+                    </span>
+                  </div>
                 </div>
                 <div className="bg-zinc-800/60 rounded-lg px-3 py-2 text-right">
-                  <div>W: <span className="text-zinc-100">{row.homeW || "0"}</span></div>
-                  <div>L: <span className="text-zinc-100">{row.homeL || "0"}</span></div>
-                  <div>PTS: <span className="text-zinc-100">{row.homePts || "0"}</span></div>
-                  <div>PL/MS: <span className="text-zinc-100">{row.homePLMS || "0"}</span></div>
+                  <div>
+                    W: <span className="text-zinc-100">{row.homeW || "0"}</span>
+                  </div>
+                  <div>
+                    L: <span className="text-zinc-100">{row.homeL || "0"}</span>
+                  </div>
+                  <div>
+                    PTS:{" "}
+                    <span className="text-zinc-100">{row.homePts || "0"}</span>
+                  </div>
+                  <div>
+                    PL/MS:{" "}
+                    <span className="text-zinc-100">
+                      {row.homePLMS || "0"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
