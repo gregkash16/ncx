@@ -165,8 +165,8 @@ export default function MatchupsPanel({
 
           const gradientStyle: React.CSSProperties = {
             backgroundImage: `
-              linear-gradient(to left, rgba(${leftColor},0.35), rgba(0,0,0,0) 25%),
-              linear-gradient(to right, rgba(${rightColor},0.35), rgba(0,0,0,0) 25%)
+              linear-gradient(to right, rgba(${leftColor},0.35) 0%, rgba(0,0,0,0) 25%),
+              linear-gradient(to left,  rgba(${rightColor},0.35) 0%, rgba(0,0,0,0) 25%)
             `,
           };
 
