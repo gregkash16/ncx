@@ -187,3 +187,71 @@ export async function fetchIndStatsData(): Promise<IndRow[]> {
       predLosses: r[21] ?? "",
     }));
 }
+
+// --- STREAM SCHEDULE FETCHER ---
+
+export type StreamSchedule = {
+  scheduleWeek: string; // value from M3
+  scheduleMap: Record<
+    string, // game number as text, e.g. "13"
+    { day: string; slot: string } // e.g. { day: "THURSDAY", slot: "GAME 1" }
+  >;
+};
+
+/**
+ * Reads:
+ *  - M3 (current stream week)
+ *  - A2:I50 (rows with Day, Game slot, Game number, etc.)
+ *
+ * Expected layout:
+ *  - Rows 2-4: TUESDAY
+ *  - Rows 6-8: THURSDAY
+ *  - A: Day, B: Slot ("Game 1"..."Game 3"), C: Game number (matches MatchupsPanel game)
+ */
+export async function fetchStreamSchedule(): Promise<StreamSchedule> {
+  const sheets = getSheets();
+
+  const sheetId =
+    process.env.STREAM_SCHEDULE_SHEET_ID ||
+    process.env.NCX_STREAM_SCHEDULE_SHEET_ID;
+
+  if (!sheetId) {
+    throw new Error(
+      "Missing STREAM_SCHEDULE_SHEET_ID (or NCX_STREAM_SCHEDULE_SHEET_ID)"
+    );
+  }
+
+  const [m3Resp, gridResp] = await Promise.all([
+    sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: "M3",
+      valueRenderOption: "FORMATTED_VALUE",
+    }),
+    sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: "A2:I50", // buffer that includes rows 2–8
+      valueRenderOption: "FORMATTED_VALUE",
+    }),
+  ]);
+
+  const scheduleWeek =
+    (m3Resp.data.values?.[0]?.[0] ?? "").toString().trim();
+
+  const rows = gridResp.data.values ?? [];
+  const scheduleMap: StreamSchedule["scheduleMap"] = {};
+
+  for (const r of rows) {
+    const day = (r?.[0] ?? "").toString().trim();  // A
+    const slot = (r?.[1] ?? "").toString().trim(); // B (e.g. "Game 1")
+    const game = (r?.[2] ?? "").toString().trim(); // C (e.g. "13")
+
+    if (!day || !slot || !game) continue;
+
+    scheduleMap[game] = {
+      day: day.toUpperCase(),               // "TUESDAY" / "THURSDAY"
+      slot: slot.toUpperCase(),             // "GAME 1" / "GAME 2" / "GAME 3"
+    };
+  }
+
+  return { scheduleWeek, scheduleMap };
+}

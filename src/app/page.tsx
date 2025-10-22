@@ -8,10 +8,18 @@ import HomeTabs from "./components/HomeTabs";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getSheets, fetchMatchupsData, fetchIndStatsData } from "@/lib/googleSheets";
+import {
+  getSheets,
+  fetchMatchupsData,
+  fetchIndStatsData,
+  fetchStreamSchedule, // ⬅️ add this helper in googleSheets.ts as we discussed
+} from "@/lib/googleSheets";
 
 function normalizeDiscordId(v: unknown): string {
-  return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
+  return String(v ?? "")
+    .trim()
+    .replace(/[<@!>]/g, "")
+    .replace(/\D/g, "");
 }
 
 export default async function HomePage() {
@@ -20,7 +28,8 @@ export default async function HomePage() {
 
   if (session?.user) {
     try {
-      const rawSessionId = (session.user as any).discordId ?? (session.user as any).id;
+      const rawSessionId =
+        (session.user as any).discordId ?? (session.user as any).id;
       const sessionId = normalizeDiscordId(rawSessionId);
 
       if (sessionId) {
@@ -52,9 +61,15 @@ export default async function HomePage() {
     }
   }
 
-  // Server fetches for tabs
-  const { weekTab, matches } = await fetchMatchupsData();
-  const indStats = await fetchIndStatsData();
+  // Server fetches for tabs (concurrent)
+  const [{ weekTab, matches }, indStats, streamSched] = await Promise.all([
+    fetchMatchupsData(),   // SCHEDULE!U2 + WEEK!A2:Q120
+    fetchIndStatsData(),   // INDIVIDUAL!A2:V
+    fetchStreamSchedule().catch(() => ({
+      scheduleWeek: "",
+      scheduleMap: {} as Record<string, { day: string; slot: string }>,
+    })), // stream schedule is optional; fail-soft
+  ]);
 
   return (
     <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
@@ -88,13 +103,20 @@ export default async function HomePage() {
       <section className="w-full px-4 pb-24">
         <div className="w-full max-w-[110rem] mx-auto">
           <HomeTabs
-            currentWeekPanel={<><CurrentWeekCard key="current-week" /></>}
-            matchupsPanel={<><MatchupsPanel key="matchups" data={matches} weekLabel={weekTab} /></>}
-            standingsPanel={<><StandingsPanel key="standings" /></>}
-            indStatsPanel={<><IndStatsPanel key="indstats" data={indStats ?? []} /></>}
-            reportPanel={<><ReportPanel key="report" /></>} // ✅ give this one a key too
+            currentWeekPanel={<CurrentWeekCard key="current-week" />}
+            matchupsPanel={
+              <MatchupsPanel
+                key="matchups"
+                data={matches}
+                weekLabel={weekTab}
+                scheduleWeek={streamSched.scheduleWeek} // M3 from stream sheet
+                scheduleMap={streamSched.scheduleMap}   // { "13": { day, slot }, ... }
+              />
+            }
+            standingsPanel={<StandingsPanel key="standings" />}
+            indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
+            reportPanel={<ReportPanel key="report" />}
           />
-
         </div>
       </section>
     </main>

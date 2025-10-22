@@ -23,6 +23,11 @@ type MatchRow = {
   scenario: string;
 };
 
+type ScheduleMap = Record<
+  string,
+  { day: string; slot: string } // e.g. { day: "THURSDAY", slot: "GAME 1" }
+>;
+
 function teamSlug(name: string) {
   return name
     .toLowerCase()
@@ -37,32 +42,26 @@ function parseIntSafe(v: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// Choose ONE team term from q by checking against actual team names in rows.
-// Prefers exact slug match; falls back to first token if nothing matches.
+/** Choose ONE team from q by checking against actual team names. */
 function pickTeamFilter(q: string, rows: MatchRow[]): string {
   const tokens = (q || "")
     .split(/[+\s]+/g)
     .map((t) => t.trim())
     .filter(Boolean);
-
   if (!tokens.length) return "";
 
   const allTeams = Array.from(
-    new Set(
-      rows.flatMap((r) => [r.awayTeam, r.homeTeam]).filter(Boolean) as string[]
-    )
+    new Set(rows.flatMap((r) => [r.awayTeam, r.homeTeam]).filter(Boolean) as string[])
   );
-
   const teamBySlug = new Map(allTeams.map((t) => [teamSlug(t), t]));
 
-  // 1) Try exact slug match
+  // 1) exact slug match
   for (const tok of tokens) {
     const s = teamSlug(tok);
     const exact = teamBySlug.get(s);
-    if (exact) return exact; // use canonical team name
+    if (exact) return exact;
   }
-
-  // 2) Try substring slug match (token within team or team within token)
+  // 2) substring slug match
   for (const tok of tokens) {
     const s = teamSlug(tok);
     const found = allTeams.find((t) => {
@@ -71,27 +70,30 @@ function pickTeamFilter(q: string, rows: MatchRow[]): string {
     });
     if (found) return found;
   }
-
-  // 3) Fallback: just use first token as-is
+  // 3) fallback: first token
   return tokens[0];
 }
 
 export default function MatchupsPanel({
   data,
   weekLabel,
+  scheduleWeek,
+  scheduleMap,
 }: {
   data: MatchRow[];
   weekLabel?: string;
+  scheduleWeek?: string;
+  scheduleMap?: ScheduleMap;
 }) {
   const searchParams = useSearchParams();
   const urlQRaw = (searchParams.get("q") ?? "").trim();
 
-  // Cleaned rows (drop non-game/header rows)
+  // Clean the incoming data
   const cleaned = useMemo(() => {
     return (data || []).filter((m) => /^\d+$/.test((m.game || "").trim()));
   }, [data]);
 
-  // Derive a single-team filter from url ?q= (if present)
+  // Derive a single-team filter from URL ?q=
   const urlSelectedTeam = useMemo(() => {
     if (!urlQRaw) return "";
     return pickTeamFilter(urlQRaw, cleaned);
@@ -99,7 +101,7 @@ export default function MatchupsPanel({
 
   const [query, setQuery] = useState(urlSelectedTeam);
 
-  // Keep input synced with URL-derived team if URL changes
+  // Keep input synced if the URL changes (clicking a different series)
   useEffect(() => {
     setQuery(urlSelectedTeam);
   }, [urlSelectedTeam]);
@@ -107,22 +109,19 @@ export default function MatchupsPanel({
   const filtered = useMemo(() => {
     const q = (query || "").toLowerCase().trim();
     if (!q) return cleaned;
-
-    // Filter by ANY field containing the single chosen team string
     return cleaned.filter((m) =>
       [
-        m.awayId,
-        m.homeId,
-        m.awayName,
-        m.homeName,
-        m.awayTeam,
-        m.homeTeam,
-        m.scenario,
+        m.awayId, m.homeId, m.awayName, m.homeName,
+        m.awayTeam, m.homeTeam, m.scenario,
       ]
         .filter(Boolean)
         .some((v) => v.toLowerCase().includes(q))
     );
   }, [cleaned, query]);
+
+  const scheduleEnabled =
+    Boolean(weekLabel && scheduleWeek) &&
+    weekLabel!.trim() === scheduleWeek!.trim();
 
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
@@ -144,7 +143,7 @@ export default function MatchupsPanel({
 
       <div className="space-y-6">
         {filtered.map((row, i) => {
-          // Winner logic based on POINTS (not series wins)
+          // Points-based winner
           const awayScore = parseIntSafe(row.awayPts);
           const homeScore = parseIntSafe(row.homePts);
           const isDone = Boolean((row.scenario || "").trim());
@@ -155,12 +154,12 @@ export default function MatchupsPanel({
           const awayLogo = `/logos/${teamSlug(row.awayTeam)}.png`;
           const homeLogo = `/logos/${teamSlug(row.homeTeam)}.png`;
 
-          // Colors (Tailwind-ish)
-          const GREEN = "34,197,94"; // green-500
-          const RED   = "239,68,68"; // red-500
-          const TIE   = "99,102,241"; // neutral
+          // Colors
+          const GREEN = "34,197,94"; // loser
+          const RED   = "239,68,68"; // winner
+          const TIE   = "99,102,241";
 
-          // Winner RED, loser GREEN (your current reversed mapping)
+          // Winner RED, loser GREEN (your current mapping)
           const leftColor  = winner === "away" ? RED : winner === "home" ? GREEN : TIE;
           const rightColor = winner === "home" ? RED : winner === "away" ? GREEN : TIE;
 
@@ -171,13 +170,19 @@ export default function MatchupsPanel({
             `,
           };
 
+          // Optional schedule badge bits
+          const sched =
+            scheduleEnabled && scheduleMap?.[row.game]
+              ? ` — ${scheduleMap[row.game].day.toUpperCase()}, ${scheduleMap[row.game].slot.toUpperCase()}`
+              : "";
+
           return (
             <div
               key={`${row.game}-${i}`}
               className="relative p-5 rounded-xl bg-zinc-950/50 border border-zinc-800 hover:border-purple-500/40 transition"
               style={gradientStyle}
             >
-              {/* Game # badge */}
+              {/* Game # badge (+ stream schedule info if available) */}
               <div className="absolute -top-3 -left-3">
                 <span
                   className={[
@@ -186,8 +191,9 @@ export default function MatchupsPanel({
                       ? "bg-cyan-500/90 shadow-cyan-500/30"
                       : "bg-pink-600/80 shadow-pink-600/30",
                   ].join(" ")}
+                  title={sched ? sched.replace(/^ — /, "") : undefined}
                 >
-                  GAME {row.game}
+                  {`GAME ${row.game}${sched}`}
                 </span>
               </div>
 
