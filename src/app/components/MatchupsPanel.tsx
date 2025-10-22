@@ -83,26 +83,44 @@ export default function MatchupsPanel({
 
       <div className="space-y-6">
         {filtered.map((row, i) => {
-          const awayWins = parseIntSafe(row.awayW);
-          const homeWins = parseIntSafe(row.homeW);
-          const seriesOver = awayWins >= 4 || homeWins >= 4;
-          const awayWinner = seriesOver && awayWins > homeWins;
-          const homeWinner = seriesOver && homeWins > awayWins;
+          // Winner logic based on POINTS (not series wins)
+          const awayScore = parseIntSafe(row.awayPts);
+          const homeScore = parseIntSafe(row.homePts);
           const isDone = Boolean((row.scenario || "").trim());
+          const winner =
+            awayScore > homeScore ? "away" :
+            homeScore > awayScore ? "home" : "tie";
 
           const awayLogo = `/logos/${teamSlug(row.awayTeam)}.png`;
           const homeLogo = `/logos/${teamSlug(row.homeTeam)}.png`;
 
-          // Points instead of wins
-          const awayScore = parseIntSafe(row.awayPts);
-          const homeScore = parseIntSafe(row.homePts);
+          // Gradient colors (TW palette equivalents):
+          // green-500 = rgb(34,197,94), red-500 = rgb(239,68,68)
+          // neutral tie color (indigo-500-ish) = rgb(99,102,241)
+          const GREEN = "34,197,94";
+          const RED   = "239,68,68";
+          const TIE   = "99,102,241";
+
+          const leftColor = winner === "away" ? GREEN : winner === "home" ? RED : TIE;
+          const rightColor = winner === "home" ? GREEN : winner === "away" ? RED : TIE;
+
+          // Two opposing gradients from center outward.
+          // Each fades to transparent a little past halfway, so “black hits about halfway”.
+          const gradientStyle: React.CSSProperties = {
+            backgroundImage: `
+              linear-gradient(to left, rgba(${leftColor},0.4), rgba(0,0,0,0) 45%),
+              linear-gradient(to right, rgba(${rightColor},0.4), rgba(0,0,0,0) 45%)
+            `,
+            backgroundBlendMode: "normal",
+          };
 
           return (
             <div
               key={`${row.game}-${i}`}
               className="relative p-5 rounded-xl bg-zinc-950/50 border border-zinc-800 hover:border-purple-500/40 transition"
+              style={gradientStyle}
             >
-              {/* Game # badge */}
+              {/* Game # badge (top-left corner) */}
               <div className="absolute -top-3 -left-3">
                 <span
                   className={[
@@ -117,7 +135,7 @@ export default function MatchupsPanel({
               </div>
 
               {/* Teams row */}
-              <div className="flex items-center justify-between font-semibold text-lg">
+              <div className="relative z-10 flex items-center justify-between font-semibold text-lg">
                 {/* Away */}
                 <div className="flex items-center gap-3 w-1/3 min-w-0">
                   <div className="w-[32px] h-[32px] rounded-md overflow-hidden bg-zinc-800 border border-zinc-700 flex items-center justify-center">
@@ -132,16 +150,14 @@ export default function MatchupsPanel({
                   </div>
                   <span
                     className={`truncate ${
-                      awayScore > homeScore
-                        ? "text-pink-400 font-bold"
-                        : "text-zinc-300"
+                      awayScore > homeScore ? "text-pink-400 font-bold" : "text-zinc-300"
                     }`}
                   >
                     {row.awayTeam || "TBD"}
                   </span>
                 </div>
 
-                {/* Scenario + Points */}
+                {/* Scenario + Points (center) */}
                 <div className="flex flex-col items-center w-1/3">
                   <span className="text-sm text-zinc-400 mb-1 italic">
                     {row.scenario || "No Scenario"}
@@ -155,9 +171,7 @@ export default function MatchupsPanel({
                 <div className="flex items-center gap-3 justify-end w-1/3 min-w-0">
                   <span
                     className={`truncate text-right ${
-                      homeScore > awayScore
-                        ? "text-cyan-400 font-bold"
-                        : "text-zinc-300"
+                      homeScore > awayScore ? "text-cyan-400 font-bold" : "text-zinc-300"
                     }`}
                   >
                     {row.homeTeam || "TBD"}
@@ -175,12 +189,10 @@ export default function MatchupsPanel({
                 </div>
               </div>
 
-              {/* Player names */}
-              <div className="mt-2 text-sm text-zinc-200 grid grid-cols-2 gap-3">
+              {/* Player names + NCX IDs */}
+              <div className="relative z-10 mt-2 text-sm text-zinc-200 grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-pink-400 font-semibold">
-                    {row.awayName || "—"}
-                  </span>
+                  <span className="text-pink-400 font-semibold">{row.awayName || "—"}</span>
                   {row.awayId ? (
                     <span className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono">
                       {row.awayId}
@@ -193,49 +205,23 @@ export default function MatchupsPanel({
                       {row.homeId}
                     </span>
                   ) : null}
-                  <span className="text-cyan-400 font-semibold text-right">
-                    {row.homeName || "—"}
-                  </span>
+                  <span className="text-cyan-400 font-semibold text-right">{row.homeName || "—"}</span>
                 </div>
               </div>
 
               {/* Full stats line */}
-              <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-zinc-400">
+              <div className="relative z-10 mt-3 grid grid-cols-2 gap-3 text-xs text-zinc-400">
                 <div className="bg-zinc-800/60 rounded-lg px-3 py-2">
-                  <div>
-                    W: <span className="text-zinc-100">{row.awayW || "0"}</span>
-                  </div>
-                  <div>
-                    L: <span className="text-zinc-100">{row.awayL || "0"}</span>
-                  </div>
-                  <div>
-                    PTS:{" "}
-                    <span className="text-zinc-100">{row.awayPts || "0"}</span>
-                  </div>
-                  <div>
-                    PL/MS:{" "}
-                    <span className="text-zinc-100">
-                      {row.awayPLMS || "0"}
-                    </span>
-                  </div>
+                  <div>W: <span className="text-zinc-100">{row.awayW || "0"}</span></div>
+                  <div>L: <span className="text-zinc-100">{row.awayL || "0"}</span></div>
+                  <div>PTS: <span className="text-zinc-100">{row.awayPts || "0"}</span></div>
+                  <div>PL/MS: <span className="text-zinc-100">{row.awayPLMS || "0"}</span></div>
                 </div>
                 <div className="bg-zinc-800/60 rounded-lg px-3 py-2 text-right">
-                  <div>
-                    W: <span className="text-zinc-100">{row.homeW || "0"}</span>
-                  </div>
-                  <div>
-                    L: <span className="text-zinc-100">{row.homeL || "0"}</span>
-                  </div>
-                  <div>
-                    PTS:{" "}
-                    <span className="text-zinc-100">{row.homePts || "0"}</span>
-                  </div>
-                  <div>
-                    PL/MS:{" "}
-                    <span className="text-zinc-100">
-                      {row.homePLMS || "0"}
-                    </span>
-                  </div>
+                  <div>W: <span className="text-zinc-100">{row.homeW || "0"}</span></div>
+                  <div>L: <span className="text-zinc-100">{row.homeL || "0"}</span></div>
+                  <div>PTS: <span className="text-zinc-100">{row.homePts || "0"}</span></div>
+                  <div>PL/MS: <span className="text-zinc-100">{row.homePLMS || "0"}</span></div>
                 </div>
               </div>
             </div>
