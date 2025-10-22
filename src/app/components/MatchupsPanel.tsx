@@ -154,19 +154,19 @@ export default function MatchupsPanel({
           const awayLogo = `/logos/${teamSlug(row.awayTeam)}.png`;
           const homeLogo = `/logos/${teamSlug(row.homeTeam)}.png`;
 
-          // Colors
-          const GREEN = "34,197,94"; // loser
-          const RED   = "239,68,68"; // winner
-          const TIE   = "99,102,241";
+          // Colors (winner = GREEN, loser = RED)
+          const GREEN = "34,197,94";   // tailwind green-500
+          const RED   = "239,68,68";   // tailwind red-500
+          const TIE   = "99,102,241";  // indigo-ish
 
-          // Winner RED, loser GREEN (your current mapping)
-          const leftColor  = winner === "away" ? RED : winner === "home" ? GREEN : TIE;
-          const rightColor = winner === "home" ? RED : winner === "away" ? GREEN : TIE;
+          // ✅ Winner GREEN, loser RED
+          const leftColor  = winner === "away" ? GREEN : winner === "home" ? RED : TIE;
+          const rightColor = winner === "home" ? GREEN : winner === "away" ? RED : TIE;
 
           const gradientStyle: React.CSSProperties = {
             backgroundImage: `
-              linear-gradient(to left, rgba(${leftColor},0.35), rgba(0,0,0,0) 35%),
-              linear-gradient(to right, rgba(${rightColor},0.35), rgba(0,0,0,0) 35%)
+              linear-gradient(to left, rgba(${leftColor},0.35), rgba(0,0,0,0) 25%),
+              linear-gradient(to right, rgba(${rightColor},0.35), rgba(0,0,0,0) 25%)
             `,
           };
 

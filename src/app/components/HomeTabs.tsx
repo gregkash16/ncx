@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, isValidElement, cloneElement, ReactElement } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import React, {
+  useState,
+  isValidElement,
+  cloneElement,
+  ReactElement,
+  useEffect,
+} from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type TabKey = "current" | "matchups" | "standings" | "report" | "indstats";
 
+/** The only extra prop we inject into the Report panel */
 type ReportPanelLikeProps = {
   goToTab?: (key: TabKey) => void;
 };
@@ -14,6 +21,7 @@ type HomeTabsProps = {
   matchupsPanel?: React.ReactNode;
   standingsPanel?: React.ReactNode;
   indStatsPanel?: React.ReactNode;
+  /** Type this as a ReactElement so we can safely clone with the extra prop */
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
 };
 
@@ -25,14 +33,16 @@ export default function HomeTabs({
   reportPanel,
 }: HomeTabsProps) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const router = useRouter();
 
-  const urlTab = (searchParams.get("tab") as TabKey | null) ?? null;
-  const [active, setActive] = useState<TabKey>(urlTab ?? "current");
+  // ---- State: active tab
+  const urlTab = (searchParams.get("tab") as TabKey) || "current";
+  const [active, setActive] = useState<TabKey>(urlTab);
 
-  // Keep active tab in sync with URL (when clicking a matchup link)
+  // ---- Keep active in sync if URL changes externally (e.g., link click from CurrentWeekCard)
   useEffect(() => {
-    if (urlTab && urlTab !== active) setActive(urlTab);
+    if (urlTab !== active) setActive(urlTab);
   }, [urlTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const btnBase =
@@ -43,16 +53,42 @@ export default function HomeTabs({
 
   const isActive = (key: TabKey) => active === key;
 
-  // Update the URL when user clicks buttons (keep existing ?q= if present)
+  // ---- When active changes (from button OR URL), keep URL in sync
+  useEffect(() => {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+
+    // reflect current tab (omit for "current" if you prefer a clean root)
+    if (active === "current") params.delete("tab");
+    else params.set("tab", active);
+
+    // if not on matchups, nuke q so it won't linger
+    if (active !== "matchups") params.delete("q");
+
+    const next = params.toString();
+    const href = next ? `${pathname}?${next}` : pathname;
+
+    // Only push a replace if something actually changed
+    const curr = searchParams.toString();
+    if (curr !== next) {
+      router.replace(href, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]); // depend just on active to avoid loops
+
+  // ---- Button click handler (internal tab navigation)
   function goToTab(key: TabKey) {
-    const q = searchParams.get("q");
-    const usp = new URLSearchParams(searchParams.toString());
-    usp.set("tab", key);
-    if (q) usp.set("q", q); else usp.delete("q");
-    router.replace(`?${usp.toString()}`, { scroll: false });
+    // If opening Matchups via the tab button, start clean (clear q)
+    if (key === "matchups") {
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      params.set("tab", "matchups");
+      params.delete("q");
+      const href = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+      router.replace(href, { scroll: false });
+    }
     setActive(key);
   }
 
+  // Inject goToTab into the report panel (only if it’s a valid element)
   const reportWithProp =
     reportPanel && isValidElement<ReportPanelLikeProps>(reportPanel)
       ? cloneElement(reportPanel, { goToTab })
@@ -62,13 +98,13 @@ export default function HomeTabs({
     <div className="w-full">
       {/* Tab Buttons */}
       <div className="flex flex-wrap justify-center gap-4 mt-3 mb-4">
-        {([
+        {[
           { key: "current" as const, label: "Current Week" },
           { key: "matchups" as const, label: "Matchups" },
           { key: "standings" as const, label: "Standings" },
           { key: "indstats" as const, label: "Ind. Stats" },
           { key: "report" as const, label: "Report a Game" },
-        ]).map(({ key, label }) => (
+        ].map(({ key, label }) => (
           <button
             key={key}
             type="button"
@@ -85,7 +121,7 @@ export default function HomeTabs({
         ))}
       </div>
 
-      {/* Panels */}
+      {/* Panels – container adapts per tab */}
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
           active === "indstats" ? "w-full max-w-[115rem]" : "max-w-6xl"

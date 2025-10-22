@@ -1,4 +1,5 @@
 import { google, sheets_v4 } from "googleapis";
+import { unstable_cache } from "next/cache";
 
 /**
  * Build an authenticated Google Sheets client using a service account.
@@ -28,7 +29,38 @@ export function getSheets(): sheets_v4.Sheets {
   return google.sheets({ version: "v4", auth: jwt });
 }
 
-/** A single matchup row from the WEEK sheet */
+/** ---------- Utility ---------- */
+
+function norm(v: unknown): string {
+  return String(v ?? "").trim();
+}
+
+function normalizeDiscordId(v: unknown): string {
+  return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
+}
+
+/** tiny 429 retry/backoff */
+async function withBackoff<T>(
+  fn: () => Promise<T>,
+  tries = 4,
+  base = 250
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (e: any) {
+    const is429 = e?.code === 429 || e?.response?.status === 429;
+    if (is429 && tries > 1) {
+      const jitter = Math.floor(Math.random() * 150);
+      const delay = base * Math.pow(2, 4 - tries) + jitter; // 250, 500, 1000...
+      await new Promise((r) => setTimeout(r, delay));
+      return withBackoff(fn, tries - 1, base);
+    }
+    throw e;
+  }
+}
+
+/** ---------- Matchups (week) ---------- */
+
 export type MatchRow = {
   game: string;
   awayId: string;
@@ -55,10 +87,6 @@ export type MatchupsData = {
   matches: MatchRow[];
 };
 
-function norm(v: unknown): string {
-  return String(v ?? "").trim();
-}
-
 /**
  * Reads SCHEDULE!U2 to discover the active week tab (e.g. "WEEK 3"),
  * then loads that tab's A2:Q120 and returns normalized match rows.
@@ -66,24 +94,26 @@ function norm(v: unknown): string {
 export async function fetchMatchupsData(): Promise<MatchupsData> {
   const sheets = getSheets();
   const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-  if (!spreadsheetId) {
-    throw new Error("Missing NCX_LEAGUE_SHEET_ID");
-  }
+  if (!spreadsheetId) throw new Error("Missing NCX_LEAGUE_SHEET_ID");
 
   // 1) Active week tab name from SCHEDULE!U2
-  const weekRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "SCHEDULE!U2",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
+  const weekRes = await withBackoff(() =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "SCHEDULE!U2",
+      valueRenderOption: "FORMATTED_VALUE",
+    })
+  );
   const weekTab = norm(weekRes.data.values?.[0]?.[0]) || "WEEK 1";
 
   // 2) Week data A2:Q120
-  const dataRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${weekTab}!A2:Q120`,
-    valueRenderOption: "FORMATTED_VALUE",
-  });
+  const dataRes = await withBackoff(() =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${weekTab}!A2:Q120`,
+      valueRenderOption: "FORMATTED_VALUE",
+    })
+  );
   const rows = dataRes.data.values || [];
 
   // 3) Normalize and filter
@@ -124,7 +154,15 @@ export async function fetchMatchupsData(): Promise<MatchupsData> {
   return { weekTab, matches };
 }
 
-// --- INDIVIDUAL STATS FETCHER ---
+/** Cached wrapper (reduces quota). Revalidates every 60s. */
+export const fetchMatchupsDataCached = unstable_cache(
+  async () => fetchMatchupsData(),
+  ["matchups-data"],
+  { revalidate: 60 }
+);
+
+/** ---------- Individual stats ---------- */
+
 export type IndRow = {
   rank: string;
   ncxid: string;
@@ -153,11 +191,13 @@ export type IndRow = {
 export async function fetchIndStatsData(): Promise<IndRow[]> {
   const sheets = getSheets();
   const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "INDIVIDUAL!A2:V",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
+  const res = await withBackoff(() =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "INDIVIDUAL!A2:V",
+      valueRenderOption: "FORMATTED_VALUE",
+    })
+  );
 
   const rows = res.data.values ?? [];
   return rows
@@ -188,7 +228,14 @@ export async function fetchIndStatsData(): Promise<IndRow[]> {
     }));
 }
 
-// --- STREAM SCHEDULE FETCHER ---
+/** Cached wrapper. Revalidates every 5 min. */
+export const fetchIndStatsDataCached = unstable_cache(
+  async () => fetchIndStatsData(),
+  ["indstats-data"],
+  { revalidate: 300 }
+);
+
+/** ---------- Stream schedule (M3 + A2:I) ---------- */
 
 export type StreamSchedule = {
   scheduleWeek: string; // value from M3
@@ -222,36 +269,86 @@ export async function fetchStreamSchedule(): Promise<StreamSchedule> {
   }
 
   const [m3Resp, gridResp] = await Promise.all([
-    sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: "M3",
-      valueRenderOption: "FORMATTED_VALUE",
-    }),
-    sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: "A2:I50", // buffer that includes rows 2–8
-      valueRenderOption: "FORMATTED_VALUE",
-    }),
+    withBackoff(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: "M3",
+        valueRenderOption: "FORMATTED_VALUE",
+      })
+    ),
+    withBackoff(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: "A2:I50", // buffer that includes rows 2–8
+        valueRenderOption: "FORMATTED_VALUE",
+      })
+    ),
   ]);
 
-  const scheduleWeek =
-    (m3Resp.data.values?.[0]?.[0] ?? "").toString().trim();
+  const scheduleWeek = (m3Resp.data.values?.[0]?.[0] ?? "").toString().trim();
 
   const rows = gridResp.data.values ?? [];
   const scheduleMap: StreamSchedule["scheduleMap"] = {};
 
   for (const r of rows) {
-    const day = (r?.[0] ?? "").toString().trim();  // A
+    const day = (r?.[0] ?? "").toString().trim(); // A
     const slot = (r?.[1] ?? "").toString().trim(); // B (e.g. "Game 1")
     const game = (r?.[2] ?? "").toString().trim(); // C (e.g. "13")
 
     if (!day || !slot || !game) continue;
 
     scheduleMap[game] = {
-      day: day.toUpperCase(),               // "TUESDAY" / "THURSDAY"
-      slot: slot.toUpperCase(),             // "GAME 1" / "GAME 2" / "GAME 3"
+      day: day.toUpperCase(), // "TUESDAY" / "THURSDAY"
+      slot: slot.toUpperCase(), // "GAME 1" / "GAME 2" / "GAME 3"
     };
   }
 
   return { scheduleWeek, scheduleMap };
 }
+
+/** Cached wrapper. Revalidates every 5 min. */
+export const fetchStreamScheduleCached = unstable_cache(
+  async () => {
+    try {
+      return await fetchStreamSchedule();
+    } catch {
+      // Fail-soft: if not configured, don't throw—return empty.
+      return { scheduleWeek: "", scheduleMap: {} as StreamSchedule["scheduleMap"] };
+    }
+  },
+  ["stream-schedule"],
+  { revalidate: 300 }
+);
+
+/** ---------- Discord map (for welcome banner) ---------- */
+// Return a plain object so unstable_cache can serialize it
+export const getDiscordMapCached = unstable_cache(
+  async (): Promise<Record<string, { ncxid: string; first: string; last: string }>> => {
+    const sheets = getSheets();
+    const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
+    const res = await withBackoff(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: "Discord_ID!A:D",
+        valueRenderOption: "FORMATTED_VALUE",
+      })
+    );
+    const rows = res.data.values || [];
+
+    const obj: Record<string, { ncxid: string; first: string; last: string }> = {};
+    for (const r of rows) {
+      const ncxid = String(r?.[0] ?? "").trim();
+      const first  = String(r?.[1] ?? "").trim();
+      const last   = String(r?.[2] ?? "").trim();
+      const discRaw = String(r?.[3] ?? "");
+      const discordId = discRaw.trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
+      if (discordId) {
+        obj[discordId] = { ncxid, first, last };
+      }
+    }
+    return obj;
+  },
+  ["discord-map"],
+  { revalidate: 300 }
+);
+

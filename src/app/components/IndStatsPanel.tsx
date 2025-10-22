@@ -104,26 +104,31 @@ export default function IndStatsPanel({ data }: Props) {
           <table className="w-full table-auto">
             {/* Explicit widths (like a spreadsheet) so headers & cells always align */}
             <colgroup>
-              <col style={{ width: 48 }} />   {/* Rank */}
-              <col style={{ width: 88 }} />   {/* NCXID */}
-              <col style={{ width: 140 }} />  {/* First */}
-              <col style={{ width: 140 }} />  {/* Last */}
-              <col style={{ width: 72 }} />   {/* Pick */}
-              <col style={{ width: 220 }} />  {/* Team */}
-              <col style={{ width: 140 }} />  {/* Faction */}
-              <col style={{ width: 56 }} />   {/* W */}
-              <col style={{ width: 56 }} />   {/* L */}
-              <col style={{ width: 72 }} />   {/* Pts */}
-              <col style={{ width: 84 }} />   {/* PL/MS */}
-              <col style={{ width: 64 }} />   {/* GP */}
-              <col style={{ width: 76 }} />   {/* Win% */}
-              <col style={{ width: 72 }} />   {/* PPG */}
-              <col style={{ width: 72 }} />   {/* Eff */}
-              <col style={{ width: 72 }} />   {/* WAR */}
-              <col style={{ width: 72 }} />   {/* H2H */}
-              <col style={{ width: 76 }} />   {/* Potato */}
-              <col style={{ width: 72 }} />   {/* SOS */}
+              {[
+                { w: 48 },   // Rank
+                { w: 88 },   // NCXID
+                { w: 140 },  // First
+                { w: 140 },  // Last
+                { w: 80 },   // Pick
+                { w: 120 },  // Team
+                { w: 110 },  // Faction
+                { w: 72 },   // Wins
+                { w: 72 },   // Losses
+                { w: 84 },   // Points
+                { w: 84 },   // PL/MS
+                { w: 84 },   // Games
+                { w: 96 },   // Win%
+                { w: 84 },   // PPG
+                { w: 110 },  // Efficiency
+                { w: 84 },   // WAR
+                { w: 84 },   // H2H
+                { w: 84 },   // Potato
+                { w: 84 },   // SOS
+              ].map((c, i) => (
+                <col key={i} style={{ width: c.w }} />
+              ))}
             </colgroup>
+
 
             <thead className={headRowCls}>
               <tr>

@@ -1,3 +1,6 @@
+// Cache the rendered page for 60s so we don't re-hit Sheets every request
+export const revalidate = 60;
+
 import Image from "next/image";
 import CurrentWeekCard from "./components/CurrentWeekCard";
 import StandingsPanel from "./components/StandingsPanel";
@@ -9,10 +12,10 @@ import HomeTabs from "./components/HomeTabs";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import {
-  getSheets,
-  fetchMatchupsData,
-  fetchIndStatsData,
-  fetchStreamSchedule, // ⬅️ add this helper in googleSheets.ts as we discussed
+  getDiscordMapCached,
+  fetchMatchupsDataCached,
+  fetchIndStatsDataCached,
+  fetchStreamScheduleCached,
 } from "@/lib/googleSheets";
 
 function normalizeDiscordId(v: unknown): string {
@@ -33,21 +36,12 @@ export default async function HomePage() {
       const sessionId = normalizeDiscordId(rawSessionId);
 
       if (sessionId) {
-        const sheets = await getSheets();
-        const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-        const range = "Discord_ID!A:D";
-
-        const res = await sheets.spreadsheets.values.get({
-          spreadsheetId,
-          range,
-          valueRenderOption: "FORMATTED_VALUE",
-        });
-
-        const rows = res.data.values || [];
-        const match = rows.find((r) => normalizeDiscordId(r?.[3]) === sessionId);
+        // ✅ cached Discord map to avoid hammering Sheets
+        const discordMap = await getDiscordMapCached();
+        const match = discordMap[sessionId];  // ← instead of .get(sessionId)
 
         if (match) {
-          const [ncxid, first, last] = match;
+          const { ncxid, first, last } = match;
           message = `Welcome ${first} ${last}! – ${ncxid}`;
         } else {
           message = `Welcome ${session.user.name ?? "Pilot"}! – No NCXID Found.`;
@@ -61,14 +55,11 @@ export default async function HomePage() {
     }
   }
 
-  // Server fetches for tabs (concurrent)
+  // Server fetches for tabs (concurrent, cached)
   const [{ weekTab, matches }, indStats, streamSched] = await Promise.all([
-    fetchMatchupsData(),   // SCHEDULE!U2 + WEEK!A2:Q120
-    fetchIndStatsData(),   // INDIVIDUAL!A2:V
-    fetchStreamSchedule().catch(() => ({
-      scheduleWeek: "",
-      scheduleMap: {} as Record<string, { day: string; slot: string }>,
-    })), // stream schedule is optional; fail-soft
+    fetchMatchupsDataCached(),   // SCHEDULE!U2 + WEEK!A2:Q120 (cached 60s)
+    fetchIndStatsDataCached(),   // INDIVIDUAL!A2:V (cached 5m)
+    fetchStreamScheduleCached(), // Stream sheet M3 + A2:I (cached 5m, fail-soft)
   ]);
 
   return (
