@@ -1,4 +1,5 @@
 // Server Component: no 'use client'
+import Link from "next/link";
 import { getSheets } from "@/lib/googleSheets";
 import TeamLogo from "../components/TeamLogo";
 
@@ -128,51 +129,59 @@ export default async function CurrentWeekCard() {
       ) : (
         <ul className="mt-3 space-y-3 text-base">
           {items.map((m, i) => {
-            // pick colors based on winner
             const leftColor  = m.awayWinner ? RED : m.homeWinner ? GREEN : "0,0,0";
             const rightColor = m.homeWinner ? RED : m.awayWinner ? GREEN : "0,0,0";
 
-            const gradientStyle: React.CSSProperties = {
-              backgroundImage: `
-                linear-gradient(to left, rgba(${leftColor},0.35), rgba(0,0,0,0) 35%),
-                linear-gradient(to right, rgba(${rightColor},0.35), rgba(0,0,0,0) 35%)
-              `,
-            };
+            const gradientStyle: React.CSSProperties = m.seriesOver
+              ? {
+                  backgroundImage: `
+                    linear-gradient(to left, rgba(${leftColor},0.35), rgba(0,0,0,0) 35%),
+                    linear-gradient(to right, rgba(${rightColor},0.35), rgba(0,0,0,0) 35%)
+                  `,
+                }
+              : {};
+
+            // Send the user to the Matchups tab with a pre-filled filter
+            const q = `${m.awayTeam} ${m.homeTeam}`;
+            const href = `?tab=matchups&q=${encodeURIComponent(q)}`;
 
             return (
-              <li
-                key={i}
-                className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border border-zinc-800 rounded-xl px-5 py-3 bg-zinc-950/60 relative overflow-hidden"
-                style={m.seriesOver ? gradientStyle : undefined}
-              >
-                {/* Left: logo + name */}
-                <div
-                  className={`flex items-center justify-start text-zinc-300 ${
-                    m.awayWinner ? "font-bold uppercase" : m.homeWinner ? "line-through" : ""
-                  }`}
+              <li key={i} className="list-none">
+                <Link
+                  href={href}
+                  scroll={false}
+                  className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border border-zinc-800 rounded-xl px-5 py-3 bg-zinc-950/60 relative overflow-hidden hover:border-purple-500/50 hover:bg-zinc-900/40 cursor-pointer"
+                  style={gradientStyle}
                 >
-                  <TeamLogo team={m.awayTeam} side="left" />
-                  <span className="break-words">{m.awayTeam}</span>
-                </div>
-
-                {/* Center: win boxes + score */}
-                <div className="flex items-center justify-center gap-3 z-10">
-                  <WinBoxes wins={m.awayWins} />
-                  <div className="text-center min-w-[5.5rem] font-semibold text-zinc-100">
-                    {m.awayWins} : {m.homeWins}
+                  {/* Left: logo + name */}
+                  <div
+                    className={`flex items-center justify-start text-zinc-300 ${
+                      m.awayWinner ? "font-bold uppercase" : m.homeWinner ? "line-through" : ""
+                    }`}
+                  >
+                    <TeamLogo team={m.awayTeam} side="left" />
+                    <span className="break-words">{m.awayTeam}</span>
                   </div>
-                  <WinBoxes wins={m.homeWins} />
-                </div>
 
-                {/* Right: name + logo */}
-                <div
-                  className={`flex items-center justify-end text-zinc-300 ${
-                    m.homeWinner ? "font-bold uppercase" : m.awayWinner ? "line-through" : ""
-                  }`}
-                >
-                  <span className="break-words">{m.homeTeam}</span>
-                  <TeamLogo team={m.homeTeam} side="right" />
-                </div>
+                  {/* Center: win boxes + score */}
+                  <div className="flex items-center justify-center gap-3 z-10">
+                    <WinBoxes wins={m.awayWins} />
+                    <div className="text-center min-w-[5.5rem] font-semibold text-zinc-100">
+                      {m.awayWins} : {m.homeWins}
+                    </div>
+                    <WinBoxes wins={m.homeWins} />
+                  </div>
+
+                  {/* Right: name + logo */}
+                  <div
+                    className={`flex items-center justify-end text-zinc-300 ${
+                      m.homeWinner ? "font-bold uppercase" : m.awayWinner ? "line-through" : ""
+                    }`}
+                  >
+                    <span className="break-words">{m.homeTeam}</span>
+                    <TeamLogo team={m.homeTeam} side="right" />
+                  </div>
+                </Link>
               </li>
             );
           })}

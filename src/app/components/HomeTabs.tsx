@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, isValidElement, cloneElement, ReactElement } from "react";
+import React, { useEffect, useMemo, useState, isValidElement, cloneElement, ReactElement } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 type TabKey = "current" | "matchups" | "standings" | "report" | "indstats";
 
-/** The only extra prop we inject into the Report panel */
 type ReportPanelLikeProps = {
   goToTab?: (key: TabKey) => void;
 };
@@ -14,7 +14,6 @@ type HomeTabsProps = {
   matchupsPanel?: React.ReactNode;
   standingsPanel?: React.ReactNode;
   indStatsPanel?: React.ReactNode;
-  /** Type this as a ReactElement so we can safely clone with the extra prop */
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
 };
 
@@ -25,7 +24,16 @@ export default function HomeTabs({
   indStatsPanel,
   reportPanel,
 }: HomeTabsProps) {
-  const [active, setActive] = useState<TabKey>("current");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const urlTab = (searchParams.get("tab") as TabKey | null) ?? null;
+  const [active, setActive] = useState<TabKey>(urlTab ?? "current");
+
+  // Keep active tab in sync with URL (when clicking a matchup link)
+  useEffect(() => {
+    if (urlTab && urlTab !== active) setActive(urlTab);
+  }, [urlTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const btnBase =
     "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
@@ -35,29 +43,36 @@ export default function HomeTabs({
 
   const isActive = (key: TabKey) => active === key;
 
-  // Inject goToTab into the report panel (only if it’s a valid element)
+  // Update the URL when user clicks buttons (keep existing ?q= if present)
+  function goToTab(key: TabKey) {
+    const q = searchParams.get("q");
+    const usp = new URLSearchParams(searchParams.toString());
+    usp.set("tab", key);
+    if (q) usp.set("q", q); else usp.delete("q");
+    router.replace(`?${usp.toString()}`, { scroll: false });
+    setActive(key);
+  }
+
   const reportWithProp =
     reportPanel && isValidElement<ReportPanelLikeProps>(reportPanel)
-      ? cloneElement(reportPanel, {
-          goToTab: (key: TabKey) => setActive(key),
-        })
+      ? cloneElement(reportPanel, { goToTab })
       : reportPanel;
 
   return (
     <div className="w-full">
       {/* Tab Buttons */}
       <div className="flex flex-wrap justify-center gap-4 mt-3 mb-4">
-        {[
+        {([
           { key: "current" as const, label: "Current Week" },
           { key: "matchups" as const, label: "Matchups" },
           { key: "standings" as const, label: "Standings" },
           { key: "indstats" as const, label: "Ind. Stats" },
           { key: "report" as const, label: "Report a Game" },
-        ].map(({ key, label }) => (
+        ]).map(({ key, label }) => (
           <button
             key={key}
             type="button"
-            onClick={() => setActive(key)}
+            onClick={() => goToTab(key)}
             className={btnBase}
           >
             <span
@@ -70,7 +85,7 @@ export default function HomeTabs({
         ))}
       </div>
 
-      {/* Panels – container adapts per tab */}
+      {/* Panels */}
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
           active === "indstats" ? "w-full max-w-[115rem]" : "max-w-6xl"

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 
 type MatchRow = {
@@ -36,6 +37,45 @@ function parseIntSafe(v: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// Choose ONE team term from q by checking against actual team names in rows.
+// Prefers exact slug match; falls back to first token if nothing matches.
+function pickTeamFilter(q: string, rows: MatchRow[]): string {
+  const tokens = (q || "")
+    .split(/[+\s]+/g)
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  if (!tokens.length) return "";
+
+  const allTeams = Array.from(
+    new Set(
+      rows.flatMap((r) => [r.awayTeam, r.homeTeam]).filter(Boolean) as string[]
+    )
+  );
+
+  const teamBySlug = new Map(allTeams.map((t) => [teamSlug(t), t]));
+
+  // 1) Try exact slug match
+  for (const tok of tokens) {
+    const s = teamSlug(tok);
+    const exact = teamBySlug.get(s);
+    if (exact) return exact; // use canonical team name
+  }
+
+  // 2) Try substring slug match (token within team or team within token)
+  for (const tok of tokens) {
+    const s = teamSlug(tok);
+    const found = allTeams.find((t) => {
+      const ts = teamSlug(t);
+      return ts.includes(s) || s.includes(ts);
+    });
+    if (found) return found;
+  }
+
+  // 3) Fallback: just use first token as-is
+  return tokens[0];
+}
+
 export default function MatchupsPanel({
   data,
   weekLabel,
@@ -43,20 +83,41 @@ export default function MatchupsPanel({
   data: MatchRow[];
   weekLabel?: string;
 }) {
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  const urlQRaw = (searchParams.get("q") ?? "").trim();
 
+  // Cleaned rows (drop non-game/header rows)
   const cleaned = useMemo(() => {
-    // Drop non-game/header rows (e.g., blank/separator lines)
     return (data || []).filter((m) => /^\d+$/.test((m.game || "").trim()));
   }, [data]);
 
+  // Derive a single-team filter from url ?q= (if present)
+  const urlSelectedTeam = useMemo(() => {
+    if (!urlQRaw) return "";
+    return pickTeamFilter(urlQRaw, cleaned);
+  }, [urlQRaw, cleaned]);
+
+  const [query, setQuery] = useState(urlSelectedTeam);
+
+  // Keep input synced with URL-derived team if URL changes
+  useEffect(() => {
+    setQuery(urlSelectedTeam);
+  }, [urlSelectedTeam]);
+
   const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
+    const q = (query || "").toLowerCase().trim();
     if (!q) return cleaned;
+
+    // Filter by ANY field containing the single chosen team string
     return cleaned.filter((m) =>
       [
-        m.awayId, m.homeId, m.awayName, m.homeName,
-        m.awayTeam, m.homeTeam, m.scenario,
+        m.awayId,
+        m.homeId,
+        m.awayName,
+        m.homeName,
+        m.awayTeam,
+        m.homeTeam,
+        m.scenario,
       ]
         .filter(Boolean)
         .some((v) => v.toLowerCase().includes(q))
@@ -94,16 +155,12 @@ export default function MatchupsPanel({
           const awayLogo = `/logos/${teamSlug(row.awayTeam)}.png`;
           const homeLogo = `/logos/${teamSlug(row.homeTeam)}.png`;
 
-          // Gradient colors (TW palette equivalents):
-          // green-500 = rgb(34,197,94), red-500 = rgb(239,68,68)
-          // neutral tie color (indigo-500-ish) = rgb(99,102,241)
-          // After: const winner = awayScore > homeScore ? "away" : homeScore > awayScore ? "home" : "tie";
+          // Colors (Tailwind-ish)
+          const GREEN = "34,197,94"; // green-500
+          const RED   = "239,68,68"; // red-500
+          const TIE   = "99,102,241"; // neutral
 
-          const GREEN = "34,197,94"; // tailwind green-500
-          const RED   = "239,68,68"; // tailwind red-500
-          const TIE   = "99,102,241"; // optional neutral
-
-          // 🔄 Reversed: (opposite of your snippet)
+          // Winner RED, loser GREEN (your current reversed mapping)
           const leftColor  = winner === "away" ? RED : winner === "home" ? GREEN : TIE;
           const rightColor = winner === "home" ? RED : winner === "away" ? GREEN : TIE;
 
@@ -114,14 +171,13 @@ export default function MatchupsPanel({
             `,
           };
 
-
           return (
             <div
               key={`${row.game}-${i}`}
               className="relative p-5 rounded-xl bg-zinc-950/50 border border-zinc-800 hover:border-purple-500/40 transition"
               style={gradientStyle}
             >
-              {/* Game # badge (top-left corner) */}
+              {/* Game # badge */}
               <div className="absolute -top-3 -left-3">
                 <span
                   className={[
@@ -158,7 +214,7 @@ export default function MatchupsPanel({
                   </span>
                 </div>
 
-                {/* Scenario + Points (center) */}
+                {/* Scenario + Points */}
                 <div className="flex flex-col items-center w-1/3">
                   <span className="text-sm text-zinc-400 mb-1 italic">
                     {row.scenario || "No Scenario"}
