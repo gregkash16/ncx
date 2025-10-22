@@ -2,11 +2,13 @@ import Image from "next/image";
 import CurrentWeekCard from "./components/CurrentWeekCard";
 import StandingsPanel from "./components/StandingsPanel";
 import MatchupsPanel from "./components/MatchupsPanel";
+import IndStatsPanel from "./components/IndStatsPanel";
+import ReportPanel from "./components/ReportPanel";
 import HomeTabs from "./components/HomeTabs";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getSheets, fetchMatchupsData } from "@/lib/googleSheets";
+import { getSheets, fetchMatchupsData, fetchIndStatsData } from "@/lib/googleSheets";
 
 function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
@@ -50,8 +52,9 @@ export default async function HomePage() {
     }
   }
 
-  // 🔹 Fetch matchups on the server and pass as plain JSON to the client panel
+  // Server fetches for tabs
   const { weekTab, matches } = await fetchMatchupsData();
+  const indStats = await fetchIndStatsData();
 
   return (
     <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
@@ -61,7 +64,7 @@ export default async function HomePage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_120%,rgba(0,255,255,0.15),transparent_60%)] blur-3xl"></div>
       </div>
 
-      {/* Hero Section */}
+      {/* HERO (kept at max-w-6xl) */}
       <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-6 text-center">
         <div className="flex flex-col items-center space-y-6">
           <Image
@@ -77,15 +80,21 @@ export default async function HomePage() {
             DRAFT LEAGUE • SEASON 8
           </h1>
 
-          {/* Dynamic greeting */}
           <p className="text-zinc-300 text-lg font-medium">{message}</p>
+        </div>
+      </section>
 
-          {/* Tabs + Panels */}
+      {/* TABS + PANELS (WIDE, OUTSIDE HERO) */}
+      <section className="w-full px-4 pb-24">
+        <div className="w-full max-w-[110rem] mx-auto">
           <HomeTabs
-            currentWeekPanel={<CurrentWeekCard />}
-            matchupsPanel={<MatchupsPanel data={matches} weekLabel={weekTab} />}
-            standingsPanel={<StandingsPanel />}
+            currentWeekPanel={<><CurrentWeekCard key="current-week" /></>}
+            matchupsPanel={<><MatchupsPanel key="matchups" data={matches} weekLabel={weekTab} /></>}
+            standingsPanel={<><StandingsPanel key="standings" /></>}
+            indStatsPanel={<><IndStatsPanel key="indstats" data={indStats ?? []} /></>}
+            reportPanel={<><ReportPanel key="report" /></>} // ✅ give this one a key too
           />
+
         </div>
       </section>
     </main>

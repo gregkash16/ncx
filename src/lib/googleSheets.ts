@@ -1,4 +1,3 @@
-// src/lib/googleSheets.ts
 import { google, sheets_v4 } from "googleapis";
 
 /**
@@ -123,4 +122,68 @@ export async function fetchMatchupsData(): Promise<MatchupsData> {
     .filter((m) => m.game !== "" && (m.awayTeam !== "" || m.homeTeam !== ""));
 
   return { weekTab, matches };
+}
+
+// --- INDIVIDUAL STATS FETCHER ---
+export type IndRow = {
+  rank: string;
+  ncxid: string;
+  first: string;
+  last: string;
+  discord: string;
+  pick: string;
+  team: string;
+  faction: string;
+  wins: string;
+  losses: string;
+  points: string;
+  plms: string;
+  games: string;
+  winPct: string;
+  ppg: string;
+  efficiency: string;
+  war: string;
+  h2h: string;
+  potato: string;
+  sos: string;
+  predWins: string;
+  predLosses: string;
+};
+
+export async function fetchIndStatsData(): Promise<IndRow[]> {
+  const sheets = getSheets();
+  const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "INDIVIDUAL!A2:V",
+    valueRenderOption: "FORMATTED_VALUE",
+  });
+
+  const rows = res.data.values ?? [];
+  return rows
+    .filter((r) => (r?.[0] ?? "").toString().trim() !== "") // keep rows with a Rank
+    .map((r): IndRow => ({
+      rank: r[0] ?? "",
+      ncxid: r[1] ?? "",
+      first: r[2] ?? "",
+      last: r[3] ?? "",
+      discord: r[4] ?? "",
+      pick: r[5] ?? "",
+      team: r[6] ?? "",
+      faction: r[7] ?? "",
+      wins: r[8] ?? "",
+      losses: r[9] ?? "",
+      points: r[10] ?? "",
+      plms: r[11] ?? "",
+      games: r[12] ?? "",
+      winPct: r[13] ?? "",
+      ppg: r[14] ?? "",
+      efficiency: r[15] ?? "",
+      war: r[16] ?? "",
+      h2h: r[17] ?? "",
+      potato: r[18] ?? "",
+      sos: r[19] ?? "",
+      predWins: r[20] ?? "",
+      predLosses: r[21] ?? "",
+    }));
 }

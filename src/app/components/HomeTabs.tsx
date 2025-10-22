@@ -1,20 +1,28 @@
 'use client';
 
-import { useState } from "react";
+import React, { useState, isValidElement, cloneElement, ReactElement } from "react";
+
+type TabKey = "current" | "matchups" | "standings" | "report" | "indstats";
+
+/** The only extra prop we inject into the Report panel */
+type ReportPanelLikeProps = {
+  goToTab?: (key: TabKey) => void;
+};
 
 type HomeTabsProps = {
   currentWeekPanel: React.ReactNode;
-  standingsPanel?: React.ReactNode;
   matchupsPanel?: React.ReactNode;
-  reportPanel?: React.ReactNode;
+  standingsPanel?: React.ReactNode;
+  indStatsPanel?: React.ReactNode;
+  /** Type this as a ReactElement so we can safely clone with the extra prop */
+  reportPanel?: ReactElement<ReportPanelLikeProps> | null;
 };
-
-type TabKey = "current" | "standings" | "matchups" | "report";
 
 export default function HomeTabs({
   currentWeekPanel,
-  standingsPanel,
   matchupsPanel,
+  standingsPanel,
+  indStatsPanel,
   reportPanel,
 }: HomeTabsProps) {
   const [active, setActive] = useState<TabKey>("current");
@@ -27,80 +35,52 @@ export default function HomeTabs({
 
   const isActive = (key: TabKey) => active === key;
 
+  // Inject goToTab into the report panel (only if it’s a valid element)
+  const reportWithProp =
+    reportPanel && isValidElement<ReportPanelLikeProps>(reportPanel)
+      ? cloneElement(reportPanel, {
+          goToTab: (key: TabKey) => setActive(key),
+        })
+      : reportPanel;
+
   return (
     <div className="w-full">
-      {/* Buttons */}
-      <div className="flex flex-wrap justify-center gap-4 mt-3">
-        {/* Current Week */}
-        <button
-          type="button"
-          onClick={() => setActive("current")}
-          className={btnBase}
-        >
-          <span
-            className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
-              isActive("current") ? "opacity-100" : ""
-            }`}
-          />
-          <span className={labelLayer}>Current Week</span>
-        </button>
-
-        {/* Matchups */}
-        <button
-          type="button"
-          onClick={() => setActive("matchups")}
-          className={btnBase}
-        >
-          <span
-            className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
-              isActive("matchups") ? "opacity-100" : ""
-            }`}
-          />
-          <span className={labelLayer}>Matchups</span>
-        </button>
-
-        {/* View Standings */}
-        <button
-          type="button"
-          onClick={() => setActive("standings")}
-          className={btnBase}
-        >
-          <span
-            className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
-              isActive("standings") ? "opacity-100" : ""
-            }`}
-          />
-          <span className={labelLayer}>View Standings</span>
-        </button>
-
-        {/* Report a Game */}
-        <button
-          type="button"
-          onClick={() => setActive("report")}
-          className={btnBase}
-        >
-          <span
-            className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
-              isActive("report") ? "opacity-100" : ""
-            }`}
-          />
-          <span className={labelLayer}>Report a Game</span>
-        </button>
+      {/* Tab Buttons */}
+      <div className="flex flex-wrap justify-center gap-4 mt-3 mb-4">
+        {[
+          { key: "current" as const, label: "Current Week" },
+          { key: "matchups" as const, label: "Matchups" },
+          { key: "standings" as const, label: "Standings" },
+          { key: "indstats" as const, label: "Ind. Stats" },
+          { key: "report" as const, label: "Report a Game" },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setActive(key)}
+            className={btnBase}
+          >
+            <span
+              className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
+                isActive(key) ? "opacity-100" : ""
+              }`}
+            />
+            <span className={labelLayer}>{label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Panels */}
-      <div className="relative max-w-6xl mx-auto px-6 pb-24 mt-6">
-        {active === "current" && <div>{currentWeekPanel}</div>}
-        {active === "matchups" && <div>{matchupsPanel ?? null}</div>}
-        {active === "standings" && <div>{standingsPanel ?? null}</div>}
-        {active === "report" && (
-          <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">
-            <h2 className="text-xl font-semibold text-pink-400 mb-2">
-              Report a Game
-            </h2>
-            <p>Coming soon — we’ll build the report form next.</p>
-          </div>
-        )}
+      {/* Panels – container adapts per tab */}
+      <div
+        className={`relative mx-auto px-2 sm:px-4 ${
+          active === "indstats" ? "w-full max-w-[115rem]" : "max-w-6xl"
+        }`}
+      >
+        {active === "current" && currentWeekPanel}
+        {active === "matchups" && matchupsPanel}
+        {active === "standings" && standingsPanel}
+        {active === "indstats" && indStatsPanel}
+        {active === "report" && reportWithProp}
       </div>
     </div>
   );
