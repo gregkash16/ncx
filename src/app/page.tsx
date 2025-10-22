@@ -81,19 +81,30 @@ export default async function HomePage() {
           <p className="text-zinc-300 text-lg font-medium">{message}</p>
 
           <div className="flex flex-wrap justify-center gap-4 mt-3">
+      
+            {/* Reusable ghost → gradient button */}
             <Link
               href="/standings"
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 text-white font-semibold shadow-lg shadow-pink-600/30 hover:scale-105 transition-transform duration-300"
+              className="group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
             >
-              View Standings
+              {/* Gradient layer (hidden until hover) */}
+              <span className="pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500"></span>
+              {/* Make the border fade out on hover so the gradient is clean */}
+              <span className="pointer-events-none absolute inset-0 rounded-xl transition-colors duration-300 group-hover:border-transparent"></span>
+              {/* Label stays above gradient */}
+              <span className="relative z-10">View Standings</span>
             </Link>
+
             <Link
               href="/report"
-              className="px-6 py-3 rounded-xl bg-zinc-900 border border-purple-500/40 hover:border-cyan-400/60 text-white font-semibold hover:scale-105 transition-transform duration-300"
+              className="group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50"
             >
-              Report a Game
+              <span className="pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500"></span>
+              <span className="pointer-events-none absolute inset-0 rounded-xl transition-colors duration-300 group-hover:border-transparent"></span>
+              <span className="relative z-10">Report a Game</span>
             </Link>
           </div>
+
         </div>
       </section>
 
