@@ -9,6 +9,17 @@ function fullName(p: PlayerRow) {
   return (f && l) ? `${f} ${l}` : f || l || p.ncxid;
 }
 
+// Champion teams per season
+const CHAMPIONS_BY_SEASON: Record<number, string> = {
+  1: "HAVOC",
+  2: "HAVOC",
+  3: "HAVOC",
+  4: "ASCENDANCY",
+  5: "ORDER 66",
+  6: "MEATBAGS",
+  7: "MEATBAGS",
+};
+
 export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
   const [q, setQ] = useState("");
   const filtered = useMemo(() => {
@@ -52,7 +63,7 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                 <button
                   onClick={() => setSelectedIdx(i)}
                   className={[
-                    "w-full text-left px-3 py-2 rounded-lg border",
+                    "w-full text-left px-3 py-2 rounded-lg border transition",
                     active
                       ? "bg-purple-500/15 border-purple-500/50"
                       : "bg-zinc-950/40 border-zinc-800 hover:border-purple-500/40",
@@ -129,14 +140,42 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800">
-                  {selected.seasons.map((team, idx) => (
-                    <tr key={idx}>
-                      <td className="px-3 py-2 text-zinc-300">Season {idx + 1}</td>
-                      <td className="px-3 py-2 text-zinc-100">
-                        {team && team.trim() ? team : <span className="text-zinc-500">—</span>}
-                      </td>
-                    </tr>
-                  ))}
+                  {selected.seasons.map((team, idx) => {
+                    const seasonNum = idx + 1;
+                    const isChampion =
+                      team &&
+                      CHAMPIONS_BY_SEASON[seasonNum] &&
+                      team.toUpperCase().trim() ===
+                        CHAMPIONS_BY_SEASON[seasonNum];
+                    return (
+                      <tr
+                        key={idx}
+                        className={
+                          isChampion
+                            ? "border border-amber-400/60 bg-amber-500/5"
+                            : ""
+                        }
+                      >
+                        <td className="px-3 py-2 text-zinc-300">
+                          Season {seasonNum}
+                        </td>
+                        <td
+                          className={[
+                            "px-3 py-2",
+                            isChampion
+                              ? "font-semibold text-amber-300"
+                              : "text-zinc-100",
+                          ].join(" ")}
+                        >
+                          {team && team.trim() ? (
+                            team
+                          ) : (
+                            <span className="text-zinc-500">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

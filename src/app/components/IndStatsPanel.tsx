@@ -38,7 +38,6 @@ export default function IndStatsPanel({ data }: Props) {
   const [sortKey, setSortKey] = useState<keyof IndRow>("rank");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  // You said you removed Discord + Predicted Wins/Losses, so we won't render those columns.
   // Search by name/NCXID/team/faction.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -77,7 +76,6 @@ export default function IndStatsPanel({ data }: Props) {
     }
   };
 
-  const headRowCls = "bg-zinc-950/70 border-b border-zinc-800 sticky top-0 z-10";
   const rowCls =
     "even:bg-zinc-900/30 odd:bg-zinc-900/10 hover:bg-zinc-800/40 transition-colors border-b border-zinc-800";
   const cell = "px-3 py-2 text-sm text-zinc-200";
@@ -99,19 +97,19 @@ export default function IndStatsPanel({ data }: Props) {
           />
         </div>
 
-        {/* REAL TABLE + EXPLICIT COLUMN WIDTHS */}
-        <div className="relative w-full overflow-x-auto rounded-xl border border-zinc-800">
+        {/* SCROLL CONTAINER: only the table area scrolls; header sticks inside it */}
+        <div className="relative w-full rounded-xl border border-zinc-800 overflow-auto max-h-[70vh]">
           <table className="w-full table-auto">
-            {/* Explicit widths (like a spreadsheet) so headers & cells always align */}
+            {/* Explicit widths so headers & cells align */}
             <colgroup>
               {[
-                { w: 48 },   // Rank
-                { w: 88 },   // NCXID
+                { w: 60 },   // Rank
+                { w: 100 },  // NCXID
                 { w: 140 },  // First
                 { w: 140 },  // Last
                 { w: 80 },   // Pick
-                { w: 120 },  // Team
-                { w: 110 },  // Faction
+                { w: 140 },  // Team
+                { w: 120 },  // Faction
                 { w: 72 },   // Wins
                 { w: 72 },   // Losses
                 { w: 84 },   // Points
@@ -129,11 +127,14 @@ export default function IndStatsPanel({ data }: Props) {
               ))}
             </colgroup>
 
-
-            <thead className={headRowCls}>
+            <thead className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur-sm border-b border-zinc-800">
               <tr>
-                <Th onClick={() => onSort("rank")} active={sortKey==="rank"} dir={sortDir}>Rk</Th>
-                <Th onClick={() => onSort("ncxid")} active={sortKey==="ncxid"} dir={sortDir}>NCXID</Th>
+                <Th onClick={() => onSort("rank")} active={sortKey==="rank"} dir={sortDir} className="text-zinc-300">
+                  Rk
+                </Th>
+                <Th onClick={() => onSort("ncxid")} active={sortKey==="ncxid"} dir={sortDir} className="text-zinc-300">
+                  NCXID
+                </Th>
                 <Th onClick={() => onSort("first")} active={sortKey==="first"} dir={sortDir}>First</Th>
                 <Th onClick={() => onSort("last")} active={sortKey==="last"} dir={sortDir}>Last</Th>
                 <Th onClick={() => onSort("pick")} active={sortKey==="pick"} dir={sortDir}>Pick</Th>
@@ -155,15 +156,16 @@ export default function IndStatsPanel({ data }: Props) {
             </thead>
 
             <tbody className="divide-y divide-zinc-800">
-                {sorted.map((r) => (
-                  <tr key={r.ncxid} className={rowCls}>
+              {sorted.map((r) => (
+                <tr key={r.ncxid} className={rowCls}>
                   <td className={num}>{r.rank}</td>
-                  <td className={`${cell} font-semibold text-cyan-300`}>{r.ncxid}</td>
+                  <td className={`${cell} font-semibold text-cyan-300`} title={r.ncxid}>
+                    {r.ncxid}
+                  </td>
                   <td className={cell}>{r.first}</td>
                   <td className={cell}>{r.last}</td>
                   <td className={num}>{r.pick}</td>
 
-                  {/* Team/Faction: truncate with tooltip to avoid overlap */}
                   <td className={`${cell} truncate`} title={r.team}>{r.team}</td>
                   <td className={`${cell} truncate`} title={r.faction}>{r.faction}</td>
 
