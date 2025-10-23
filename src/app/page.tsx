@@ -8,6 +8,7 @@ import MatchupsPanel from "./components/MatchupsPanel";
 import IndStatsPanel from "./components/IndStatsPanel";
 import ReportPanel from "./components/ReportPanel";
 import PlayersPanelServer from "./components/PlayersPanelServer";
+import AdvStatsPanelServer from "./components/AdvStatsPanelServer"; 
 import HomeTabs from "./components/HomeTabs";
 
 import { getServerSession } from "next-auth";
@@ -105,12 +106,13 @@ export default async function HomePage() {
                 weekLabel={weekTab}
                 scheduleWeek={streamSched.scheduleWeek}
                 scheduleMap={streamSched.scheduleMap}
-                indStats={indStats ?? []}     // ← NEW
-                factionMap={factionMap}       // ← NEW
+                indStats={indStats ?? []}
+                factionMap={factionMap}
               />
             }
             standingsPanel={<StandingsPanel key="standings" />}
             indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
+            advStatsPanel={<AdvStatsPanelServer key="advstats" />}   
             playersPanel={<PlayersPanelServer key="players" />}
             reportPanel={<ReportPanel key="report" />}
           />

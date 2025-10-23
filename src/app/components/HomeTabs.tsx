@@ -9,7 +9,14 @@ import React, {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-type TabKey = "current" | "matchups" | "standings" | "report" | "indstats" | "players";
+type TabKey =
+  | "current"
+  | "matchups"
+  | "standings"
+  | "indstats"
+  | "advstats"   // ← NEW
+  | "players"
+  | "report";
 
 /** The only extra prop we inject into the Report panel */
 type ReportPanelLikeProps = {
@@ -21,8 +28,9 @@ type HomeTabsProps = {
   matchupsPanel?: React.ReactNode;
   standingsPanel?: React.ReactNode;
   indStatsPanel?: React.ReactNode;
+  advStatsPanel?: React.ReactNode;   // ← NEW
+  playersPanel?: React.ReactNode;
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
-  playersPanel?: React.ReactNode; // ← NEW
 };
 
 export default function HomeTabs({
@@ -30,8 +38,9 @@ export default function HomeTabs({
   matchupsPanel,
   standingsPanel,
   indStatsPanel,
-  reportPanel,
+  advStatsPanel,    // ← NEW
   playersPanel,
+  reportPanel,
 }: HomeTabsProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -104,7 +113,8 @@ export default function HomeTabs({
           { key: "matchups" as const, label: "Matchups" },
           { key: "standings" as const, label: "Standings" },
           { key: "indstats" as const, label: "Ind. Stats" },
-          { key: "players" as const, label: "Players" },  // ← NEW
+          { key: "advstats" as const, label: "Adv. Stats" }, // ← NEW (after Ind. Stats)
+          { key: "players" as const, label: "Players" },
           { key: "report" as const, label: "Report a Game" },
         ].map(({ key, label }) => (
           <button
@@ -126,13 +136,16 @@ export default function HomeTabs({
       {/* Panels */}
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
-          active === "indstats" ? "w-full max-w-[115rem]" : "max-w-6xl"
+          active === "indstats" || active === "advstats"
+            ? "w-full max-w-[115rem]"
+            : "max-w-6xl"
         }`}
       >
         {active === "current" && currentWeekPanel}
         {active === "matchups" && matchupsPanel}
         {active === "standings" && standingsPanel}
         {active === "indstats" && indStatsPanel}
+        {active === "advstats" && advStatsPanel}    {/* ← NEW */}
         {active === "players" && playersPanel}
         {active === "report" && reportWithProp}
       </div>
