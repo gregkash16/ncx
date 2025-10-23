@@ -352,3 +352,53 @@ export const getDiscordMapCached = unstable_cache(
   { revalidate: 300 }
 );
 
+// --- NEW: Faction map loader -------------------------------------------------
+export type FactionMap = Record<string, string>; // ncxid -> "REBELS" | "EMPIRE" | ...
+
+let __factionMapCache: { data: FactionMap; at: number } | null = null;
+const FIVE_MIN = 5 * 60 * 1000;
+
+export async function fetchFactionMapCached(): Promise<FactionMap> {
+  if (__factionMapCache && Date.now() - __factionMapCache.at < FIVE_MIN) {
+    return __factionMapCache.data;
+  }
+
+  const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
+  const sheets = await getSheets();
+
+  // Read YES/NO switch from K28 on the NCXID tab
+  const switchRes = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "NCXID!K28",
+    valueRenderOption: "FORMATTED_VALUE",
+  });
+  const switchVal = ((switchRes.data.values?.[0]?.[0] ?? "") as string).trim().toUpperCase();
+  const useSwitch = switchVal === "YES";
+
+  // Read A2:I215 → need A (NCXID), H (Faction), I (Faction Switch)
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "NCXID!A2:I215",
+    valueRenderOption: "FORMATTED_VALUE",
+  });
+
+  const rows = (res.data.values ?? []) as string[][];
+  const map: FactionMap = {};
+
+  for (const r of rows) {
+    const ncxid = (r[0] ?? "").toString().trim();
+    if (!ncxid) continue;
+
+    const factionH = (r[7] ?? "").toString().trim(); // H
+    const factionI = (r[8] ?? "").toString().trim(); // I
+    const chosen = useSwitch ? factionI : factionH;
+
+    if (chosen) {
+      // Normalize to your canonical uppercase labels
+      map[ncxid] = chosen.toUpperCase();
+    }
+  }
+
+  __factionMapCache = { data: map, at: Date.now() };
+  return map;
+}

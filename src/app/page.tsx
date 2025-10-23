@@ -17,6 +17,7 @@ import {
   fetchMatchupsDataCached,
   fetchIndStatsDataCached,
   fetchStreamScheduleCached,
+  fetchFactionMapCached, // ← NEW
 } from "@/lib/googleSheets";
 
 function normalizeDiscordId(v: unknown): string {
@@ -57,10 +58,11 @@ export default async function HomePage() {
   }
 
   // Server fetches for tabs (concurrent, cached)
-  const [{ weekTab, matches }, indStats, streamSched] = await Promise.all([
-    fetchMatchupsDataCached(), // SCHEDULE!U2 + WEEK!A2:Q120 (cached 60s)
-    fetchIndStatsDataCached(), // INDIVIDUAL!A2:V (cached 5m)
+  const [{ weekTab, matches }, indStats, streamSched, factionMap] = await Promise.all([
+    fetchMatchupsDataCached(),   // SCHEDULE!U2 + WEEK!A2:Q120 (cached 60s)
+    fetchIndStatsDataCached(),   // INDIVIDUAL!A2:V (cached 5m)
     fetchStreamScheduleCached(), // Stream sheet M3 + A2:I (cached 5m, fail-soft)
+    fetchFactionMapCached(),     // ← NEW: NCXID!A2:I215 + K28
   ]);
 
   return (
@@ -83,7 +85,7 @@ export default async function HomePage() {
             className="drop-shadow-[0_0_30px_rgba(255,0,150,0.5)] hover:scale-105 transition-transform duration-500"
           />
 
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
+        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
             DRAFT LEAGUE • SEASON 8
           </h1>
 
@@ -103,6 +105,8 @@ export default async function HomePage() {
                 weekLabel={weekTab}
                 scheduleWeek={streamSched.scheduleWeek}
                 scheduleMap={streamSched.scheduleMap}
+                indStats={indStats ?? []}     // ← NEW
+                factionMap={factionMap}       // ← NEW
               />
             }
             standingsPanel={<StandingsPanel key="standings" />}
