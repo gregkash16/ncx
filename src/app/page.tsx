@@ -7,6 +7,7 @@ import StandingsPanel from "./components/StandingsPanel";
 import MatchupsPanel from "./components/MatchupsPanel";
 import IndStatsPanel from "./components/IndStatsPanel";
 import ReportPanel from "./components/ReportPanel";
+import PlayersPanelServer from "./components/PlayersPanelServer";
 import HomeTabs from "./components/HomeTabs";
 
 import { getServerSession } from "next-auth";
@@ -38,7 +39,7 @@ export default async function HomePage() {
       if (sessionId) {
         // ✅ cached Discord map to avoid hammering Sheets
         const discordMap = await getDiscordMapCached();
-        const match = discordMap[sessionId];  // ← instead of .get(sessionId)
+        const match = discordMap[sessionId]; // ← instead of .get(sessionId)
 
         if (match) {
           const { ncxid, first, last } = match;
@@ -57,8 +58,8 @@ export default async function HomePage() {
 
   // Server fetches for tabs (concurrent, cached)
   const [{ weekTab, matches }, indStats, streamSched] = await Promise.all([
-    fetchMatchupsDataCached(),   // SCHEDULE!U2 + WEEK!A2:Q120 (cached 60s)
-    fetchIndStatsDataCached(),   // INDIVIDUAL!A2:V (cached 5m)
+    fetchMatchupsDataCached(), // SCHEDULE!U2 + WEEK!A2:Q120 (cached 60s)
+    fetchIndStatsDataCached(), // INDIVIDUAL!A2:V (cached 5m)
     fetchStreamScheduleCached(), // Stream sheet M3 + A2:I (cached 5m, fail-soft)
   ]);
 
@@ -100,12 +101,13 @@ export default async function HomePage() {
                 key="matchups"
                 data={matches}
                 weekLabel={weekTab}
-                scheduleWeek={streamSched.scheduleWeek} // M3 from stream sheet
-                scheduleMap={streamSched.scheduleMap}   // { "13": { day, slot }, ... }
+                scheduleWeek={streamSched.scheduleWeek}
+                scheduleMap={streamSched.scheduleMap}
               />
             }
             standingsPanel={<StandingsPanel key="standings" />}
             indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
+            playersPanel={<PlayersPanelServer key="players" />}
             reportPanel={<ReportPanel key="report" />}
           />
         </div>

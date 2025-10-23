@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-type TabKey = "current" | "matchups" | "standings" | "report" | "indstats";
+type TabKey = "current" | "matchups" | "standings" | "report" | "indstats" | "players";
 
 /** The only extra prop we inject into the Report panel */
 type ReportPanelLikeProps = {
@@ -21,8 +21,8 @@ type HomeTabsProps = {
   matchupsPanel?: React.ReactNode;
   standingsPanel?: React.ReactNode;
   indStatsPanel?: React.ReactNode;
-  /** Type this as a ReactElement so we can safely clone with the extra prop */
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
+  playersPanel?: React.ReactNode; // ← NEW
 };
 
 export default function HomeTabs({
@@ -31,6 +31,7 @@ export default function HomeTabs({
   standingsPanel,
   indStatsPanel,
   reportPanel,
+  playersPanel,
 }: HomeTabsProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -103,6 +104,7 @@ export default function HomeTabs({
           { key: "matchups" as const, label: "Matchups" },
           { key: "standings" as const, label: "Standings" },
           { key: "indstats" as const, label: "Ind. Stats" },
+          { key: "players" as const, label: "Players" },  // ← NEW
           { key: "report" as const, label: "Report a Game" },
         ].map(({ key, label }) => (
           <button
@@ -121,7 +123,7 @@ export default function HomeTabs({
         ))}
       </div>
 
-      {/* Panels – container adapts per tab */}
+      {/* Panels */}
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
           active === "indstats" ? "w-full max-w-[115rem]" : "max-w-6xl"
@@ -131,6 +133,7 @@ export default function HomeTabs({
         {active === "matchups" && matchupsPanel}
         {active === "standings" && standingsPanel}
         {active === "indstats" && indStatsPanel}
+        {active === "players" && playersPanel}
         {active === "report" && reportWithProp}
       </div>
     </div>
