@@ -1,7 +1,15 @@
-import { a } from "framer-motion/client";
 import type { NextConfig } from "next";
+import withPWAInit from "next-pwa";
 
-const nextConfig: NextConfig = {
+// ✅ Initialize PWA plugin
+const withPWA = withPWAInit({
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+});
+
+// ✅ Your normal Next.js config
+const baseConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
@@ -11,10 +19,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-
-  // TEMPORARY: allow the build to pass while we surface the real error
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  reactStrictMode: true,
 };
 
-export default nextConfig;
+// ✅ Export the wrapped config (PWA + your options)
+export default withPWA(baseConfig);

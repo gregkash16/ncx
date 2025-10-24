@@ -19,3 +19,4 @@ declare module "next-auth/jwt" {
     discordDisplay?: string;
   }
 }
+
