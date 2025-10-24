@@ -2,6 +2,7 @@
 // Server component (no 'use client')
 import TeamLogo from "@/app/components/TeamLogo";
 import { getSheets } from "@/lib/googleSheets";
+console.log('[SSR] MobileStandings render', new Date().toISOString());
 
 type Row = {
   rank: string;
