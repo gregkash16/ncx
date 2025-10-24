@@ -36,13 +36,18 @@ type Props = {
 };
 
 function teamSlug(name: string) {
+  if (!name) return '';
   return name
+    .normalize('NFD')                   // handles accents
+    .replace(/\p{Diacritic}/gu, '')     // strips accents
     .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^\p{L}\p{N}]+/gu, "-")
-    .replace(/-+/g, "-")
-    .replace(/(^-|-$)/g, "");
+    .replace(/&/g, 'and')
+    .replace(/\s+/g, '-')               // convert spaces to hyphens
+    .replace(/[^\w-]/g, '')             // remove anything not word/hyphen
+    .replace(/-+/g, '-')                // collapse multiple hyphens
+    .replace(/(^-|-$)/g, '');           // trim leading/trailing
 }
+
 
 function parseIntSafe(v: string): number {
   const n = Number((v || "").trim());
