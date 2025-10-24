@@ -402,3 +402,4 @@ export async function fetchFactionMapCached(): Promise<FactionMap> {
   __factionMapCache = { data: map, at: Date.now() };
   return map;
 }
+

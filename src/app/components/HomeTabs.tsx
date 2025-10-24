@@ -9,12 +9,12 @@ import React, {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-type TabKey =
+export type TabKey =
   | "current"
   | "matchups"
   | "standings"
   | "indstats"
-  | "advstats"   // ← NEW
+  | "advstats"
   | "players"
   | "report";
 
@@ -28,9 +28,12 @@ type HomeTabsProps = {
   matchupsPanel?: React.ReactNode;
   standingsPanel?: React.ReactNode;
   indStatsPanel?: React.ReactNode;
-  advStatsPanel?: React.ReactNode;   // ← NEW
+  advStatsPanel?: React.ReactNode;
   playersPanel?: React.ReactNode;
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
+
+  /** NEW: hide the desktop tab buttons (for mobile wrapper) */
+  hideButtons?: boolean;
 };
 
 export default function HomeTabs({
@@ -38,9 +41,10 @@ export default function HomeTabs({
   matchupsPanel,
   standingsPanel,
   indStatsPanel,
-  advStatsPanel,    // ← NEW
+  advStatsPanel,
   playersPanel,
   reportPanel,
+  hideButtons = false, // default = false
 }: HomeTabsProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -50,7 +54,7 @@ export default function HomeTabs({
   const urlTab = (searchParams.get("tab") as TabKey) || "current";
   const [active, setActive] = useState<TabKey>(urlTab);
 
-  // ---- Keep active in sync if URL changes externally (e.g., link click from CurrentWeekCard)
+  // ---- Keep active in sync if URL changes externally
   useEffect(() => {
     if (urlTab !== active) setActive(urlTab);
   }, [urlTab]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -63,31 +67,25 @@ export default function HomeTabs({
 
   const isActive = (key: TabKey) => active === key;
 
-  // ---- When active changes (from button OR URL), keep URL in sync
+  // ---- When active changes, sync URL
   useEffect(() => {
     const params = new URLSearchParams(Array.from(searchParams.entries()));
 
-    // reflect current tab (omit for "current" if you prefer a clean root)
     if (active === "current") params.delete("tab");
     else params.set("tab", active);
 
-    // if not on matchups, nuke q so it won't linger
     if (active !== "matchups") params.delete("q");
 
     const next = params.toString();
     const href = next ? `${pathname}?${next}` : pathname;
-
-    // Only push a replace if something actually changed
     const curr = searchParams.toString();
-    if (curr !== next) {
-      router.replace(href, { scroll: false });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]); // depend just on active to avoid loops
 
-  // ---- Button click handler (internal tab navigation)
+    if (curr !== next) router.replace(href, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  // ---- Button click handler
   function goToTab(key: TabKey) {
-    // If opening Matchups via the tab button, start clean (clear q)
     if (key === "matchups") {
       const params = new URLSearchParams(Array.from(searchParams.entries()));
       params.set("tab", "matchups");
@@ -98,7 +96,7 @@ export default function HomeTabs({
     setActive(key);
   }
 
-  // Inject goToTab into the report panel (only if it’s a valid element)
+  // Inject goToTab into the report panel
   const reportWithProp =
     reportPanel && isValidElement<ReportPanelLikeProps>(reportPanel)
       ? cloneElement(reportPanel, { goToTab })
@@ -106,32 +104,34 @@ export default function HomeTabs({
 
   return (
     <div className="w-full">
-      {/* Tab Buttons */}
-      <div className="flex flex-wrap justify-center gap-4 mt-3 mb-4">
-        {[
-          { key: "current" as const, label: "Current Week" },
-          { key: "matchups" as const, label: "Matchups" },
-          { key: "standings" as const, label: "Standings" },
-          { key: "indstats" as const, label: "Ind. Stats" },
-          { key: "advstats" as const, label: "Adv. Stats" }, // ← NEW (after Ind. Stats)
-          { key: "players" as const, label: "Players" },
-          { key: "report" as const, label: "Report a Game" },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => goToTab(key)}
-            className={btnBase}
-          >
-            <span
-              className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
-                isActive(key) ? "opacity-100" : ""
-              }`}
-            />
-            <span className={labelLayer}>{label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Tab Buttons (hidden when hideButtons = true) */}
+      {!hideButtons && (
+        <div className="flex flex-wrap justify-center gap-4 mt-3 mb-4">
+          {[
+            { key: "current" as const, label: "Current Week" },
+            { key: "matchups" as const, label: "Matchups" },
+            { key: "standings" as const, label: "Standings" },
+            { key: "indstats" as const, label: "Ind. Stats" },
+            { key: "advstats" as const, label: "Adv. Stats" },
+            { key: "players" as const, label: "Players" },
+            { key: "report" as const, label: "Report a Game" },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => goToTab(key)}
+              className={btnBase}
+            >
+              <span
+                className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
+                  isActive(key) ? "opacity-100" : ""
+                }`}
+              />
+              <span className={labelLayer}>{label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Panels */}
       <div
@@ -145,7 +145,7 @@ export default function HomeTabs({
         {active === "matchups" && matchupsPanel}
         {active === "standings" && standingsPanel}
         {active === "indstats" && indStatsPanel}
-        {active === "advstats" && advStatsPanel}    {/* ← NEW */}
+        {active === "advstats" && advStatsPanel}
         {active === "players" && playersPanel}
         {active === "report" && reportWithProp}
       </div>

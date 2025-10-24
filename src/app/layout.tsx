@@ -1,7 +1,7 @@
 'use client';
 import './globals.css';
 import { SessionProvider } from "next-auth/react";
-import LoginControl from "./components/LoginControl";
+import ShowDesktopLoginOnly from "./components/ShowDesktopLoginOnly";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,7 +9,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-zinc-950 text-zinc-100">
         <SessionProvider>
           {/* Fixed login control in the top-right */}
-          <LoginControl />
+          <ShowDesktopLoginOnly />
           {/* Main content */}
           <main className="min-h-screen">{children}</main>
         </SessionProvider>

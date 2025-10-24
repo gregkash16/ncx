@@ -4,6 +4,7 @@ type Props = {
   team: string;
   side?: 'left' | 'right';
   sizeEm?: number; // optional, default 1.2em
+  className?: string; // 👈 NEW: allow extra styling (fixes TS error)
 };
 
 /** Turns "Crimson Squadron!" -> "crimson-squadron" */
@@ -18,19 +19,23 @@ function slugifyTeam(name: string) {
 }
 
 /** Renders a team logo from /public/logos/<slug>.png and hides itself if missing */
-export default function TeamLogo({ team, side = 'left', sizeEm = 1.2 }: Props) {
+export default function TeamLogo({
+  team,
+  side = 'left',
+  sizeEm = 1.2,
+  className = '',
+}: Props) {
   if (!team) return null;
   const src = `/logos/${slugifyTeam(team)}.png`;
 
-  // Use a plain <img> so we can hide on error without needing domain config.
-  // (Server components strip handlers; this is a client component.)
+  // Margin based on side
   const marginClass = side === 'left' ? 'mr-2' : 'ml-2';
 
   return (
     <img
       src={src}
       alt={`${team} logo`}
-      className={`inline-block align-middle object-contain ${marginClass}`}
+      className={`inline-block align-middle object-contain ${marginClass} ${className}`}
       style={{ height: `${sizeEm}em`, width: 'auto' }}
       onError={(e) => {
         // Hide the image if it 404s (no layout shift)
