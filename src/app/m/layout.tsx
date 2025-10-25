@@ -4,6 +4,7 @@ import MobileBottomNav from "./mobile/MobileBottomNav";
 
 export const metadata = {
   title: "NCX (Mobile)",
+  // remove themeColor from here
 };
 
 export default function MobileLayout({ children }: { children: ReactNode }) {

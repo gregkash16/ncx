@@ -3,8 +3,7 @@ import Providers from "./providers";
 
 export const metadata = {
   title: "Nickel City X-Wing",
-  description: "Track matchups, standings, and stats for the NCX League.",
-  themeColor: "#ff00ff",
+  description: "Track matchups, standings, and stats for the NCX League."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -49,3 +48,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+
+export const viewport = {
+  // one fixed color:
+  // themeColor: "#ff00ff",
+
+  // or adaptive colors:
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+  ],
+};

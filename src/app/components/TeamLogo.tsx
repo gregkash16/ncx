@@ -1,48 +1,98 @@
+// src/app/components/TeamLogo.tsx
 'use client';
 
-type Props = {
-  team: string;
-  side?: 'left' | 'right';
-  sizeEm?: number; // optional, default 1.2em
-  className?: string; // 👈 NEW: allow extra styling (fixes TS error)
-};
+import { useEffect, useMemo, useState } from 'react';
 
-/** Turns "Crimson Squadron!" -> "crimson-squadron" */
-function slugifyTeam(name: string) {
-  return String(name)
-    .toLowerCase()
-    .replace(/&/g, 'and')
-    .replace(/[^a-z0-9\s-]/g, '')
+function norm(s: string) {
+  // trim + normalize + remove diacritics + collapse whitespace
+  return (s || '')
     .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/\s+/g, ' ');
 }
 
-/** Renders a team logo from /public/logos/<slug>.png and hides itself if missing */
+function slug(name: string) {
+  const n = norm(name)
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    // keep letters/numbers/spaces/hyphens, drop punctuation
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  return n;
+}
+
+const ASSET_VERSION = process.env.NEXT_PUBLIC_ASSET_VERSION || 'v1';
+
 export default function TeamLogo({
   team,
-  side = 'left',
-  sizeEm = 1.2,
+  size = 28,
   className = '',
-}: Props) {
-  if (!team) return null;
-  const src = `/logos/${slugifyTeam(team)}.png`;
+  altPrefix = '',
+}: {
+  team: string;
+  size?: number;
+  className?: string;
+  altPrefix?: string;
+}) {
+  const slugged = useMemo(() => slug(team), [team]);
+  const url = useMemo(
+    () => (slugged ? `/logos/${slugged}.png?v=${ASSET_VERSION}` : '/logos/default.png'),
+    [slugged]
+  );
 
-  // Margin based on side
-  const marginClass = side === 'left' ? 'mr-2' : 'ml-2';
+  const [src, setSrc] = useState(url);
+  const [failed, setFailed] = useState(false);
+
+  // update src whenever team changes
+  useEffect(() => {
+    setFailed(false);
+    setSrc(url);
+  }, [url]);
+
+  // If image failed, show a text fallback (initials chip)
+  if (failed) {
+    const initials =
+      norm(team)
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 3)
+        .toUpperCase() || '—';
+
+    return (
+      <span
+        title={`${altPrefix}${team || 'Team'}`}
+        className={[
+          'inline-flex items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-[10px] font-bold text-zinc-200',
+          className || '',
+        ].join(' ')}
+        style={{ width: size, height: size }}
+      >
+        {initials}
+      </span>
+    );
+  }
 
   return (
     <img
-      src={src}
-      alt={`${team} logo`}
-      className={`inline-block align-middle object-contain ${marginClass} ${className}`}
-      style={{ height: `${sizeEm}em`, width: 'auto' }}
-      onError={(e) => {
-        // Hide the image if it 404s (no layout shift)
-        (e.currentTarget as HTMLImageElement).style.display = 'none';
+      src={src} // absolute path from /public
+      alt={`${altPrefix}${team || 'Team'}`}
+      width={size}
+      height={size}
+      className={className}
+      onError={() => {
+        // Log once in dev to see exactly which URL failed
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.warn('[TeamLogo] 404 ->', src, 'for team:', team);
+        }
+        setFailed(true);
       }}
-      loading="eager"
       decoding="async"
+      loading="eager"
     />
   );
 }

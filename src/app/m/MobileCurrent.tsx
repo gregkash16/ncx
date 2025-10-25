@@ -146,7 +146,7 @@ export default async function MobileCurrent() {
                           : "",
                       ].join(" ")}
                     >
-                      <TeamLogo team={m.awayTeam} className="h-7 w-7" />
+                      <TeamLogo team={m.awayTeam} className="h-7 w-7 shrink-0" />
                       <span className="truncate text-sm">{m.awayTeam || "TBD"}</span>
                     </div>
 
@@ -164,7 +164,7 @@ export default async function MobileCurrent() {
                       ].join(" ")}
                     >
                       <span className="truncate text-sm">{m.homeTeam || "TBD"}</span>
-                      <TeamLogo team={m.homeTeam} className="h-7 w-7" />
+                      <TeamLogo team={m.homeTeam} className="h-7 w-7 shrink-0" />
                     </div>
                   </div>
 
