@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
 function norm(s: string) {
-  // trim + normalize + remove diacritics + collapse whitespace
   return (s || '')
     .trim()
     .normalize('NFD')
@@ -16,7 +15,6 @@ function slug(name: string) {
   const n = norm(name)
     .toLowerCase()
     .replace(/&/g, 'and')
-    // keep letters/numbers/spaces/hyphens, drop punctuation
     .replace(/[^\p{L}\p{N}\s-]/gu, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
@@ -46,13 +44,11 @@ export default function TeamLogo({
   const [src, setSrc] = useState(url);
   const [failed, setFailed] = useState(false);
 
-  // update src whenever team changes
   useEffect(() => {
     setFailed(false);
     setSrc(url);
   }, [url]);
 
-  // If image failed, show a text fallback (initials chip)
   if (failed) {
     const initials =
       norm(team)
@@ -66,7 +62,7 @@ export default function TeamLogo({
       <span
         title={`${altPrefix}${team || 'Team'}`}
         className={[
-          'inline-flex items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-[10px] font-bold text-zinc-200',
+          'inline-flex items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-[10px] font-bold text-zinc-200 shrink-0',
           className || '',
         ].join(' ')}
         style={{ width: size, height: size }}
@@ -78,13 +74,11 @@ export default function TeamLogo({
 
   return (
     <img
-      src={src} // absolute path from /public
+      src={src}
       alt={`${altPrefix}${team || 'Team'}`}
-      width={size}
-      height={size}
-      className={className}
+      className={['block object-contain rounded-md border border-zinc-700 bg-zinc-800 shrink-0', className || ''].join(' ')}
+      style={{ width: size, height: size }}
       onError={() => {
-        // Log once in dev to see exactly which URL failed
         if (process.env.NODE_ENV !== 'production') {
           // eslint-disable-next-line no-console
           console.warn('[TeamLogo] 404 ->', src, 'for team:', team);
