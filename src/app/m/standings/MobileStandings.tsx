@@ -1,6 +1,7 @@
 // src/app/m/standings/MobileStandings.tsx
 // Server component (no 'use client')
-import TeamLogo from "@/app/components/TeamLogo";
+import Image from "next/image";
+import { teamSlug } from "@/lib/slug";
 import { getSheets } from "@/lib/googleSheets";
 console.log('[SSR] MobileStandings render', new Date().toISOString());
 
@@ -13,6 +14,31 @@ type Row = {
   points: string;
 };
 
+function Logo({
+  name,
+  size = 24,
+  className = "",
+}: {
+  name: string;
+  size?: number;
+  className?: string;
+}) {
+  const slug = teamSlug(name);
+  const src = slug ? `/logos/${slug}.png` : `/logos/default.png`; // absolute path
+  return (
+    <Image
+      src={src}
+      alt={name || "Team"}
+      width={size}
+      height={size}
+      className={["inline-block object-contain shrink-0", className || ""].join(" ")}
+      unoptimized
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
+
 export default async function MobileStandings() {
   const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
   const sheets = await getSheets();
@@ -24,7 +50,9 @@ export default async function MobileStandings() {
   });
 
   const rows = (res.data.values || []).filter(
-    (r) => (r?.[0] ?? "").toString().trim() !== "" && (r?.[1] ?? "").toString().trim() !== ""
+    (r) =>
+      (r?.[0] ?? "").toString().trim() !== "" &&
+      (r?.[1] ?? "").toString().trim() !== ""
   );
 
   const data: Row[] = rows.map((r) => ({
@@ -62,7 +90,7 @@ export default async function MobileStandings() {
                 <span className="w-6 text-right text-sm font-semibold text-neutral-400">
                   {t.rank || i + 1}
                 </span>
-                <TeamLogo team={t.team} className="h-6 w-6" />
+                <Logo name={t.team} size={24} />
                 <span className="truncate text-sm font-medium text-neutral-200">
                   {t.team}
                 </span>

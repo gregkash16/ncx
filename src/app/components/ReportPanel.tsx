@@ -1,7 +1,10 @@
+// src/app/(home)/ReportPanel.tsx  (or wherever this lives)
+// 'use client' stays the same
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { teamSlug } from "@/lib/slug"; // ✅ use same slugger as everywhere
 
 // The tab key type should match your HomeTabs
 type TabKey = "current" | "matchups" | "standings" | "report" | "indstats";
@@ -118,19 +121,22 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
     }
   }
 
-  // Small helper: team logo (optional)
+  // Small helper: team logo (uses /logos + teamSlug; no borders/background)
   function TeamLogo({ name }: { name: string }) {
-    const key = name?.trim().toLowerCase().replace(/\s+/g, "-");
-    if (!key) return null;
+    const slug = teamSlug(name);
+    if (!slug) return null;
     return (
       <Image
-        src={`/teams/${key}.png`}
+        src={`/logos/${slug}.png`} // ✅ absolute path under /public/logos
         alt={`${name} logo`}
         width={24}
         height={24}
-        className="inline-block rounded-sm align-middle mr-2"
+        className="inline-block align-middle mr-2 object-contain"
+        unoptimized
+        loading="lazy"
+        decoding="async"
         onError={(e) => {
-          // Hide image if missing
+          // hide if missing; Next/Image forwards event to underlying <img>
           (e.currentTarget as HTMLImageElement).style.display = "none";
         }}
       />
@@ -286,4 +292,3 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
     </div>
   );
 }
-/*comment make this happen*/ 
