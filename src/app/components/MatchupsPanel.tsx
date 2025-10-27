@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import type { IndRow } from "@/lib/googleSheets"; // season summaries (wins, losses, winPct, sos, potato)
+import { teamSlug } from "@/lib/slug";             // <- shared slug helper
 
 type MatchRow = {
   game: string;
@@ -34,20 +35,6 @@ type Props = {
   indStats?: IndRow[];
   factionMap?: Record<string, string>; // ncxid -> faction (uppercase)
 };
-
-function teamSlug(name: string) {
-  if (!name) return '';
-  return name
-    .normalize('NFD')                   // handles accents
-    .replace(/\p{Diacritic}/gu, '')     // strips accents
-    .toLowerCase()
-    .replace(/&/g, 'and')
-    .replace(/\s+/g, '-')               // convert spaces to hyphens
-    .replace(/[^\w-]/g, '')             // remove anything not word/hyphen
-    .replace(/-+/g, '-')                // collapse multiple hyphens
-    .replace(/(^-|-$)/g, '');           // trim leading/trailing
-}
-
 
 function parseIntSafe(v: string): number {
   const n = Number((v || "").trim());
@@ -93,13 +80,13 @@ function pickTeamFilter(q: string, rows: MatchRow[]): string {
 
 // Map canonical faction label → PNG filename in /public/factions
 const FACTION_FILE: Record<string, string> = {
-  "REBELS": "Rebels.png",
-  "EMPIRE": "Empire.png",
-  "REPUBLIC": "Republic.png",
-  "CIS": "CIS.png",
-  "RESISTANCE": "Resistance.png",
+  REBELS: "Rebels.png",
+  EMPIRE: "Empire.png",
+  REPUBLIC: "Republic.png",
+  CIS: "CIS.png",
+  RESISTANCE: "Resistance.png",
   "FIRST ORDER": "First Order.png",
-  "SCUM": "Scum.png",
+  SCUM: "Scum.png",
 };
 
 function factionIconSrc(faction?: string) {
@@ -162,8 +149,13 @@ export default function MatchupsPanel({
       ? cleaned
       : cleaned.filter((m) =>
           [
-            m.awayId, m.homeId, m.awayName, m.homeName,
-            m.awayTeam, m.homeTeam, m.scenario,
+            m.awayId,
+            m.homeId,
+            m.awayName,
+            m.homeName,
+            m.awayTeam,
+            m.homeTeam,
+            m.scenario,
           ]
             .filter(Boolean)
             .some((v) => v.toLowerCase().includes(q))
@@ -177,10 +169,10 @@ export default function MatchupsPanel({
     });
 
     rows.sort((a, b) => {
-      const aInSel = selectedTeam &&
-        (a.awayTeam === selectedTeam || a.homeTeam === selectedTeam) ? 1 : 0;
-      const bInSel = selectedTeam &&
-        (b.awayTeam === selectedTeam || b.homeTeam === selectedTeam) ? 1 : 0;
+      const aInSel =
+        selectedTeam && (a.awayTeam === selectedTeam || a.homeTeam === selectedTeam) ? 1 : 0;
+      const bInSel =
+        selectedTeam && (b.awayTeam === selectedTeam || b.homeTeam === selectedTeam) ? 1 : 0;
 
       if (aInSel !== bInSel) return bInSel - aInSel; // selected team first
 
@@ -193,22 +185,19 @@ export default function MatchupsPanel({
   }, [cleaned, query, onlyCompleted, onlyScheduled, selectedTeam]);
 
   const scheduleEnabled =
-    Boolean(weekLabel && scheduleWeek) &&
-    weekLabel!.trim() === scheduleWeek!.trim();
+    Boolean(weekLabel && scheduleWeek) && weekLabel!.trim() === scheduleWeek!.trim();
 
   // Colors (winner = GREEN, loser = RED)
-  const GREEN = "34,197,94";   // tailwind green-500
-  const RED   = "239,68,68";   // tailwind red-500
-  const TIE   = "99,102,241";  // indigo-ish
+  const GREEN = "34,197,94"; // tailwind green-500
+  const RED = "239,68,68"; // tailwind red-500
+  const TIE = "99,102,241"; // indigo-ish
 
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
       <h2 className="text-2xl font-bold text-center mb-4">
         <span className="text-pink-400">WEEKLY</span>{" "}
         <span className="text-cyan-400">MATCHUPS</span>
-        {weekLabel ? (
-          <span className="ml-2 text-zinc-400 text-base">• {weekLabel}</span>
-        ) : null}
+        {weekLabel ? <span className="ml-2 text-zinc-400 text-base">• {weekLabel}</span> : null}
       </h2>
 
       {/* Search + toggles */}
@@ -247,8 +236,7 @@ export default function MatchupsPanel({
       {/* Selected team banner (optional) */}
       {selectedTeam && (
         <div className="mb-4 text-center text-sm text-zinc-300">
-          Showing games involving{" "}
-          <span className="font-semibold text-cyan-300">{selectedTeam}</span>
+          Showing games involving <span className="font-semibold text-cyan-300">{selectedTeam}</span>
         </div>
       )}
 
@@ -258,13 +246,12 @@ export default function MatchupsPanel({
           const homeScore = parseIntSafe(row.homePts);
           const isDone = Boolean((row.scenario || "").trim());
           const winner =
-            awayScore > homeScore ? "away" :
-            homeScore > awayScore ? "home" : "tie";
+            awayScore > homeScore ? "away" : homeScore > awayScore ? "home" : "tie";
 
           const awayLogo = `/logos/${teamSlug(row.awayTeam)}.png`;
           const homeLogo = `/logos/${teamSlug(row.homeTeam)}.png`;
 
-          const leftColor  = winner === "away" ? GREEN : winner === "home" ? RED : TIE;
+          const leftColor = winner === "away" ? GREEN : winner === "home" ? RED : TIE;
           const rightColor = winner === "home" ? GREEN : winner === "away" ? RED : TIE;
 
           const gradientStyle: React.CSSProperties = {
@@ -281,13 +268,12 @@ export default function MatchupsPanel({
               : "";
 
           // Season summaries (from IndStats)
-          const indById = statsMapFromIndRows(indStats);
           const awaySeason = row.awayId ? indById.get(row.awayId) : undefined;
           const homeSeason = row.homeId ? indById.get(row.homeId) : undefined;
 
-          // Faction icons (from factionMap + /public/factions); BIGGER now (36px)
-          const awayFactionIcon = factionIconSrc((factionMap ?? {})[row.awayId]);
-          const homeFactionIcon = factionIconSrc((factionMap ?? {})[row.homeId]);
+          // Faction icons (from factionMap + /public/factions)
+          const awayFactionIcon = factionIconSrc(factionById[row.awayId]);
+          const homeFactionIcon = factionIconSrc(factionById[row.homeId]);
 
           return (
             <div
@@ -300,9 +286,7 @@ export default function MatchupsPanel({
                 <span
                   className={[
                     "inline-flex items-center rounded-lg text-white text-xs font-bold px-2 py-1 shadow-lg",
-                    isDone
-                      ? "bg-cyan-500/90 shadow-cyan-500/30"
-                      : "bg-pink-600/80 shadow-pink-600/30",
+                    isDone ? "bg-cyan-500/90 shadow-cyan-500/30" : "bg-pink-600/80 shadow-pink-600/30",
                   ].join(" ")}
                   title={sched ? sched.replace(/^ — /, "") : undefined}
                 >
@@ -314,22 +298,26 @@ export default function MatchupsPanel({
               <div className="relative z-10 flex items-center justify-between font-semibold text-lg">
                 {/* Away */}
                 <div className="flex items-center gap-3 w-1/3 min-w-0">
-                  <div className="w-[32px] h-[32px] rounded-md overflow-hidden bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                    <Image
-                      src={awayLogo}
-                      alt={row.awayTeam}
-                      width={32}
-                      height={32}
-                      className="object-contain"
-                      unoptimized
-                    />
-                  </div>
-                  <span className={`truncate ${awayScore > homeScore ? "text-pink-400 font-bold" : "text-zinc-300"}`}>
+                  <Image
+                    src={awayLogo}
+                    alt={row.awayTeam || "Team"}
+                    width={32}
+                    height={32}
+                    className="inline-block object-contain shrink-0"
+                    unoptimized
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span
+                    className={`truncate ${
+                      awayScore > homeScore ? "text-pink-400 font-bold" : "text-zinc-300"
+                    }`}
+                  >
                     {row.awayTeam || "TBD"}
                   </span>
                 </div>
 
-                {/* Scenario + Score (BIGGER + SPACED) */}
+                {/* Scenario + Score */}
                 <div className="flex flex-col items-center w-1/3">
                   <span className="text-sm text-zinc-400 mb-1 italic">
                     {row.scenario || "No Scenario"}
@@ -343,34 +331,40 @@ export default function MatchupsPanel({
 
                 {/* Home */}
                 <div className="flex items-center gap-3 justify-end w-1/3 min-w-0">
-                  <span className={`truncate text-right ${homeScore > awayScore ? "text-cyan-400 font-bold" : "text-zinc-300"}`}>
+                  <span
+                    className={`truncate text-right ${
+                      homeScore > awayScore ? "text-cyan-400 font-bold" : "text-zinc-300"
+                    }`}
+                  >
                     {row.homeTeam || "TBD"}
                   </span>
-                  <div className="w-[32px] h-[32px] rounded-md overflow-hidden bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                    <Image
-                      src={homeLogo}
-                      alt={row.homeTeam}
-                      width={32}
-                      height={32}
-                      className="object-contain"
-                      unoptimized
-                    />
-                  </div>
+                  <Image
+                    src={homeLogo}
+                    alt={row.homeTeam || "Team"}
+                    width={32}
+                    height={32}
+                    className="inline-block object-contain shrink-0"
+                    unoptimized
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
               </div>
 
-              {/* Player names + NCX IDs + (BIGGER) Faction icons */}
+              {/* Player names + NCX IDs + Faction icons */}
               <div className="relative z-10 mt-3 text-sm text-zinc-200 grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-3">
-                  {/* faction icon (away) — CLEAN */}
+                  {/* faction icon (away) */}
                   {awayFactionIcon && (
                     <Image
                       src={awayFactionIcon}
                       alt={`${row.awayName} faction`}
-                      width={48}      // make it a bit bigger for clarity
+                      width={48}
                       height={48}
                       className="object-contain"
                       unoptimized
+                      loading="lazy"
+                      decoding="async"
                     />
                   )}
 
@@ -388,8 +382,10 @@ export default function MatchupsPanel({
                       {row.homeId}
                     </span>
                   ) : null}
-                  <span className="text-cyan-400 font-semibold text-right">{row.homeName || "—"}</span>
-                  {/* faction icon (home) — CLEAN */}
+                  <span className="text-cyan-400 font-semibold text-right">
+                    {row.homeName || "—"}
+                  </span>
+                  {/* faction icon (home) */}
                   {homeFactionIcon && (
                     <Image
                       src={homeFactionIcon}
@@ -398,12 +394,14 @@ export default function MatchupsPanel({
                       height={48}
                       className="object-contain"
                       unoptimized
+                      loading="lazy"
+                      decoding="async"
                     />
                   )}
                 </div>
               </div>
 
-              {/* Season summary rail (kept) */}
+              {/* Season summary rail */}
               <div className="relative z-10 mt-4 grid grid-cols-2 gap-3 text-xs text-zinc-300">
                 <div className="bg-zinc-800/60 rounded-lg px-3 py-2">
                   <div>
@@ -433,8 +431,6 @@ export default function MatchupsPanel({
                   </div>
                 </div>
               </div>
-
-              {/* (Removed the inner W/L/PTS/PLMS section per your request) */}
             </div>
           );
         })}

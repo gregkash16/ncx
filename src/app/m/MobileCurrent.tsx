@@ -1,7 +1,9 @@
 // src/app/m/MobileCurrent.tsx
 // Server Component (no 'use client')
-import TeamLogo from "@/app/components/TeamLogo";
+import type React from "react";
+import Image from "next/image";
 import { getSheets } from "@/lib/googleSheets";
+import { teamSlug } from "@/lib/slug";
 
 type SeriesRow = {
   awayTeam: string;
@@ -13,6 +15,38 @@ type SeriesRow = {
 function toInt(val: unknown): number {
   const n = parseInt(String(val ?? "").trim(), 10);
   return Number.isFinite(n) ? n : 0;
+}
+
+// Small helper: absolute, basePath-aware, clean PNG with transparency.
+function Logo({
+  name,
+  size = 28,
+  className = "",
+  side,
+}: {
+  name: string;
+  size?: number;
+  className?: string;
+  side: "left" | "right";
+}) {
+  const slug = teamSlug(name);
+  const src = slug ? `/logos/${slug}.png` : `/logos/default.png`;
+  return (
+    <Image
+      src={src}              // absolute path (leading slash)
+      alt={name || "Team"}
+      width={size}
+      height={size}
+      className={[
+        "inline-block object-contain shrink-0",
+        side === "left" ? "mr-2" : "ml-2",
+        className || "",
+      ].join(" ")}
+      unoptimized
+      loading="lazy"
+      decoding="async"
+    />
+  );
 }
 
 export default async function MobileCurrent() {
@@ -116,8 +150,10 @@ export default async function MobileCurrent() {
               else if (home > away) winner = "home";
             }
 
-            const leftColor = winner === "away" ? GREEN : winner === "home" ? RED : "0,0,0";
-            const rightColor = winner === "home" ? GREEN : winner === "away" ? RED : "0,0,0";
+            const leftColor =
+              winner === "away" ? GREEN : winner === "home" ? RED : "0,0,0";
+            const rightColor =
+              winner === "home" ? GREEN : winner === "away" ? RED : "0,0,0";
 
             const gradientStyle: React.CSSProperties = seriesOver
               ? {
@@ -146,7 +182,7 @@ export default async function MobileCurrent() {
                           : "",
                       ].join(" ")}
                     >
-                      <TeamLogo team={m.awayTeam} className="h-7 w-7 shrink-0" />
+                      <Logo name={m.awayTeam} side="left" size={28} />
                       <span className="truncate text-sm">{m.awayTeam || "TBD"}</span>
                     </div>
 
@@ -164,7 +200,7 @@ export default async function MobileCurrent() {
                       ].join(" ")}
                     >
                       <span className="truncate text-sm">{m.homeTeam || "TBD"}</span>
-                      <TeamLogo team={m.homeTeam} className="h-7 w-7 shrink-0" />
+                      <Logo name={m.homeTeam} side="right" size={28} />
                     </div>
                   </div>
 

@@ -1,7 +1,7 @@
 // Server Component: no 'use client'
 import Link from "next/link";
 import { getSheets } from "@/lib/googleSheets";
-import TeamLogo from "../components/TeamLogo";
+import { teamSlug } from "@/lib/slug";
 
 type SeriesRow = {
   awayTeam: string;
@@ -34,6 +34,37 @@ function WinBoxes({ wins }: { wins: number }) {
         );
       })}
     </div>
+  );
+}
+
+function Logo({
+  name,
+  side,
+  size = 28,
+  className = "",
+}: {
+  name: string;
+  side: "left" | "right";
+  size?: number;
+  className?: string;
+}) {
+  const src = `/logos/${teamSlug(name)}.png`;
+  // No borders / background so the PNG’s transparency shows cleanly.
+  // object-contain keeps aspect ratio inside a square box.
+  return (
+    <img
+      src={src}
+      alt={name || "Team"}
+      width={size}
+      height={size}
+      className={[
+        "inline-block shrink-0 object-contain",
+        side === "left" ? "mr-2" : "ml-2",
+        className,
+      ].join(" ")}
+      decoding="async"
+      loading="lazy"
+    />
   );
 }
 
@@ -106,13 +137,7 @@ export default async function CurrentWeekCard() {
     const seriesOver = s.awayWins >= 4 || s.homeWins >= 4;
     const awayWinner = seriesOver && s.awayWins >= 4 && s.awayWins > s.homeWins;
     const homeWinner = seriesOver && s.homeWins >= 4 && s.homeWins > s.awayWins;
-
-    return {
-      ...s,
-      seriesOver,
-      awayWinner,
-      homeWinner,
-    };
+    return { ...s, seriesOver, awayWinner, homeWinner };
   });
 
   const GREEN = "34,197,94";
@@ -129,7 +154,7 @@ export default async function CurrentWeekCard() {
       ) : (
         <ul className="mt-3 space-y-3 text-base">
           {items.map((m, i) => {
-            const leftColor  = m.awayWinner ? RED : m.homeWinner ? GREEN : "0,0,0";
+            const leftColor = m.awayWinner ? RED : m.homeWinner ? GREEN : "0,0,0";
             const rightColor = m.homeWinner ? RED : m.awayWinner ? GREEN : "0,0,0";
 
             const gradientStyle: React.CSSProperties = m.seriesOver
@@ -141,7 +166,6 @@ export default async function CurrentWeekCard() {
                 }
               : {};
 
-            // Send the user to the Matchups tab with a pre-filled filter
             const q = `${m.awayTeam} ${m.homeTeam}`;
             const href = `?tab=matchups&q=${encodeURIComponent(q)}`;
 
@@ -155,11 +179,12 @@ export default async function CurrentWeekCard() {
                 >
                   {/* Left: logo + name */}
                   <div
-                    className={`flex items-center justify-start text-zinc-300 ${
-                      m.awayWinner ? "font-bold uppercase" : m.homeWinner ? "line-through" : ""
-                    }`}
+                    className={[
+                      "flex items-center justify-start text-zinc-300",
+                      m.awayWinner ? "font-bold uppercase" : m.homeWinner ? "line-through" : "",
+                    ].join(" ")}
                   >
-                    <TeamLogo team={m.awayTeam} side="left" />
+                    <Logo name={m.awayTeam} side="left" />
                     <span className="break-words">{m.awayTeam}</span>
                   </div>
 
@@ -174,12 +199,13 @@ export default async function CurrentWeekCard() {
 
                   {/* Right: name + logo */}
                   <div
-                    className={`flex items-center justify-end text-zinc-300 ${
-                      m.homeWinner ? "font-bold uppercase" : m.awayWinner ? "line-through" : ""
-                    }`}
+                    className={[
+                      "flex items-center justify-end text-zinc-300",
+                      m.homeWinner ? "font-bold uppercase" : m.awayWinner ? "line-through" : "",
+                    ].join(" ")}
                   >
                     <span className="break-words">{m.homeTeam}</span>
-                    <TeamLogo team={m.homeTeam} side="right" />
+                    <Logo name={m.homeTeam} side="right" />
                   </div>
                 </Link>
               </li>
