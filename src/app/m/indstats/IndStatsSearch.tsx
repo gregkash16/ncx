@@ -2,7 +2,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import TeamLogo from "@/app/components/TeamLogo";
+import Image from "next/image";
+import { teamSlug } from "@/lib/slug";
 
 type Player = {
   rank: number;
@@ -93,9 +94,7 @@ export default function IndStatsSearch() {
           </div>
         )}
         {loading && (
-          <div className="mt-4 text-center text-sm text-neutral-300">
-            Searching…
-          </div>
+          <div className="mt-4 text-center text-sm text-neutral-300">Searching…</div>
         )}
         {showEmptyState && (
           <div className="mt-4 text-center text-sm text-neutral-400">
@@ -108,11 +107,11 @@ export default function IndStatsSearch() {
             {items.map((p) => {
               const name = `${p.first} ${p.last}`.trim() || p.ncxid;
               const wl = `${p.wins}-${p.losses}`;
+              const slug = teamSlug(p.team);
+              const logoSrc = slug ? `/logos/${slug}.png` : `/logos/default.png`;
+
               return (
-                <li
-                  key={p.ncxid}
-                  className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3"
-                >
+                <li key={p.ncxid} className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3">
                   {/* Top row: Rank badge • Name • Team/Faction */}
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
@@ -122,7 +121,19 @@ export default function IndStatsSearch() {
                       >
                         {p.rank || "—"}
                       </span>
-                      <TeamLogo team={p.team} className="h-6 w-6" />
+
+                      {/* Team logo (transparent, no border/bg) */}
+                      <Image
+                        src={logoSrc}
+                        alt={p.team || "Team"}
+                        width={24}
+                        height={24}
+                        className="inline-block object-contain shrink-0"
+                        unoptimized
+                        loading="lazy"
+                        decoding="async"
+                      />
+
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium text-neutral-200">
                           {name}
