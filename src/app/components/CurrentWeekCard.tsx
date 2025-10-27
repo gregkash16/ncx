@@ -49,8 +49,6 @@ function Logo({
   className?: string;
 }) {
   const src = `/logos/${teamSlug(name)}.png`;
-  // No borders / background so the PNG’s transparency shows cleanly.
-  // object-contain keeps aspect ratio inside a square box.
   return (
     <img
       src={src}
@@ -68,7 +66,22 @@ function Logo({
   );
 }
 
-export default async function CurrentWeekCard() {
+function parseWeekNum(label: string | undefined): number | null {
+  if (!label) return null;
+  const m = label.trim().match(/week\s*(\d+)/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+function formatWeekLabel(n: number) {
+  return `WEEK ${n}`;
+}
+
+export default async function CurrentWeekCard({
+  activeWeek,
+  selectedWeek,
+}: {
+  activeWeek: string;
+  selectedWeek?: string | null;
+}) {
   const spreadsheetId =
     process.env.NCX_LEAGUE_SHEET_ID || process.env.SHEETS_SPREADSHEET_ID;
 
@@ -85,26 +98,19 @@ export default async function CurrentWeekCard() {
 
   const sheets = getSheets();
 
-  const u2 = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "SCHEDULE!U2",
-  });
-  const activeWeek = u2.data.values?.[0]?.[0] as string | undefined;
+  // Determine which week to display
+  const showWeek = (selectedWeek && selectedWeek.trim()) || activeWeek || "WEEK 1";
 
-  if (!activeWeek) {
-    return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
-        <h2 className="text-xl font-semibold text-pink-400">Current Week</h2>
-        <p className="mt-2 text-zinc-400">
-          No active week found (SCHEDULE!U2 is empty).
-        </p>
-      </div>
-    );
-  }
+  const activeNum = parseWeekNum(activeWeek);
+  const pastWeeks =
+    activeNum && activeNum > 0
+      ? Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1))
+      : [];
 
+  // Fetch data for showWeek
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${activeWeek}!A1:P120`,
+    range: `${showWeek}!A1:Q120`,
   });
   const data = resp.data.values ?? [];
 
@@ -143,12 +149,53 @@ export default async function CurrentWeekCard() {
   const GREEN = "34,197,94";
   const RED = "239,68,68";
 
+  const btnBase =
+    "group relative overflow-hidden rounded-xl border bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
+  const gradient =
+    "pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100";
+
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 hover:border-purple-500/40 transition w-full">
       <h2 className="text-2xl font-extrabold text-center uppercase bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_20px_rgba(255,0,255,0.25)] mb-4 tracking-wide">
-        Current Week — {activeWeek}
+        {showWeek === activeWeek ? "Current Week" : "Week View"} — {showWeek}
       </h2>
 
+      {/* Week selector strip */}
+      {activeNum && activeNum > 1 && (
+        <div className="flex flex-wrap justify-center gap-2 mb-5">
+          {pastWeeks.map((wk) => {
+            const selected = wk.toUpperCase() === showWeek.toUpperCase();
+            const isActive = wk.toUpperCase() === activeWeek.toUpperCase();
+            const href =
+              wk === activeWeek ? "?tab=current" : `?tab=current&w=${encodeURIComponent(wk)}`;
+
+            return (
+              <Link
+                key={wk}
+                href={href}
+                scroll={false}
+                className={[
+                  btnBase,
+                  isActive ? "border-yellow-400/70" : selected ? "border-cyan-400/60" : "border-purple-500/40",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    gradient,
+                    isActive
+                      ? "bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20"
+                      : "bg-gradient-to-r from-pink-600/20 via-purple-500/20 to-cyan-500/20",
+                    selected ? "opacity-100" : "",
+                  ].join(" ")}
+                />
+                <span className="relative z-10">{wk}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Matchup grid */}
       {items.length === 0 ? (
         <p className="mt-2 text-zinc-400">No matchups found.</p>
       ) : (
@@ -167,7 +214,8 @@ export default async function CurrentWeekCard() {
               : {};
 
             const q = `${m.awayTeam} ${m.homeTeam}`;
-            const href = `?tab=matchups&q=${encodeURIComponent(q)}`;
+            const href = `?tab=matchups&w=${encodeURIComponent(showWeek)}&q=${encodeURIComponent(q)}`;
+
 
             return (
               <li key={i} className="list-none">
@@ -177,7 +225,7 @@ export default async function CurrentWeekCard() {
                   className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border border-zinc-800 rounded-xl px-5 py-3 bg-zinc-950/60 relative overflow-hidden hover:border-purple-500/50 hover:bg-zinc-900/40 cursor-pointer"
                   style={gradientStyle}
                 >
-                  {/* Left: logo + name */}
+                  {/* Away */}
                   <div
                     className={[
                       "flex items-center justify-start text-zinc-300",
@@ -188,7 +236,7 @@ export default async function CurrentWeekCard() {
                     <span className="break-words">{m.awayTeam}</span>
                   </div>
 
-                  {/* Center: win boxes + score */}
+                  {/* Center */}
                   <div className="flex items-center justify-center gap-3 z-10">
                     <WinBoxes wins={m.awayWins} />
                     <div className="text-center min-w-[5.5rem] font-semibold text-zinc-100">
@@ -197,7 +245,7 @@ export default async function CurrentWeekCard() {
                     <WinBoxes wins={m.homeWins} />
                   </div>
 
-                  {/* Right: name + logo */}
+                  {/* Home */}
                   <div
                     className={[
                       "flex items-center justify-end text-zinc-300",

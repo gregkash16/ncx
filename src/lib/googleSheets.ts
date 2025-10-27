@@ -16,8 +16,6 @@ export function getSheets(): sheets_v4.Sheets {
       "Missing GOOGLE_SERVICE_ACCOUNT_EMAIL or GOOGLE_SERVICE_ACCOUNT_KEY"
     );
   }
-
-  // If the key is provided with literal \n, turn them into real newlines.
   key = key.replace(/\\n/g, "\n");
 
   const jwt = new google.auth.JWT({
@@ -33,10 +31,6 @@ export function getSheets(): sheets_v4.Sheets {
 
 function norm(v: unknown): string {
   return String(v ?? "").trim();
-}
-
-function normalizeDiscordId(v: unknown): string {
-  return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
 }
 
 /** tiny 429 retry/backoff */
@@ -87,6 +81,51 @@ export type MatchupsData = {
   matches: MatchRow[];
 };
 
+// Single mapping used everywhere (A..Q = 0..16)
+function mapGridRowToMatchRow(r: any[]): MatchRow {
+  const game = norm(r?.[0]);         // A
+  const awayId = norm(r?.[1]);       // B
+  const awayName = norm(r?.[2]);     // C
+  const awayTeam = norm(r?.[3]);     // D
+  const awayW = norm(r?.[4]);        // E
+  const awayL = norm(r?.[5]);        // F
+  const awayPts = norm(r?.[6]);      // G
+  const awayPLMS = norm(r?.[7]);     // H
+  // I (index 8) intentionally ignored
+  const homeId = norm(r?.[9]);       // J
+  const homeName = norm(r?.[10]);    // K
+  const homeTeam = norm(r?.[11]);    // L
+  const homeW = norm(r?.[12]);       // M
+  const homeL = norm(r?.[13]);       // N
+  const homePts = norm(r?.[14]);     // O
+  const homePLMS = norm(r?.[15]);    // P
+  const scenario = norm(r?.[16]);    // Q
+
+  const nGame = Number(game);
+  const seriesNo =
+    Number.isFinite(nGame) && nGame > 0 ? Math.ceil(nGame / 7) : 0;
+
+  return {
+    game,
+    awayId,
+    awayName,
+    awayTeam,
+    awayW,
+    awayL,
+    awayPts,
+    awayPLMS,
+    homeId,
+    homeName,
+    homeTeam,
+    homeW,
+    homeL,
+    homePts,
+    homePLMS,
+    scenario,
+    seriesNo,
+  };
+}
+
 /**
  * Reads SCHEDULE!U2 to discover the active week tab (e.g. "WEEK 3"),
  * then loads that tab's A2:Q120 and returns normalized match rows.
@@ -118,48 +157,56 @@ export async function fetchMatchupsData(): Promise<MatchupsData> {
 
   // 3) Normalize and filter
   const matches: MatchRow[] = rows
-    .map((r) => {
-      const game = norm(r?.[0]);
-      const awayTeam = norm(r?.[3]);
-      const homeTeam = norm(r?.[11]);
-
-      // derive seriesNo: games 1–7 => 1, 8–14 => 2, etc.
-      const nGame = Number(game);
-      const seriesNo =
-        Number.isFinite(nGame) && nGame > 0 ? Math.ceil(nGame / 7) : 0;
-
-      return {
-        game,
-        awayId: norm(r?.[1]),
-        awayName: norm(r?.[2]),
-        awayTeam,
-        awayW: norm(r?.[4]),
-        awayL: norm(r?.[5]),
-        awayPts: norm(r?.[6]),
-        awayPLMS: norm(r?.[7]),
-        homeId: norm(r?.[9]),
-        homeName: norm(r?.[10]),
-        homeTeam,
-        homeW: norm(r?.[12]),
-        homeL: norm(r?.[13]),
-        homePts: norm(r?.[14]),
-        homePLMS: norm(r?.[15]),
-        scenario: norm(r?.[16]),
-        seriesNo,
-      };
-    })
+    .map(mapGridRowToMatchRow)
     // Keep only rows that have a game number and at least one team present
     .filter((m) => m.game !== "" && (m.awayTeam !== "" || m.homeTeam !== ""));
 
   return { weekTab, matches };
 }
 
-/** Cached wrapper (reduces quota). Revalidates every 60s. */
-export const fetchMatchupsDataCached = unstable_cache(
-  async () => fetchMatchupsData(),
-  ["matchups-data"],
-  { revalidate: 60 }
-);
+/** Cached, param-aware wrapper for matchups. Revalidates every 60s. */
+export async function fetchMatchupsDataCached(weekOverride?: string): Promise<MatchupsData> {
+  const cached = unstable_cache(
+    async (): Promise<MatchupsData> => {
+      const sheets = getSheets();
+      const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
+      if (!spreadsheetId) throw new Error("Missing NCX_LEAGUE_SHEET_ID");
+
+      // Get active week (SCHEDULE!U2)
+      const u2 = await withBackoff(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: "SCHEDULE!U2",
+          valueRenderOption: "FORMATTED_VALUE",
+        })
+      );
+      const activeWeek = norm(u2.data.values?.[0]?.[0]) || "WEEK 1";
+      const targetWeek = (weekOverride && weekOverride.trim()) || activeWeek;
+
+      // Fetch week grid
+      const res = await withBackoff(() =>
+        sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${targetWeek}!A2:Q120`, // A..Q = 0..16
+          valueRenderOption: "FORMATTED_VALUE",
+        })
+      );
+
+      const rows = res.data.values ?? [];
+      const matches: MatchRow[] = rows
+        .map(mapGridRowToMatchRow)
+        .filter((m) => m.game !== "" && (m.awayTeam !== "" || m.homeTeam !== ""));
+
+      return { weekTab: targetWeek, matches };
+    },
+    // ✅ concrete cache key parts (param-aware)
+    ["matchups-data", weekOverride || "active"],
+    { revalidate: 60 }
+  );
+
+  return cached();
+}
+
 
 /** ---------- Individual stats ---------- */
 
@@ -352,7 +399,7 @@ export const getDiscordMapCached = unstable_cache(
   { revalidate: 300 }
 );
 
-// --- NEW: Faction map loader -------------------------------------------------
+// --- Faction map loader -------------------------------------------------
 export type FactionMap = Record<string, string>; // ncxid -> "REBELS" | "EMPIRE" | ...
 
 let __factionMapCache: { data: FactionMap; at: number } | null = null;
@@ -364,23 +411,27 @@ export async function fetchFactionMapCached(): Promise<FactionMap> {
   }
 
   const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-  const sheets = await getSheets();
+  const sheets = getSheets();
 
   // Read YES/NO switch from K28 on the NCXID tab
-  const switchRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "NCXID!K28",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
+  const switchRes = await withBackoff(() =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "NCXID!K28",
+      valueRenderOption: "FORMATTED_VALUE",
+    })
+  );
   const switchVal = ((switchRes.data.values?.[0]?.[0] ?? "") as string).trim().toUpperCase();
   const useSwitch = switchVal === "YES";
 
   // Read A2:I215 → need A (NCXID), H (Faction), I (Faction Switch)
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "NCXID!A2:I215",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
+  const res = await withBackoff(() =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "NCXID!A2:I215",
+      valueRenderOption: "FORMATTED_VALUE",
+    })
+  );
 
   const rows = (res.data.values ?? []) as string[][];
   const map: FactionMap = {};
@@ -394,7 +445,6 @@ export async function fetchFactionMapCached(): Promise<FactionMap> {
     const chosen = useSwitch ? factionI : factionH;
 
     if (chosen) {
-      // Normalize to your canonical uppercase labels
       map[ncxid] = chosen.toUpperCase();
     }
   }
@@ -402,4 +452,3 @@ export async function fetchFactionMapCached(): Promise<FactionMap> {
   __factionMapCache = { data: map, at: Date.now() };
   return map;
 }
-
