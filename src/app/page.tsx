@@ -19,6 +19,9 @@ import {
   fetchIndStatsDataCached,
   fetchStreamScheduleCached,
   fetchFactionMapCached,
+  type IndRow,
+  type FactionMap,
+  type MatchRow,
 } from "@/lib/googleSheets";
 
 function parseWeekNum(label: string | undefined | null): number | null {
@@ -28,12 +31,10 @@ function parseWeekNum(label: string | undefined | null): number | null {
 }
 
 function normalizeDiscordId(v: unknown): string {
-  return String(v ?? "")
-    .trim()
-    .replace(/[<@!>]/g, "")
-    .replace(/\D/g, "");
+  return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
 }
 
+// NOTE: searchParams is a Promise in Next 15 server components
 export default async function HomePage({
   searchParams,
 }: {
@@ -41,6 +42,7 @@ export default async function HomePage({
 }) {
   const sp = await searchParams;
 
+  // --- Welcome banner (Discord -> NCXID lookup, cached) ---
   const session = await getServerSession(authOptions);
   let message = "Please log in with your Discord.";
 
@@ -68,14 +70,18 @@ export default async function HomePage({
     }
   }
 
-  // 1) Fetch active week & default matches (this gives us the true active week)
-  const [{ weekTab: activeWeek, matches: activeMatches }, indStats, streamSched, factionMap] =
-    await Promise.all([
-      fetchMatchupsDataCached(),      // active week
-      fetchIndStatsDataCached(),
-      fetchStreamScheduleCached(),
-      fetchFactionMapCached(),
-    ]);
+  // 1) Get the true active week + default matches
+  const [
+    { weekTab: activeWeek, matches: activeMatches },
+    indStats,
+    streamSched,
+    factionMap,
+  ] = await Promise.all([
+    fetchMatchupsDataCached(), // active week (cached 60s)
+    fetchIndStatsDataCached(), // cached 5m
+    fetchStreamScheduleCached(), // cached 5m
+    fetchFactionMapCached(), // tiny in-memory cache + live read
+  ]);
 
   // 2) Read ?w=WEEK N and enforce "only up to active"
   const requestedWeekRaw = (sp?.w as string | undefined) || undefined;
@@ -84,22 +90,49 @@ export default async function HomePage({
   const selectedWeek =
     reqNum && activeNum && reqNum <= activeNum ? requestedWeekRaw : undefined;
 
-  // 3) If a valid past week is requested, refetch matches for that week
-  const { matches: matchesToUse, weekTab: weekLabelForPanel } = selectedWeek
+  // 3) If a valid past week is requested, fetch that week’s matches (cached by week key)
+  const {
+    matches: matchesToUse,
+    weekTab: weekLabelForPanel,
+  }: { matches: MatchRow[]; weekTab: string } = selectedWeek
     ? await fetchMatchupsDataCached(selectedWeek)
     : { matches: activeMatches, weekTab: activeWeek };
 
   return (
     <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
-      {/* ... your hero ... */}
+      {/* HERO */}
+      <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-6 text-center">
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,0,150,0.25),transparent_70%)] animate-pulse"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_120%,rgba(0,255,255,0.15),transparent_60%)] blur-3xl"></div>
+        </div>
 
+        <div className="flex flex-col items-center space-y-6">
+          <Image
+            src="/logo.png"
+            alt="NCX Draft League Season 8"
+            width={240}
+            height={240}
+            priority
+            className="drop-shadow-[0_0_30px_rgba(255,0,150,0.5)] hover:scale-105 transition-transform duration-500"
+          />
+
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
+            DRAFT LEAGUE • SEASON 8
+          </h1>
+
+          <p className="text-zinc-300 text-lg font-medium">{message}</p>
+        </div>
+      </section>
+
+      {/* TABS + PANELS */}
       <section className="w-full px-4 pb-24">
         <div className="w-full max-w-[110rem] mx-auto">
           <HomeTabs
             currentWeekPanel={
               <CurrentWeekCard
                 key="current-week"
-                // 👇 keep the true active, and the selected (if any)
+                // Pass both the true active and the validated selection
                 activeWeek={activeWeek}
                 selectedWeek={selectedWeek}
               />
@@ -108,10 +141,8 @@ export default async function HomePage({
               <MatchupsPanel
                 key="matchups"
                 data={matchesToUse}
-                // Show label of the currently displayed set (selected or active)
-                weekLabel={weekLabelForPanel}
-                // 👇 also pass the true active week so pills know the max
-                activeWeek={activeWeek}
+                weekLabel={weekLabelForPanel}      // label of the shown data (selected or active)
+                activeWeek={activeWeek}             // the true current week for the pills/max bound
                 scheduleWeek={streamSched.scheduleWeek}
                 scheduleMap={streamSched.scheduleMap}
                 indStats={indStats ?? []}
