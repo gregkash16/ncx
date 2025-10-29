@@ -1,52 +1,88 @@
 // src/app/m/matchups/MatchupsClient.tsx
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import MatchCard from './MatchCard';
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import MatchCard from "./MatchCard";
 
 type MatchRow = {
   game: string;
-  awayTeam: string; homeTeam: string;
-  awayName?: string; homeName?: string;
-  awayId?: string; homeId?: string;
-  awayPts?: string | number; homePts?: string | number;
+  awayTeam: string;
+  homeTeam: string;
+  awayName?: string;
+  homeName?: string;
+  awayId?: string;
+  homeId?: string;
+  awayPts?: string | number;
+  homePts?: string | number;
   scenario?: string;
 };
 
 type Payload = {
   rows: MatchRow[];
-  weekLabel: string;
+  weekLabel: string; // shown data label (selected or active)
+  activeWeek: string; // true active week for max bound
   scheduleWeek: string;
   scheduleMap: Record<string, { day: string; slot: string }>;
 };
 
+function parseWeekNum(label?: string | null): number | null {
+  if (!label) return null;
+  const m = label.trim().match(/week\s*(\d+)/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+function formatWeekLabel(n: number) {
+  return `WEEK ${n}`;
+}
 function gameNum(g: string): number {
-  const m = (g || '').match(/^\d+/);
+  const m = (g || "").match(/^\d+/);
   return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
 }
 
 export default function MatchupsClient({ payload }: { payload: Payload }) {
-  const [query, setQuery] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
+  const sp = useSearchParams();
+
+  const {
+    rows: baseRows = [],
+    weekLabel = "",
+    activeWeek = "",
+    scheduleWeek = "",
+    scheduleMap = {},
+  } = payload ?? ({} as Payload);
+
+  // Initialize query from ?q so taps from Current carry the filter
+  const qFromUrl = (sp.get("q") ?? "").trim();
+  const wFromUrl = (sp.get("w") ?? "").trim();
+
+  const [query, setQuery] = useState(qFromUrl);
   const [onlyCompleted, setOnlyCompleted] = useState(false);
   const [onlyScheduled, setOnlyScheduled] = useState(false);
 
-  // ✅ Safe default with full Payload shape
-  const {
-    rows: baseRows,
-    weekLabel,
-    scheduleWeek,
-    scheduleMap,
-  } = payload ?? {
-    rows: [],
-    weekLabel: '',
-    scheduleWeek: '',
-    scheduleMap: {},
-  };
+  // Keep input in sync if the URL changes (e.g., tapping another matchup)
+  useEffect(() => {
+    setQuery(qFromUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qFromUrl]);
 
+  // Week strip: Current + WEEK 1..active
+  const activeNum = useMemo(() => parseWeekNum(activeWeek), [activeWeek]);
+  const selectedNum = useMemo(() => parseWeekNum(wFromUrl || weekLabel), [wFromUrl, weekLabel]);
+
+  const isCurrentSelected = useMemo(() => {
+    if (!activeNum) return true;
+    return !selectedNum || selectedNum === activeNum;
+  }, [activeNum, selectedNum]);
+
+  const weekPills = useMemo(() => {
+    if (!activeNum || activeNum <= 0) return [activeWeek].filter(Boolean);
+    return Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1));
+  }, [activeNum, activeWeek]);
+
+  // Schedule chips only if the page’s week equals the schedule’s week
   const scheduleOn =
-    Boolean(weekLabel) &&
-    Boolean(scheduleWeek) &&
-    weekLabel.trim() === scheduleWeek.trim();
+    Boolean(weekLabel) && Boolean(scheduleWeek) && weekLabel.trim() === scheduleWeek.trim();
 
   const rows = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -61,7 +97,7 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
     }
 
     arr = arr.filter((m) => {
-      const isCompleted = Boolean(String(m.scenario || '').trim());
+      const isCompleted = Boolean(String(m.scenario || "").trim());
       if (onlyCompleted && !isCompleted) return false;
       if (onlyScheduled && isCompleted) return false;
       return true;
@@ -71,12 +107,14 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
     return arr;
   }, [baseRows, query, onlyCompleted, onlyScheduled]);
 
-  if (!rows.length) {
-    return (
-      <div className="max-w-screen-sm mx-auto px-3 py-6 text-center text-zinc-400">
-        No matchups found.
-      </div>
-    );
+  function goWeek(wk: string) {
+    const params = new URLSearchParams(Array.from(sp.entries()));
+    if (wk.toUpperCase() === activeWeek.toUpperCase()) params.delete("w");
+    else params.set("w", wk);
+    // keep q so deep links from Current still filter
+    const next = params.toString();
+    const href = next ? `${pathname}?${next}` : pathname;
+    router.replace(href, { scroll: false });
   }
 
   return (
@@ -85,6 +123,50 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
         <h2 className="mb-3 text-center text-[15px] font-extrabold tracking-wide bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
           WEEKLY MATCHUPS {weekLabel ? <span className="text-zinc-400">• {weekLabel}</span> : null}
         </h2>
+
+        {/* Week selector strip (Current + WEEK 1..active) */}
+        {activeNum && activeNum > 1 && (
+          <div className="mb-4 flex flex-wrap justify-center gap-2">
+            {/* Current */}
+            <button
+              type="button"
+              onClick={() => goWeek(activeWeek)}
+              className="group relative overflow-hidden rounded-md border border-yellow-400/70 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow transition active:scale-[0.98]"
+            >
+              <span className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20 opacity-100 group-hover:opacity-100" />
+              <span className="relative z-10">Current</span>
+            </button>
+
+            {weekPills.map((wk) => {
+              const selected = wk.toUpperCase() === weekLabel.toUpperCase() && !isCurrentSelected;
+              const isActive = wk.toUpperCase() === activeWeek.toUpperCase();
+
+              const cls =
+                isActive
+                  ? "border-yellow-400/70"
+                  : selected
+                  ? "border-cyan-400/60"
+                  : "border-purple-500/40";
+
+              const glow =
+                isActive
+                  ? "bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20"
+                  : "bg-gradient-to-r from-pink-600/20 via-purple-500/20 to-cyan-500/20";
+
+              return (
+                <button
+                  key={wk}
+                  type="button"
+                  onClick={() => goWeek(wk)}
+                  className={`group relative overflow-hidden rounded-md border ${cls} bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow transition active:scale-[0.98]`}
+                >
+                  <span className={`pointer-events-none absolute inset-0 z-0 ${glow} ${selected ? "opacity-100" : ""}`} />
+                  <span className="relative z-10">{wk}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Sticky filter bar */}
         <div className="sticky top-0 z-20 -mx-3 px-3 py-3 mb-4 bg-zinc-900/85 backdrop-blur supports-[backdrop-filter]:bg-zinc-900/60 border-b border-zinc-800 rounded-none">
@@ -130,16 +212,20 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
         </div>
 
         {/* Cards */}
-        <div className="space-y-4">
-          {rows.map((row, i) => (
-            <MatchCard
-              key={`${row.game}-${i}`}
-              row={row}
-              scheduleOn={scheduleOn}
-              scheduleMap={scheduleMap}
-            />
-          ))}
-        </div>
+        {rows.length === 0 ? (
+          <div className="px-3 py-6 text-center text-zinc-400">No matchups found.</div>
+        ) : (
+          <div className="space-y-4">
+            {rows.map((row, i) => (
+              <MatchCard
+                key={`${row.game}-${i}`}
+                row={row}
+                scheduleOn={scheduleOn}
+                scheduleMap={scheduleMap}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
