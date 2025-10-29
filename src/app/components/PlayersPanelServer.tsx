@@ -2,8 +2,12 @@
 // Server Component (no 'use client')
 import PlayersPanel from "./PlayersPanel";
 import { fetchAllTimeStatsCached } from "@/lib/googleSheets";
+import { fetchVideosByNCXID } from "@/lib/youtube";
 
-// Exported so PlayersPanel.tsx can `import type { PlayerRow } from "./PlayersPanelServer"`
+/**
+ * Exported so PlayersPanel.tsx (client) can `import type { PlayerRow } from "./PlayersPanelServer"`.
+ * NOTE: Do not add runtime-only fields here unless PlayersPanel also expects them.
+ */
 export type PlayerRow = {
   ncxid: string;
   first: string;
@@ -19,6 +23,62 @@ export type PlayerRow = {
   seasons: (string | null)[]; // S1..S8 team names, null if empty
   championships: string;
 };
+
+/**
+ * ⬇️ Add your playlist IDs here. Only these will be scanned for ncxid tags.
+ * You can update this list at deploy time without touching any client code.
+ *
+ * Examples:
+ *  - https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxx  -> list param is the playlistId
+ */
+export const PLAYLIST_IDS: string[] = [
+  // S8
+  "PLthDdnmc3AhMNcXcyb6thZpdCjWbt8RoP",
+  // S7
+  "PLthDdnmc3AhPIAWm3Eg14LKA-DXDcqsGf",
+  // S6
+  "PLthDdnmc3AhMAmg_RiTD6M5_Im5Me9Pb-",
+  // S5
+  "PLthDdnmc3AhObY8AVPxno8D5eIUMPTTh0",
+  // S4
+  "PLthDdnmc3AhMXKzs-EVzwT1sibGpOXLGo",
+  // S3
+  "PLthDdnmc3AhPeLNZTI36p2eMFkSk1JbqM",
+  // S2
+  "PLthDdnmc3AhNxzabFnsm3kKVWNXl5qdkG",
+  // S1
+  "PLthDdnmc3AhNfRyS_9RA3PY6v1g2ZmYLz",
+];
+
+
+/**
+ * Server-helper: fetch videos for an NCXID across the configured playlists.
+ * Returns a minimal shape you can pass to a client video gallery.
+ *
+ * Usage (server-side only):
+ *   const vids = await fetchPlayerVideos("NCX123");
+ */
+export async function fetchPlayerVideos(ncxid: string) {
+  if (!ncxid) return [];
+  if (!PLAYLIST_IDS.length) return [];
+
+  try {
+    const videos = await fetchVideosByNCXID(ncxid, PLAYLIST_IDS);
+    // Normalize to a lean shape for the client
+    return videos.map(v => ({
+      id: v.id,
+      title: v.title,
+      tags: v.tags ?? [],
+      thumb: `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`,
+      embedUrl: `https://www.youtube.com/embed/${v.id}`,
+    }));
+  } catch (err) {
+    console.error("[fetchPlayerVideos] Failed:", err);
+    return [];
+  }
+}
+
+/** ---------- existing logic below (unchanged) ---------- */
 
 function toStr(v: unknown) {
   return (v ?? "").toString().trim();
@@ -74,6 +134,11 @@ export default async function PlayersPanelServer() {
       if (na !== nb) return na - nb;
       return a.ncxid.localeCompare(b.ncxid, undefined, { numeric: true });
     });
+
+    // Note: We intentionally do NOT pass any YouTube data to PlayersPanel yet,
+    // to avoid changing its prop shape. You can fetch on-demand in a client
+    // component via an API route that calls `fetchPlayerVideos()`, or create a
+    // small server wrapper to hydrate the initial player's videos.
 
     return <PlayersPanel data={data} />;
   } catch (err: any) {

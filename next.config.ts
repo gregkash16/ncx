@@ -7,11 +7,11 @@ import type { RouteMatchCallbackOptions } from "workbox-core/types.js";
 const baseConfig: NextConfig = {
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "cdn.discordapp.com",
-        pathname: "/avatars/**",
-      },
+      // Existing Discord avatars
+      { protocol: "https", hostname: "cdn.discordapp.com", pathname: "/avatars/**" },
+      // ✅ Add YouTube thumbnails
+      { protocol: "https", hostname: "img.youtube.com" },
+      { protocol: "https", hostname: "i.ytimg.com" },
     ],
   },
   typescript: { ignoreBuildErrors: true },
@@ -22,10 +22,10 @@ const baseConfig: NextConfig = {
 export default function defineConfig(phase: string): NextConfig {
   const isDev = phase === PHASE_DEVELOPMENT_SERVER;
 
-  // ✅ No PWA in dev — avoids GenerateSW spam
+  // ✅ Skip PWA in dev — avoids GenerateSW spam
   if (isDev) return baseConfig;
 
-  // ✅ Only wrap with next-pwa in prod
+  // ✅ Only wrap with next-pwa in production
   const runtimeCaching = [
     {
       urlPattern: ({ url }: RouteMatchCallbackOptions) =>

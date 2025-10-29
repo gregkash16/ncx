@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { PlayerRow } from "./PlayersPanelServer";
+import PlayerVideos from "./PlayerVideos";
 
 function fullName(p: PlayerRow) {
   const f = (p.first || "").trim();
@@ -179,6 +180,13 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                 </tbody>
               </table>
             </div>
+
+            // Inside the RIGHT: player card section (after the Seasons table, for example)
+              {selected && (
+                <div className="pt-2">
+                  <PlayerVideos ncxid={selected.ncxid} />
+                </div>
+              )}
           </div>
         )}
       </section>
