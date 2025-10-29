@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PlayerRow } from "./PlayersPanelServer";
 import PlayerVideos from "./PlayerVideos";
 
 function fullName(p: PlayerRow) {
   const f = (p.first || "").trim();
   const l = (p.last || "").trim();
-  return (f && l) ? `${f} ${l}` : f || l || p.ncxid;
+  return f && l ? `${f} ${l}` : f || l || p.ncxid;
 }
 
 // Champion teams per season
@@ -23,6 +23,7 @@ const CHAMPIONS_BY_SEASON: Record<number, string> = {
 
 export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
   const [q, setQ] = useState("");
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     if (!qq) return data;
@@ -39,10 +40,16 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const selected = filtered[selectedIdx] ?? filtered[0] ?? null;
 
-  // keep selection in range when filter changes
-  if (selectedIdx >= filtered.length && filtered.length > 0) {
-    setSelectedIdx(0);
-  }
+  // ✅ Keep selection in range when the filter or list changes (avoid setState during render)
+  useEffect(() => {
+    if (!filtered.length) {
+      if (selectedIdx !== 0) setSelectedIdx(0);
+      return;
+    }
+    if (selectedIdx >= filtered.length) {
+      setSelectedIdx(0);
+    }
+  }, [filtered.length, selectedIdx]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-4">
@@ -93,7 +100,7 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
         {!selected ? (
           <div className="text-zinc-400">Select a player on the left.</div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-5 mx-auto w-full max-w-[1100px]">
             <header className="flex items-center justify-between">
               <h2 className="text-xl font-bold">
                 <span className="text-zinc-100">{selected.ncxid}</span>{" "}
@@ -123,7 +130,9 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                   className="rounded-lg bg-zinc-950/50 border border-zinc-800 p-3"
                 >
                   <div className="text-xs uppercase text-zinc-400">{label}</div>
-                  <div className="text-lg font-mono text-zinc-100">{value || "-"}</div>
+                  <div className="text-lg font-mono text-zinc-100">
+                    {value || "-"}
+                  </div>
                 </div>
               ))}
             </div>
@@ -144,8 +153,8 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                   {selected.seasons.map((team, idx) => {
                     const seasonNum = idx + 1;
                     const isChampion =
-                      team &&
-                      CHAMPIONS_BY_SEASON[seasonNum] &&
+                      !!team &&
+                      !!CHAMPIONS_BY_SEASON[seasonNum] &&
                       team.toUpperCase().trim() ===
                         CHAMPIONS_BY_SEASON[seasonNum];
                     return (
@@ -181,12 +190,12 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
               </table>
             </div>
 
-            // Inside the RIGHT: player card section (after the Seasons table, for example)
-              {selected && (
-                <div className="pt-2">
-                  <PlayerVideos ncxid={selected.ncxid} />
-                </div>
-              )}
+            {/* Videos (consistent embed width handled inside PlayerVideos) */}
+            {selected && (
+              <div className="pt-2">
+                <PlayerVideos ncxid={selected.ncxid} />
+              </div>
+            )}
           </div>
         )}
       </section>
