@@ -1,18 +1,38 @@
+function pickEnv(names: string[]): string | null {
+  for (const n of names) {
+    const v = process.env[n];
+    if (v) return v;
+  }
+  return null;
+}
+
 function getKvEnv() {
-  const url = process.env.YTKV_REST_API_URL;
-  const token = process.env.YTKV_REST_API_TOKEN;
+  const url =
+    pickEnv([
+      "YTKV_KV_REST_API_URL",     // <-- yours
+      "YTKV_REST_API_URL",
+      "KV_REST_API_URL",
+      "UPSTASH_REDIS_REST_URL",
+    ]);
+  const token =
+    pickEnv([
+      "YTKV_KV_REST_API_TOKEN",   // <-- yours
+      "YTKV_REST_API_TOKEN",
+      "KV_REST_API_TOKEN",
+      "UPSTASH_REDIS_REST_TOKEN",
+      "YTKV_KV_REST_API_READ_ONLY_TOKEN", // last-resort fallback
+    ]);
   if (!url || !token) {
     throw new Error(
-      `Missing Upstash REST envs: ${
-        !url ? "YTKV_REST_API_URL " : ""
-      }${!token ? "YTKV_REST_API_TOKEN" : ""}`
+      `Missing Upstash REST envs. Have URL=${!!url}, TOKEN=${!!token}.
+Checked names: URL[YTKV_KV_REST_API_URL,YTKV_REST_API_URL,KV_REST_API_URL,UPSTASH_REDIS_REST_URL] TOKEN[YTKV_KV_REST_API_TOKEN,YTKV_REST_API_TOKEN,KV_REST_API_TOKEN,UPSTASH_REDIS_REST_TOKEN,YTKV_KV_REST_API_READ_ONLY_TOKEN]`
     );
   }
   return { url, token };
 }
 
 export async function kvGet<T>(key: string): Promise<T | null> {
-  const { url, token } = getKvEnv(); // ✅ only evaluated when called at runtime
+  const { url, token } = getKvEnv();
   const res = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
@@ -33,12 +53,7 @@ export async function kvGet<T>(key: string): Promise<T | null> {
 
   try {
     const parsed = JSON.parse(raw);
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      "value" in parsed &&
-      typeof (parsed as any).value === "string"
-    ) {
+    if (parsed && typeof parsed === "object" && "value" in parsed && typeof (parsed as any).value === "string") {
       return JSON.parse((parsed as any).value) as T;
     }
     return parsed as T;
@@ -48,7 +63,7 @@ export async function kvGet<T>(key: string): Promise<T | null> {
 }
 
 export async function kvSet(key: string, value: unknown, ttlSec?: number) {
-  const { url, token } = getKvEnv(); // ✅ lazy
+  const { url, token } = getKvEnv();
   const body = { value: JSON.stringify(value), ...(ttlSec ? { ex: ttlSec } : {}) };
   const res = await fetch(`${url}/set/${encodeURIComponent(key)}`, {
     method: "POST",
