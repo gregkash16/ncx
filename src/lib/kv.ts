@@ -4,13 +4,13 @@ function must(name: string): string {
   return v;
 }
 
-const KV_URL = must("KV_REST_API_URL");
-const KV_TOKEN = must("KV_REST_API_TOKEN");
+const YTKV_URL = must("YTKV_REST_API_URL");
+const YTKV_TOKEN = must("YTKV_REST_API_TOKEN");
 
 export async function kvGet<T>(key: string): Promise<T | null> {
-  const url = `${KV_URL}/get/${encodeURIComponent(key)}`;
+  const url = `${YTKV_URL}/get/${encodeURIComponent(key)}`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${KV_TOKEN}` },
+    headers: { Authorization: `Bearer ${YTKV_TOKEN}` },
     cache: "no-store",
   });
   if (!res.ok) return null;
@@ -44,12 +44,12 @@ export async function kvGet<T>(key: string): Promise<T | null> {
 }
 
 export async function kvSet(key: string, value: unknown, ttlSec?: number) {
-  const url = `${KV_URL}/set/${encodeURIComponent(key)}`;
+  const url = `${YTKV_URL}/set/${encodeURIComponent(key)}`;
   const body = { value: JSON.stringify(value), ...(ttlSec ? { ex: ttlSec } : {}) };
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${KV_TOKEN}`,
+      Authorization: `Bearer ${YTKV_TOKEN}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -62,6 +62,6 @@ export async function kvSet(key: string, value: unknown, ttlSec?: number) {
 
 // optional
 export async function kvDel(key: string) {
-  const url = `${KV_URL}/del/${encodeURIComponent(key)}`;
-  await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${KV_TOKEN}` } });
+  const url = `${YTKV_URL}/del/${encodeURIComponent(key)}`;
+  await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${YTKV_TOKEN}` } });
 }
