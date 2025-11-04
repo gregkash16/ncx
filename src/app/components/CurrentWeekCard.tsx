@@ -15,17 +15,21 @@ function toInt(val: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function WinBoxes({ wins }: { wins: number }) {
-  const count = Math.max(0, Math.min(4, wins));
+function WinBoxes({ wins, direction = "right" }: { wins: number; direction?: "left" | "right" }) {
+  const count = Math.max(0, Math.min(4, wins)); // clamp between 0–4
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: 4 }).map((_, i) => {
-        const filled = i >= 4 - count;
+        // fill left→right or right→left depending on direction
+        const filled =
+          direction === "left"
+            ? i < count            // fill first N boxes
+            : i >= 4 - count;      // fill last N boxes
         return (
           <span
             key={i}
             className={[
-              "inline-block size-3.5 rounded-[3px] border",
+              "inline-block size-3.5 rounded-[3px] border transition-colors duration-200",
               filled
                 ? "bg-green-500/90 border-green-500/80 shadow-[0_0_6px_rgba(34,197,94,0.35)]"
                 : "bg-zinc-800 border-zinc-700",
@@ -238,14 +242,14 @@ export default async function CurrentWeekCard({
 
                   {/* Center */}
                   <div className="flex items-center justify-center gap-3 z-10">
-                    <WinBoxes wins={m.awayWins} />
+                    <WinBoxes wins={m.awayWins} direction="left" />   {/* ✅ fill left→right */}
                     <div className="text-center min-w-[5.5rem] font-semibold text-zinc-100">
                       {m.awayWins} : {m.homeWins}
                     </div>
-                    <WinBoxes wins={m.homeWins} />
+                    <WinBoxes wins={m.homeWins} direction="right" />  {/* ✅ fill right→left */}
                   </div>
 
-                  {/* Home */}
+                   {/* Home */}
                   <div
                     className={[
                       "flex items-center justify-end text-zinc-300",
