@@ -7,7 +7,6 @@ import { getSheets } from "@/lib/googleSheets";
 function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
 }
-
 function norm(v: unknown) {
   return String(v ?? "").trim();
 }
@@ -39,90 +38,68 @@ type LookupResult =
       scenario: string;
       alreadyFilled: boolean;
     }
-  | {
-      ok: false;
-      reason: string;
-    };
+  | { ok: false; reason: string };
 
 async function getNcxIdForDiscord(
   sheets: ReturnType<typeof getSheets>,
   spreadsheetId: string,
   discordId: string
 ) {
-  console.log("🔍 Looking up NCXID for Discord ID:", discordId);
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: "Discord_ID!A:D",
     valueRenderOption: "FORMATTED_VALUE",
   });
   const rows = res.data.values ?? [];
-  console.log("📋 Discord_ID rows:", rows.length);
-
   const hit = rows.find((r) => normalizeDiscordId(r?.[3]) === discordId);
-  if (!hit) {
-    console.log("⚠️ No Discord match found in Discord_ID sheet.");
-    return null;
-  }
+  if (!hit) return null;
 
-  const result = { ncxid: hit[0] ?? "", first: hit[1] ?? "", last: hit[2] ?? "" };
-  console.log("✅ Found NCXID:", result);
-  return result;
+  return { ncxid: hit[0] ?? "", first: hit[1] ?? "", last: hit[2] ?? "" };
 }
 
 // ---------- GET /api/report-game ----------
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    console.log("👤 Session User:", session?.user);
-
     if (!session?.user) {
-      console.log("⚠️ No session user found (not logged in)");
       return NextResponse.json<LookupResult>({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
     const raw = (session.user as any).discordId ?? (session.user as any).id;
     const discordId = normalizeDiscordId(raw);
-    console.log("🆔 Normalized Discord ID:", discordId);
-
     if (!discordId) {
-      console.log("❌ No valid Discord ID found in session");
       return NextResponse.json<LookupResult>({ ok: false, reason: "NO_DISCORD_ID" }, { status: 400 });
     }
 
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
     const sheets = getSheets();
 
-    // 1️⃣ Get NCXID for this Discord
+    // 1) Find player by Discord
     const who = await getNcxIdForDiscord(sheets, spreadsheetId, discordId);
     if (!who?.ncxid) {
-      console.log("⚠️ No NCXID found for this Discord user");
       return NextResponse.json<LookupResult>({ ok: false, reason: "NO_NCXID" }, { status: 404 });
     }
 
-    console.log("✅ Player NCXID:", who.ncxid);
-
-    // 2️⃣ Find active week
+    // 2) Active week
     const weekRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: "SCHEDULE!U2",
       valueRenderOption: "FORMATTED_VALUE",
     });
     const weekTab = norm(weekRes.data.values?.[0]?.[0]) || "WEEK 1";
-    console.log("🗓️ Active Week Tab:", weekTab);
 
-    // 3️⃣ Pull that week's matchups
+    // 3) Week rows
     const dataRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `${weekTab}!A2:Q120`,
       valueRenderOption: "FORMATTED_VALUE",
     });
     const rows = dataRes.data.values ?? [];
-    console.log("📊 Loaded week rows:", rows.length);
 
-    // 4️⃣ Try to find a match row for this NCXID
+    // 4) Find user’s row(s)
     const candidates = rows
       .map((r, i) => {
-        const rowIndex = i + 2;
+        const rowIndex = i + 2; // sheet is 1-based; header consumed
         const game = norm(r?.[0]);
         const awayId = norm(r?.[1]);
         const homeId = norm(r?.[9]);
@@ -136,25 +113,16 @@ export async function GET() {
 
         const unreported = awayPts === "" && homePts === "" && scenario === "";
 
-        if (isMine) {
-          console.log(
-            `🎯 Found possible match row ${rowIndex}: Game ${game}, Away=${awayId}, Home=${homeId}, Scenario=${scenario}`
-          );
-        }
-
         return { isMine, unreported, row: r, rowIndex, game };
       })
       .filter((x) => x.isMine);
 
     if (candidates.length === 0) {
-      console.log("❌ No game found for NCXID:", who.ncxid);
       return NextResponse.json<LookupResult>({ ok: false, reason: "NO_GAME_FOUND" }, { status: 404 });
     }
 
     const chosen = candidates.find((c) => c.unreported) ?? candidates[0];
     const r = chosen.row;
-
-    console.log("✅ Selected row index:", chosen.rowIndex, "Game:", chosen.game);
 
     const payload: LookupResult = {
       ok: true,
@@ -211,7 +179,10 @@ export async function POST(req: Request) {
     if (!validScenarios.includes(cleanScenario)) {
       return NextResponse.json({ ok: false, reason: "BAD_SCENARIO" }, { status: 400 });
     }
-    if (isNaN(Number(awayPts)) || isNaN(Number(homePts))) {
+
+    const a = Number(awayPts);
+    const h = Number(homePts);
+    if (!Number.isFinite(a) || !Number.isFinite(h)) {
       return NextResponse.json({ ok: false, reason: "BAD_SCORES" }, { status: 400 });
     }
 
@@ -221,12 +192,11 @@ export async function POST(req: Request) {
     const raw = (session.user as any).discordId ?? (session.user as any).id;
     const discordId = normalizeDiscordId(raw);
     const who = await getNcxIdForDiscord(sheets, spreadsheetId, discordId);
-
     if (!who?.ncxid) {
       return NextResponse.json({ ok: false, reason: "NO_NCXID" }, { status: 404 });
     }
 
-    // Find week tab again
+    // Active week
     const weekRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: "SCHEDULE!U2",
@@ -234,8 +204,9 @@ export async function POST(req: Request) {
     });
     const weekTab = norm(weekRes.data.values?.[0]?.[0]) || "WEEK 1";
 
-    // Confirm row belongs to this player
-    const rowRange = `${weekTab}!A${rowIndex}:Q${rowIndex}`;
+    // Confirm the row belongs to this player
+    const rowNum = Number(rowIndex);
+    const rowRange = `${weekTab}!A${rowNum}:Q${rowNum}`;
     const rowRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: rowRange,
@@ -256,31 +227,72 @@ export async function POST(req: Request) {
     const alreadyFilled = !(curAway === "" && curHome === "" && curScen === "");
     if (alreadyFilled && !force) {
       return NextResponse.json(
-        {
-          ok: false,
-          reason: "ALREADY_FILLED",
-          current: { awayPts: curAway, homePts: curHome, scenario: curScen },
-        },
+        { ok: false, reason: "ALREADY_FILLED", current: { awayPts: curAway, homePts: curHome, scenario: curScen } },
         { status: 409 }
       );
     }
 
-    // Write new values
-    const updates = [
-      { range: `${weekTab}!G${rowIndex}`, values: [[String(awayPts)]] },
-      { range: `${weekTab}!O${rowIndex}`, values: [[String(homePts)]] },
-      { range: `${weekTab}!Q${rowIndex}`, values: [[cleanScenario]] },
-    ];
-
+    // Write: numbers as numbers, scenario as text
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId,
       requestBody: {
         valueInputOption: "RAW",
-        data: updates,
+        data: [
+          { range: `${weekTab}!G${rowNum}`, values: [[a]] }, // Away score (number)
+          { range: `${weekTab}!O${rowNum}`, values: [[h]] }, // Home score (number)
+          { range: `${weekTab}!Q${rowNum}`, values: [[cleanScenario]] }, // Scenario (text)
+        ],
       },
     });
 
-    // Optional webhook
+    // Optional: enforce number formatting on G and O for this row (safe to leave in)
+    try {
+      const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+      const weekSheet = spreadsheet.data.sheets?.find((s) => s.properties?.title === weekTab);
+      const sheetId = weekSheet?.properties?.sheetId;
+
+      if (sheetId != null) {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [
+              // G column (index 6) — Away score
+              {
+                repeatCell: {
+                  range: {
+                    sheetId,
+                    startRowIndex: rowNum - 1,
+                    endRowIndex: rowNum,
+                    startColumnIndex: 6,
+                    endColumnIndex: 7,
+                  },
+                  cell: { userEnteredFormat: { numberFormat: { type: "NUMBER", pattern: "0" } } },
+                  fields: "userEnteredFormat.numberFormat",
+                },
+              },
+              // O column (index 14) — Home score
+              {
+                repeatCell: {
+                  range: {
+                    sheetId,
+                    startRowIndex: rowNum - 1,
+                    endRowIndex: rowNum,
+                    startColumnIndex: 14,
+                    endColumnIndex: 15,
+                  },
+                  cell: { userEnteredFormat: { numberFormat: { type: "NUMBER", pattern: "0" } } },
+                  fields: "userEnteredFormat.numberFormat",
+                },
+              },
+            ],
+          },
+        });
+      }
+    } catch (fmtErr) {
+      console.warn("⚠️ Formatting skipped/failed:", fmtErr);
+    }
+
+    // Optional Discord webhook
     const webhook = process.env.DISCORD_WEBHOOK_URL;
     if (webhook) {
       const gameNo = norm(row?.[0]);
@@ -288,19 +300,16 @@ export async function POST(req: Request) {
       const awayTeam = norm(row?.[3]);
       const homeName = norm(row?.[10]);
       const homeTeam = norm(row?.[11]);
+      const mention = `<@${discordId}>`;
 
-      const discordId = normalizeDiscordId(raw); // you already have this variable above
-        const mention = `<@${discordId}>`;
-
-        const content =
+      const content =
         `✅ **Game Reported**\n` +
         `**Week:** ${weekTab}\n` +
         `**Game #:** ${gameNo}\n` +
-        `**Away:** ${awayTeam} • ${awayName} — ${awayPts}\n` +
-        `**Home:** ${homeTeam} • ${homeName} — ${homePts}\n` +
+        `**Away:** ${awayTeam} • ${awayName} — ${a}\n` +
+        `**Home:** ${homeTeam} • ${homeName} — ${h}\n` +
         `**Scenario:** ${cleanScenario}\n` +
         `**By:** ${mention} (${who.ncxid} - ${who.first} ${who.last})`;
-
 
       try {
         await fetch(webhook, {
