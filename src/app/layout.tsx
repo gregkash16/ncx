@@ -3,7 +3,7 @@ import Providers from "./providers";
 
 export const metadata = {
   title: "Nickel City X-Wing",
-  description: "Track matchups, standings, and stats for the NCX League."
+  description: "Track matchups, standings, and stats for the NCX League.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -22,6 +22,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <main className="min-h-screen">{children}</main>
         </Providers>
+
+        {/* 👇 Register the service worker globally (runs on every page) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                if ('serviceWorker' in navigator) {
+                  // Register at root scope so it controls the whole site
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
+                }
+              })();
+            `,
+          }}
+        />
 
         {/* 👇 Your viewport width tracking script */}
         <script
@@ -50,10 +64,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 
 export const viewport = {
-  // one fixed color:
-  // themeColor: "#ff00ff",
-
-  // or adaptive colors:
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },

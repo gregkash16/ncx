@@ -10,60 +10,61 @@ export function urlBase64ToUint8Array(base64String: string) {
   return out;
 }
 
-export async function enableNotifications() {
+export async function enableNotifications(): Promise<boolean> {
   try {
-    if (!("Notification" in window)) throw new Error("Notifications not supported");
-    if (!("serviceWorker" in navigator)) throw new Error("Service worker not supported");
-    if (!("PushManager" in window)) throw new Error("Push not supported");
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      alert("This browser doesn't support web push."); return false;
+    }
 
-    // Ask permission (should trigger the Allow prompt)
+    // Ask permission (shows the Allow prompt)
     const perm = await Notification.requestPermission();
-    if (perm !== "granted") {
-      throw new Error(
-        perm === "denied"
-          ? "Notifications are blocked. Lock icon → Site settings → Notifications → Allow."
-          : "Permission was not granted."
-      );
-    }
+    if (perm !== "granted") { alert("Permission was not granted."); return false; }
 
-    // Ensure SW is installed/active
+    // Wait until the SW is active
     const reg = await navigator.serviceWorker.ready;
+
+    // If the page is not yet controlled by the SW, wait for it (first load often needs this)
     if (!navigator.serviceWorker.controller) {
-      location.reload(); // let the SW take control, then click again
-      return false;
+      await new Promise<void>((resolve) => {
+        const onChange = () => { navigator.serviceWorker.removeEventListener("controllerchange", onChange); resolve(); };
+        navigator.serviceWorker.addEventListener("controllerchange", onChange, { once: true });
+        // safety: if it already claimed, resolve shortly
+        setTimeout(() => { if (navigator.serviceWorker.controller) resolve(); }, 50);
+      });
     }
 
-    const PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!PUBLIC) throw new Error("Missing NEXT_PUBLIC_VAPID_PUBLIC_KEY in client bundle");
+    // Get public VAPID key from your route
+    const r = await fetch("/api/push/vapidPublicKey", { cache: "no-store" });
+    const { key } = await r.json();
+    if (!key) { alert("No VAPID key from server."); return false; }
 
-    // Clean rotate any old sub
-    const existing = await reg.pushManager.getSubscription();
-    if (existing) { try { await existing.unsubscribe(); } catch {} }
+    // Convert to bytes
+    const appServerKey = (() => {
+      const p = "=".repeat((4 - (key.length % 4)) % 4);
+      const b = (key + p).replace(/-/g, "+").replace(/_/g, "/");
+      const raw = atob(b);
+      const out = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+      return out;
+    })();
 
-    const appServerKey = urlBase64ToUint8Array(PUBLIC);
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: appServerKey,
-    });
+    // Clean any old sub
+    try { const s = await reg.pushManager.getSubscription(); if (s) await s.unsubscribe(); } catch {}
 
-    const res = await fetch("/api/push/subscribe", {
+    // Subscribe (now that SW is active + controlling)
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appServerKey });
+
+    // Save on server
+    const save = await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subscription: sub,
-        origin: location.origin,
-        userAgent: navigator.userAgent,
-      }),
+      body: JSON.stringify({ subscription: sub, origin: location.origin, userAgent: navigator.userAgent })
     });
-
-    if (!res.ok) {
-      try { await sub.unsubscribe(); } catch {}
-      throw new Error(`/api/push/subscribe responded ${res.status}`);
-    }
+    if (!save.ok) { try { await sub.unsubscribe(); } catch {}; alert(`/api/push/subscribe ${save.status}`); return false; }
 
     return true;
   } catch (e: any) {
-    alert(`Enable notifications failed:\n${e?.name || "Error"}: ${e?.message || e}`);
+    alert(e?.message || String(e));
     return false;
   }
 }
