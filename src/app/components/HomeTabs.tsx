@@ -1,3 +1,4 @@
+// src/components/HomeTabs.tsx
 'use client';
 
 import React, {
@@ -8,6 +9,7 @@ import React, {
   useEffect,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import PushToggle from "./PushToggle"; // same folder
 
 export type TabKey =
   | "current"
@@ -18,7 +20,6 @@ export type TabKey =
   | "players"
   | "report";
 
-/** The only extra prop we inject into the Report panel */
 type ReportPanelLikeProps = {
   goToTab?: (key: TabKey) => void;
 };
@@ -31,8 +32,6 @@ type HomeTabsProps = {
   advStatsPanel?: React.ReactNode;
   playersPanel?: React.ReactNode;
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
-
-  /** NEW: hide the desktop tab buttons (for mobile wrapper) */
   hideButtons?: boolean;
 };
 
@@ -44,20 +43,19 @@ export default function HomeTabs({
   advStatsPanel,
   playersPanel,
   reportPanel,
-  hideButtons = false, // default = false
+  hideButtons = false,
 }: HomeTabsProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
 
-  // ---- State: active tab
   const urlTab = (searchParams.get("tab") as TabKey) || "current";
   const [active, setActive] = useState<TabKey>(urlTab);
 
-  // ---- Keep active in sync if URL changes externally
   useEffect(() => {
     if (urlTab !== active) setActive(urlTab);
-  }, [urlTab]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlTab]);
 
   const btnBase =
     "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
@@ -67,7 +65,6 @@ export default function HomeTabs({
 
   const isActive = (key: TabKey) => active === key;
 
-  // ---- When active changes, sync URL
   useEffect(() => {
     const params = new URLSearchParams(Array.from(searchParams.entries()));
 
@@ -84,7 +81,6 @@ export default function HomeTabs({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
-  // ---- Button click handler
   function goToTab(key: TabKey) {
     if (key === "matchups") {
       const params = new URLSearchParams(Array.from(searchParams.entries()));
@@ -96,7 +92,6 @@ export default function HomeTabs({
     setActive(key);
   }
 
-  // Inject goToTab into the report panel
   const reportWithProp =
     reportPanel && isValidElement<ReportPanelLikeProps>(reportPanel)
       ? cloneElement(reportPanel, { goToTab })
@@ -104,34 +99,44 @@ export default function HomeTabs({
 
   return (
     <div className="w-full">
-      {/* Tab Buttons (hidden when hideButtons = true) */}
+      {/* Header: perfectly centered tab row + compact toggle */}
       {!hideButtons && (
-        <div className="flex flex-wrap justify-center gap-4 mt-3 mb-4">
-          {[
-            { key: "current" as const, label: "Current Week" },
-            { key: "matchups" as const, label: "Matchups" },
-            { key: "standings" as const, label: "Standings" },
-            { key: "indstats" as const, label: "Ind. Stats" },
-            { key: "advstats" as const, label: "Adv. Stats" },
-            { key: "players" as const, label: "Players" },
-            { key: "report" as const, label: "Report a Game" },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => goToTab(key)}
-              className={btnBase}
-            >
-              <span
-                className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
-                  isActive(key) ? "opacity-100" : ""
-                }`}
-              />
-              <span className={labelLayer}>{label}</span>
-            </button>
-          ))}
+        <div className="mt-3 mb-4 flex justify-center">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {[
+              { key: "current" as const, label: "Current Week" },
+              { key: "matchups" as const, label: "Matchups" },
+              { key: "standings" as const, label: "Standings" },
+              { key: "indstats" as const, label: "Ind. Stats" },
+              { key: "advstats" as const, label: "Adv. Stats" },
+              { key: "players" as const, label: "Players" },
+              { key: "report" as const, label: "Report a Game" },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => goToTab(key)}
+                className={btnBase}
+              >
+                <span
+                  className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
+                    isActive(key) ? "opacity-100" : ""
+                  }`}
+                />
+                <span className={labelLayer}>{label}</span>
+              </button>
+            ))}
+
+            {/* divider + toggle snug beside tabs */}
+            <span className="h-6 w-px bg-zinc-700/60 mx-1" />
+            <div className="shrink-0">
+              <PushToggle />
+            </div>
+          </div>
         </div>
       )}
+
+
 
       {/* Panels */}
       <div

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSheets } from "@/lib/googleSheets";
+import { sql } from "@vercel/postgres";
+import webpush from "web-push";
 
 function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
@@ -39,6 +41,44 @@ type LookupResult =
       alreadyFilled: boolean;
     }
   | { ok: false; reason: string };
+
+/* -------------------- Push helpers -------------------- */
+let vapidReady = false;
+function ensureVapid() {
+  if (vapidReady) return;
+  const subject = process.env.VAPID_MAILTO || "mailto:noreply@nickelcityxwing.com";
+  const pub = process.env.VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  if (!pub || !priv) throw new Error("Missing VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env vars.");
+  webpush.setVapidDetails(subject, pub, priv);
+  vapidReady = true;
+}
+
+async function sendPushToAll(payload: { title: string; body: string; url: string }) {
+  ensureVapid();
+  const { rows } = await sql`SELECT endpoint, p256dh, auth FROM push_subscriptions`;
+  const subs = rows.map((r) => ({
+    endpoint: r.endpoint,
+    keys: { p256dh: r.p256dh, auth: r.auth },
+  }));
+
+  const msg = JSON.stringify(payload);
+
+  await Promise.allSettled(
+    subs.map(async (s) => {
+      try {
+        await webpush.sendNotification(s as any, msg);
+      } catch (e: any) {
+        if (e?.statusCode === 404 || e?.statusCode === 410) {
+          await sql`DELETE FROM push_subscriptions WHERE endpoint = ${s.endpoint}`;
+        }
+      }
+    })
+  );
+
+  return subs.length;
+}
+/* ------------------------------------------------------ */
 
 async function getNcxIdForDiscord(
   sheets: ReturnType<typeof getSheets>,
@@ -99,7 +139,7 @@ export async function GET() {
     // 4) Find user’s row(s)
     const candidates = rows
       .map((r, i) => {
-        const rowIndex = i + 2; // sheet is 1-based; header consumed
+        const rowIndex = i + 2; // header consumed
         const game = norm(r?.[0]);
         const awayId = norm(r?.[1]);
         const homeId = norm(r?.[9]);
@@ -238,14 +278,14 @@ export async function POST(req: Request) {
       requestBody: {
         valueInputOption: "RAW",
         data: [
-          { range: `${weekTab}!G${rowNum}`, values: [[a]] }, // Away score (number)
-          { range: `${weekTab}!O${rowNum}`, values: [[h]] }, // Home score (number)
-          { range: `${weekTab}!Q${rowNum}`, values: [[cleanScenario]] }, // Scenario (text)
+          { range: `${weekTab}!G${rowNum}`, values: [[a]] }, // Away score
+          { range: `${weekTab}!O${rowNum}`, values: [[h]] }, // Home score
+          { range: `${weekTab}!Q${rowNum}`, values: [[cleanScenario]] }, // Scenario
         ],
       },
     });
 
-    // Optional: enforce number formatting on G and O for this row (safe to leave in)
+    // Optional: enforce number formatting
     try {
       const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
       const weekSheet = spreadsheet.data.sheets?.find((s) => s.properties?.title === weekTab);
@@ -256,30 +296,16 @@ export async function POST(req: Request) {
           spreadsheetId,
           requestBody: {
             requests: [
-              // G column (index 6) — Away score
               {
                 repeatCell: {
-                  range: {
-                    sheetId,
-                    startRowIndex: rowNum - 1,
-                    endRowIndex: rowNum,
-                    startColumnIndex: 6,
-                    endColumnIndex: 7,
-                  },
+                  range: { sheetId, startRowIndex: rowNum - 1, endRowIndex: rowNum, startColumnIndex: 6, endColumnIndex: 7 },
                   cell: { userEnteredFormat: { numberFormat: { type: "NUMBER", pattern: "0" } } },
                   fields: "userEnteredFormat.numberFormat",
                 },
               },
-              // O column (index 14) — Home score
               {
                 repeatCell: {
-                  range: {
-                    sheetId,
-                    startRowIndex: rowNum - 1,
-                    endRowIndex: rowNum,
-                    startColumnIndex: 14,
-                    endColumnIndex: 15,
-                  },
+                  range: { sheetId, startRowIndex: rowNum - 1, endRowIndex: rowNum, startColumnIndex: 14, endColumnIndex: 15 },
                   cell: { userEnteredFormat: { numberFormat: { type: "NUMBER", pattern: "0" } } },
                   fields: "userEnteredFormat.numberFormat",
                 },
@@ -322,7 +348,23 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true });
+    // ---- Push: title = Game #, body = Teams + score ----
+    let pushed = 0;
+    try {
+      const gameNo   = norm(row?.[0]);   // e.g., "12"
+      const awayTeam = norm(row?.[3]);   // team (not faction)
+      const homeTeam = norm(row?.[11]);  // team (not faction)
+
+      const title    = `Game ${gameNo}`;
+      const bodyText = `${awayTeam} ${a} — ${homeTeam} ${h}`;
+      const url      = `/matchups?game=${encodeURIComponent(gameNo)}`;
+
+      pushed = await sendPushToAll({ title, body: bodyText, url });
+    } catch (pushErr) {
+      console.warn("⚠️ Push send failed:", pushErr);
+    }
+
+    return NextResponse.json({ ok: true, pushed });
   } catch (e) {
     console.error("💥 Report POST error:", e);
     return NextResponse.json({ ok: false, reason: "SERVER_ERROR" }, { status: 500 });
