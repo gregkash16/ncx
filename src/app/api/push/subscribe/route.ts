@@ -1,45 +1,42 @@
+// src/app/api/push/subscribe/route.ts
 import { NextResponse } from "next/server";
 import { sql } from "@vercel/postgres";
 
-// Allow the client to send the same body structure used by your push helper
-//  { subscription: { endpoint, keys: { p256dh, auth } }, origin, userAgent }
-type Body = {
-  subscription?: { endpoint: string; keys?: { p256dh?: string; auth?: string } };
-  endpoint?: string;
-  keys?: { p256dh?: string; auth?: string };
-  origin?: string;
-  userAgent?: string;
-};
+type Keys = { p256dh?: string; auth?: string };
+type SubPayload =
+  | { subscription?: { endpoint?: string; keys?: Keys } } // preferred shape from client
+  | { endpoint?: string; keys?: Keys };                   // legacy flat shape
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as Body;
+    const body = (await req.json()) as SubPayload;
+    const sub = (body as any).subscription ?? body;
 
-    // Accept either "subscription" wrapper or flat shape
-    const sub = body.subscription ?? body;
     const endpoint = sub?.endpoint;
     const p256dh = sub?.keys?.p256dh;
     const auth = sub?.keys?.auth;
 
     if (!endpoint || !p256dh || !auth) {
-      return NextResponse.json({ error: "Invalid subscription payload" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Invalid subscription payload (need endpoint, keys.p256dh, keys.auth)" },
+        { status: 400 }
+      );
     }
 
-    // Upsert by endpoint (avoids duplicates)
+    // Minimal upsert (ONLY the three columns).
     await sql`
-      INSERT INTO push_subscriptions (endpoint, p256dh, auth, origin, user_agent)
-      VALUES (${endpoint}, ${p256dh}, ${auth}, ${body.origin ?? null}, ${body.userAgent ?? null})
+      INSERT INTO push_subscriptions (endpoint, p256dh, auth)
+      VALUES (${endpoint}, ${p256dh}, ${auth})
       ON CONFLICT (endpoint)
-      DO UPDATE SET
-        p256dh = EXCLUDED.p256dh,
-        auth = EXCLUDED.auth,
-        origin = EXCLUDED.origin,
-        user_agent = EXCLUDED.user_agent;
+      DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth
     `;
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error("subscribe error", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    console.error("push/subscribe error:", err?.message || err);
+    return NextResponse.json(
+      { ok: false, error: "Server error while saving subscription", detail: String(err?.message || err) },
+      { status: 500 }
+    );
   }
 }
