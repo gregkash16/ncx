@@ -1,70 +1,106 @@
-// src/lib/push.ts
-export function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = typeof window !== "undefined"
-    ? window.atob(base64)
-    : Buffer.from(base64, "base64").toString("binary");
+// Robust enable that waits for the SW to be ACTIVE *and* CONTROLLING the page
+function b64urlToBytes(s: string) {
+  const p = "=".repeat((4 - (s.length % 4)) % 4);
+  const b64 = (s + p).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
   const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; ++i) out[i] = raw.charCodeAt(i);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
+}
+
+async function fetchVapidKey(): Promise<string> {
+  const r = await fetch("/api/push/vapidPublicKey", { cache: "no-store" });
+  if (!r.ok) throw new Error(`vapidPublicKey responded ${r.status}`);
+  const j = await r.json();
+  const key = j.key || j.publicKey;
+  if (!key) throw new Error("vapidPublicKey missing 'key'");
+  return key;
+}
+
+// Waits up to 5s for the page to be controlled by the active SW
+async function ensureServiceWorkerControl(): Promise<ServiceWorkerRegistration> {
+  // Wait for activation
+  const reg = await navigator.serviceWorker.ready;
+
+  // If already controlling, we're done
+  if (navigator.serviceWorker.controller) return reg;
+
+  // Otherwise wait for controllerchange (clientsClaim can be async)
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) { settled = true; reject(new Error("Service worker did not take control")); }
+    }, 5000);
+
+    const onChange = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        navigator.serviceWorker.removeEventListener("controllerchange", onChange);
+        resolve();
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", onChange, { once: true });
+    // micro-wait: it might already have claimed
+    setTimeout(() => {
+      if (!settled && navigator.serviceWorker.controller) {
+        onChange();
+      }
+    }, 50);
+  });
+
+  return reg;
 }
 
 export async function enableNotifications(): Promise<boolean> {
   try {
-    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-      alert("This browser doesn't support web push."); return false;
-    }
+    if (!("Notification" in window)) throw new Error("Notifications not supported");
+    if (!("serviceWorker" in navigator)) throw new Error("Service worker not supported");
+    if (!("PushManager" in window)) throw new Error("Push not supported");
 
-    // Ask permission (shows the Allow prompt)
+    // 1) Ask permission (triggers Allow prompt)
     const perm = await Notification.requestPermission();
-    if (perm !== "granted") { alert("Permission was not granted."); return false; }
+    if (perm !== "granted") throw new Error("Permission was not granted");
 
-    // Wait until the SW is active
-    const reg = await navigator.serviceWorker.ready;
+    // 2) Ensure SW is active *and* controlling this page
+    const reg = await ensureServiceWorkerControl();
 
-    // If the page is not yet controlled by the SW, wait for it (first load often needs this)
-    if (!navigator.serviceWorker.controller) {
-      await new Promise<void>((resolve) => {
-        const onChange = () => { navigator.serviceWorker.removeEventListener("controllerchange", onChange); resolve(); };
-        navigator.serviceWorker.addEventListener("controllerchange", onChange, { once: true });
-        // safety: if it already claimed, resolve shortly
-        setTimeout(() => { if (navigator.serviceWorker.controller) resolve(); }, 50);
-      });
-    }
+    // 3) Get public VAPID key from server
+    const PUBLIC = await fetchVapidKey();
 
-    // Get public VAPID key from your route
-    const r = await fetch("/api/push/vapidPublicKey", { cache: "no-store" });
-    const { key } = await r.json();
-    if (!key) { alert("No VAPID key from server."); return false; }
+    // 4) Clean any old sub (avoids different-key errors)
+    try {
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
+    } catch {}
 
-    // Convert to bytes
-    const appServerKey = (() => {
-      const p = "=".repeat((4 - (key.length % 4)) % 4);
-      const b = (key + p).replace(/-/g, "+").replace(/_/g, "/");
-      const raw = atob(b);
-      const out = new Uint8Array(raw.length);
-      for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-      return out;
-    })();
+    // 5) Subscribe
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: b64urlToBytes(PUBLIC),
+    });
 
-    // Clean any old sub
-    try { const s = await reg.pushManager.getSubscription(); if (s) await s.unsubscribe(); } catch {}
-
-    // Subscribe (now that SW is active + controlling)
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appServerKey });
-
-    // Save on server
+    // 6) Save in your DB (this is the bit that writes to MySQL)
     const save = await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscription: sub, origin: location.origin, userAgent: navigator.userAgent })
+      body: JSON.stringify({
+        subscription: sub,
+        origin: location.origin,
+        userAgent: navigator.userAgent,
+      }),
     });
-    if (!save.ok) { try { await sub.unsubscribe(); } catch {}; alert(`/api/push/subscribe ${save.status}`); return false; }
+
+    if (!save.ok) {
+      // if server rejected, clean up the client sub so you don't keep a bad one around
+      try { await sub.unsubscribe(); } catch {}
+      throw new Error(`/api/push/subscribe responded ${save.status}`);
+    }
 
     return true;
-  } catch (e: any) {
-    alert(e?.message || String(e));
+  } catch (err: any) {
+    alert(`Enable notifications failed:\n${err?.message || String(err)}`);
     return false;
   }
 }

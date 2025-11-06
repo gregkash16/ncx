@@ -63,6 +63,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   );
 }
 
+<script
+  dangerouslySetInnerHTML={{
+    __html: `
+      (function () {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
+        }
+      })();
+    `,
+  }}
+/>
+
+
 export const viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
