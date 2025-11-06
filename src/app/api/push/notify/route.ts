@@ -6,7 +6,7 @@ let vapidReady = false;
 function ensureVapid() {
   if (vapidReady) return;
   const subject = process.env.VAPID_MAILTO || 'mailto:noreply@nickelcityxwing.com';
-  const pub = process.env.VAPID_PUBLIC_KEY;
+  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
   if (!pub || !priv) {
     // Throw a clear error only when the route is called
