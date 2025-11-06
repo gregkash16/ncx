@@ -47,6 +47,7 @@ let vapidReady = false;
 function ensureVapid() {
   if (vapidReady) return;
   const subject = process.env.VAPID_MAILTO || "mailto:noreply@nickelcityxwing.com";
+  // OK to use the same public key you expose to the client
   const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
   if (!pub || !priv) throw new Error("Missing VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env vars.");
@@ -316,6 +317,40 @@ export async function POST(req: Request) {
       }
     } catch (fmtErr) {
       console.warn("⚠️ Formatting skipped/failed:", fmtErr);
+    }
+
+    // ---- Streamer.bot overlay push (mirrors Discord bot) ----
+    try {
+      const sbUrl = process.env.STREAMERBOT_URL;
+      const sbActionId = process.env.STREAMERBOT_ACTION_ID;
+
+      if (sbUrl && sbActionId) {
+        const awayName  = norm(row?.[2]);   // C: Away player name
+        const awayTeam  = norm(row?.[3]);   // D: Away team
+        const homeName  = norm(row?.[10]);  // K: Home player name
+        const homeTeam  = norm(row?.[11]);  // L: Home team
+
+        const payload = {
+          action: {
+            id: sbActionId,
+            name: "Score Update",
+          },
+          args: {
+            away: `${awayName} - ${awayTeam} - ${a}`,
+            home: `${homeName} - ${homeTeam} - ${h}`,
+          },
+        };
+
+        await fetch(sbUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        console.warn("Streamer.bot env not set; skipping overlay call.");
+      }
+    } catch (e) {
+      console.warn("⚠️ Streamer.bot overlay call failed:", e);
     }
 
     // Optional Discord webhook
