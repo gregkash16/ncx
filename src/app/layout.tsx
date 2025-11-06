@@ -58,12 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             `,
           }}
         />
-      </body>
-    </html>
-  );
-}
-
-<script
+        <script
   dangerouslySetInnerHTML={{
     __html: `
       (function () {
@@ -75,6 +70,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }}
 />
 
+      </body>
+    </html>
+  );
+}
 
 export const viewport = {
   themeColor: [

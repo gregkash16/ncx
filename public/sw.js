@@ -1,27 +1,44 @@
-self.addEventListener('push', (event) => {
+// public/sw.js
+self.addEventListener("install", (event) => {
+  // Activate immediately
+  self.skipWaiting();
+});
+self.addEventListener("activate", (event) => {
+  // Take control of open pages
+  clients.claim();
+});
+
+self.addEventListener("push", (event) => {
   let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch {}
-  const title = data.title || 'NCX';
-  const body = data.body || 'New game reported';
-  const url = data.url || '/';
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {}
+  const title = data.title || "Notification";
+  const body = data.body || "";
+  const url = data.url || "/";
 
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/badge.png',
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
       data: { url },
     })
   );
 });
 
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
-  event.waitUntil((async () => {
-    const all = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const match = all.find(c => c.url.includes(new URL(url, self.location.origin).pathname));
-    if (match) return match.focus();
-    return clients.openWindow(url);
-  })());
+  const path = (event.notification.data && event.notification.data.url) || "/";
+  const full = new URL(path, self.location.origin).toString();
+
+  event.waitUntil(
+    (async () => {
+      const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const c of allClients) {
+        if ("focus" in c && c.url === full) return c.focus();
+      }
+      return clients.openWindow(full);
+    })()
+  );
 });
