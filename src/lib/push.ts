@@ -1,42 +1,69 @@
 // src/lib/push.ts
-import { sql } from '@vercel/postgres';
-import webpush from 'web-push';
-
-let vapidReady = false;
-function ensureVapid() {
-  if (vapidReady) return;
-  const subject = process.env.VAPID_MAILTO || 'mailto:noreply@nickelcityxwing.com';
-  const pub = process.env.VAPID_PUBLIC_KEY;
-  const priv = process.env.VAPID_PRIVATE_KEY;
-  if (!pub || !priv) {
-    throw new Error('Missing VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env vars.');
-  }
-  webpush.setVapidDetails(subject, pub, priv);
-  vapidReady = true;
+export function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = typeof window !== "undefined"
+    ? window.atob(base64)
+    : Buffer.from(base64, "base64").toString("binary");
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; ++i) out[i] = raw.charCodeAt(i);
+  return out;
 }
 
-export async function sendPushToAll(payload: { title: string; body: string; url: string }) {
-  ensureVapid();
+export async function enableNotifications() {
+  try {
+    if (!("Notification" in window)) throw new Error("Notifications not supported");
+    if (!("serviceWorker" in navigator)) throw new Error("Service worker not supported");
+    if (!("PushManager" in window)) throw new Error("Push not supported");
 
-  const { rows } = await sql`SELECT endpoint, p256dh, auth FROM push_subscriptions`;
-  const subs = rows.map(r => ({
-    endpoint: r.endpoint,
-    keys: { p256dh: r.p256dh, auth: r.auth },
-  }));
+    // Ask permission (should trigger the Allow prompt)
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") {
+      throw new Error(
+        perm === "denied"
+          ? "Notifications are blocked. Lock icon → Site settings → Notifications → Allow."
+          : "Permission was not granted."
+      );
+    }
 
-  const msg = JSON.stringify(payload);
+    // Ensure SW is installed/active
+    const reg = await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      location.reload(); // let the SW take control, then click again
+      return false;
+    }
 
-  await Promise.allSettled(
-    subs.map(async (s) => {
-      try {
-        await webpush.sendNotification(s as any, msg);
-      } catch (e: any) {
-        if (e?.statusCode === 404 || e?.statusCode === 410) {
-          await sql`DELETE FROM push_subscriptions WHERE endpoint = ${s.endpoint}`;
-        }
-      }
-    })
-  );
+    const PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!PUBLIC) throw new Error("Missing NEXT_PUBLIC_VAPID_PUBLIC_KEY in client bundle");
 
-  return subs.length; // number attempted
+    // Clean rotate any old sub
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) { try { await existing.unsubscribe(); } catch {} }
+
+    const appServerKey = urlBase64ToUint8Array(PUBLIC);
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: appServerKey,
+    });
+
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscription: sub,
+        origin: location.origin,
+        userAgent: navigator.userAgent,
+      }),
+    });
+
+    if (!res.ok) {
+      try { await sub.unsubscribe(); } catch {}
+      throw new Error(`/api/push/subscribe responded ${res.status}`);
+    }
+
+    return true;
+  } catch (e: any) {
+    alert(`Enable notifications failed:\n${e?.name || "Error"}: ${e?.message || e}`);
+    return false;
+  }
 }

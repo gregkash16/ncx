@@ -49,3 +49,5 @@ export default function MobileLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+
