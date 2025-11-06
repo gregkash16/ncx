@@ -1,4 +1,4 @@
-// Robust enable that waits for the SW to be ACTIVE *and* CONTROLLING the page
+// Minimal helpers
 function b64urlToBytes(s: string) {
   const p = "=".repeat((4 - (s.length % 4)) % 4);
   const b64 = (s + p).replace(/-/g, "+").replace(/_/g, "/");
@@ -17,71 +17,58 @@ async function fetchVapidKey(): Promise<string> {
   return key;
 }
 
-// Waits up to 5s for the page to be controlled by the active SW
-async function ensureServiceWorkerControl(): Promise<ServiceWorkerRegistration> {
-  // Wait for activation
-  const reg = await navigator.serviceWorker.ready;
-
-  // If already controlling, we're done
-  if (navigator.serviceWorker.controller) return reg;
-
-  // Otherwise wait for controllerchange (clientsClaim can be async)
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (!settled) { settled = true; reject(new Error("Service worker did not take control")); }
-    }, 5000);
-
-    const onChange = () => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timer);
-        navigator.serviceWorker.removeEventListener("controllerchange", onChange);
-        resolve();
-      }
-    };
-
-    navigator.serviceWorker.addEventListener("controllerchange", onChange, { once: true });
-    // micro-wait: it might already have claimed
-    setTimeout(() => {
-      if (!settled && navigator.serviceWorker.controller) {
-        onChange();
-      }
-    }, 50);
-  });
-
-  return reg;
-}
+// One-time reload handoff key
+const HANDOFF_KEY = "ncx_sw_handoff";
 
 export async function enableNotifications(): Promise<boolean> {
   try {
-    if (!("Notification" in window)) throw new Error("Notifications not supported");
-    if (!("serviceWorker" in navigator)) throw new Error("Service worker not supported");
-    if (!("PushManager" in window)) throw new Error("Push not supported");
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      alert("This browser doesn't support web push."); 
+      return false;
+    }
 
-    // 1) Ask permission (triggers Allow prompt)
-    const perm = await Notification.requestPermission();
-    if (perm !== "granted") throw new Error("Permission was not granted");
+    // If coming back from the one-time reload, skip straight to subscribe
+    const comingFromReload = localStorage.getItem(HANDOFF_KEY) === "1";
 
-    // 2) Ensure SW is active *and* controlling this page
-    const reg = await ensureServiceWorkerControl();
+    // Ask permission (shows Allow prompt)
+    if (!comingFromReload) {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") { alert("Permission was not granted."); return false; }
+    }
 
-    // 3) Get public VAPID key from server
+    // Ensure the SW is registered (safe even if already done)
+    await navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+
+    // Wait until SW is active
+    const reg = await navigator.serviceWorker.ready;
+
+    // If the page is not yet controlled by the SW, do a one-time reload handoff
+    if (!navigator.serviceWorker.controller && !comingFromReload) {
+      localStorage.setItem(HANDOFF_KEY, "1");
+      // after reload SW will control the page
+      location.reload();
+      return false;
+    }
+
+    // Clear the handoff flag if present
+    if (comingFromReload) localStorage.removeItem(HANDOFF_KEY);
+
+    // Get the public key from server
     const PUBLIC = await fetchVapidKey();
 
-    // 4) Clean any old sub (avoids different-key errors)
+    // Clean any old sub
     try {
       const existing = await reg.pushManager.getSubscription();
       if (existing) await existing.unsubscribe();
     } catch {}
 
-    // 5) Subscribe
+    // Subscribe
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: b64urlToBytes(PUBLIC),
     });
 
-    // 6) Save in your DB (this is the bit that writes to MySQL)
+    // Save in DB (this is where your MySQL write happens)
     const save = await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -93,14 +80,15 @@ export async function enableNotifications(): Promise<boolean> {
     });
 
     if (!save.ok) {
-      // if server rejected, clean up the client sub so you don't keep a bad one around
       try { await sub.unsubscribe(); } catch {}
-      throw new Error(`/api/push/subscribe responded ${save.status}`);
+      const msg = `/api/push/subscribe responded ${save.status}`;
+      alert(msg);
+      return false;
     }
 
     return true;
-  } catch (err: any) {
-    alert(`Enable notifications failed:\n${err?.message || String(err)}`);
+  } catch (e: any) {
+    alert(e?.message || String(e));
     return false;
   }
 }
