@@ -47,7 +47,7 @@ let vapidReady = false;
 function ensureVapid() {
   if (vapidReady) return;
   const subject = process.env.VAPID_MAILTO || "mailto:noreply@nickelcityxwing.com";
-  const pub = process.env.VAPID_PUBLIC_KEY;
+  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
   if (!pub || !priv) throw new Error("Missing VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env vars.");
   webpush.setVapidDetails(subject, pub, priv);
