@@ -2,14 +2,11 @@
 import type { NextConfig } from "next";
 import withPWAInit from "next-pwa";
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
-import type { RouteMatchCallbackOptions } from "workbox-core/types.js";
 
 const baseConfig: NextConfig = {
   images: {
     remotePatterns: [
-      // Existing Discord avatars
       { protocol: "https", hostname: "cdn.discordapp.com", pathname: "/avatars/**" },
-      // ✅ Add YouTube thumbnails
       { protocol: "https", hostname: "img.youtube.com" },
       { protocol: "https", hostname: "i.ytimg.com" },
     ],
@@ -21,15 +18,12 @@ const baseConfig: NextConfig = {
 
 export default function defineConfig(phase: string): NextConfig {
   const isDev = phase === PHASE_DEVELOPMENT_SERVER;
+  if (isDev) return baseConfig; // no PWA in dev
 
-  // ✅ Skip PWA in dev — avoids GenerateSW spam
-  if (isDev) return baseConfig;
-
-  // ✅ Only wrap with next-pwa in production
   const runtimeCaching = [
     {
-      urlPattern: ({ url }: RouteMatchCallbackOptions) =>
-        url.origin === self.location.origin && url.pathname.startsWith("/logos/"),
+      // use a simple RegExp to avoid type funkiness
+      urlPattern: /^\/logos\//,
       handler: "CacheFirst",
       options: {
         cacheName: "ncx-logos",
@@ -46,6 +40,15 @@ export default function defineConfig(phase: string): NextConfig {
     register: true,
     skipWaiting: true,
     runtimeCaching,
+
+    // ⛔ prevent Workbox from precaching Next internal manifests that 404 in prod
+    buildExcludes: [
+      "**/app-build-manifest.json",
+      "**/react-loadable-manifest.json",
+      "**/middleware-manifest.json",
+      "**/_buildManifest.js",
+      "**/_ssgManifest.js",
+    ],
   });
 
   return withPWA(baseConfig);
