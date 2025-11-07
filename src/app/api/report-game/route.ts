@@ -47,7 +47,6 @@ let vapidReady = false;
 function ensureVapid() {
   if (vapidReady) return;
   const subject = process.env.VAPID_MAILTO || "mailto:noreply@nickelcityxwing.com";
-  // OK to use the same public key you expose to the client
   const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
   if (!pub || !priv) throw new Error("Missing VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env vars.");
@@ -58,6 +57,47 @@ function ensureVapid() {
 async function sendPushToAll(payload: { title: string; body: string; url: string }) {
   ensureVapid();
   const { rows } = await sql`SELECT endpoint, p256dh, auth FROM push_subscriptions`;
+  const subs = rows.map((r) => ({
+    endpoint: r.endpoint,
+    keys: { p256dh: r.p256dh, auth: r.auth },
+  }));
+  const msg = JSON.stringify(payload);
+
+  await Promise.allSettled(
+    subs.map(async (s) => {
+      try {
+        await webpush.sendNotification(s as any, msg);
+      } catch (e: any) {
+        if (e?.statusCode === 404 || e?.statusCode === 410) {
+          await sql`DELETE FROM push_subscriptions WHERE endpoint = ${s.endpoint}`;
+        }
+      }
+    })
+  );
+
+  return subs.length;
+}
+
+// Filtered push sender — only notifies users who selected these teams
+async function sendPushForTeams(teams: string[], payload: { title: string; body: string; url: string }) {
+  ensureVapid();
+
+  const teamsJson = JSON.stringify(
+    teams.map((t) => (t ?? "").trim()).filter(Boolean)
+  );
+
+  const { rows } = await sql`
+    SELECT endpoint, p256dh, auth
+    FROM push_subscriptions
+    WHERE
+      all_teams = TRUE
+      OR EXISTS (
+        SELECT 1
+        FROM json_array_elements_text(${teamsJson}::json) j
+        WHERE j = ANY(push_subscriptions.teams)
+      )
+  `;
+
   const subs = rows.map((r) => ({
     endpoint: r.endpoint,
     keys: { p256dh: r.p256dh, auth: r.auth },
@@ -331,10 +371,7 @@ export async function POST(req: Request) {
         const homeTeam  = norm(row?.[11]);  // L: Home team
 
         const payload = {
-          action: {
-            id: sbActionId,
-            name: "Score Update",
-          },
+          action: { id: sbActionId, name: "Score Update" },
           args: {
             away: `${awayName} - ${awayTeam} - ${a}`,
             home: `${homeName} - ${homeTeam} - ${h}`,
@@ -396,7 +433,8 @@ export async function POST(req: Request) {
       const bodyText = `${awayName} - ${awayTeam} ${a} — ${h} ${homeTeam} - ${homeName}`;
       const url      = `/matchups?game=${encodeURIComponent(gameNo)}`;
 
-      pushed = await sendPushToAll({ title, body: bodyText, url });
+      // Filtered push by selected teams
+      pushed = await sendPushForTeams([awayTeam, homeTeam], { title, body: bodyText, url });
     } catch (pushErr) {
       console.warn("⚠️ Push send failed:", pushErr);
     }
