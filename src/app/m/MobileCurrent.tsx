@@ -243,9 +243,7 @@ export default async function MobileCurrent({
 
               // Clicking a series -> Matchups tab with the same week + a team query
               const q = `${m.awayTeam} ${m.homeTeam}`.trim();
-              const href = `?tab=matchups&w=${encodeURIComponent(
-                showWeek
-              )}&q=${encodeURIComponent(q)}`;
+              const href = `/m/matchups?w=${encodeURIComponent(showWeek)}&q=${encodeURIComponent(q)}`;
 
               return (
                 <li key={i} className="list-none">

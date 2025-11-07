@@ -21,10 +21,12 @@ export default function MatchCard({
   row,
   scheduleOn,
   scheduleMap,
+  onSelect,               // NEW
 }: {
   row: Row;
   scheduleOn: boolean;
   scheduleMap: ScheduleMap;
+  onSelect?: (row: Row) => void;   // NEW
 }) {
   const awayScore = parseIntSafe(row.awayPts);
   const homeScore = parseIntSafe(row.homePts);
@@ -39,7 +41,6 @@ export default function MatchCard({
         ).toUpperCase()}`
       : '';
 
-  // visual intent colors (soft, not neon)
   const baseRing = isDone ? 'ring-cyan-500/25' : 'ring-pink-500/25';
   const baseGlow = isDone ? 'shadow-cyan-500/10' : 'shadow-pink-600/10';
 
@@ -55,10 +56,18 @@ export default function MatchCard({
 
   return (
     <article
+      role={onSelect ? 'button' : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      onClick={() => onSelect?.(row)}                         // NEW
+      onKeyDown={(e) => {
+        if (!onSelect) return;
+        if (e.key === 'Enter' || e.key === ' ') onSelect(row);
+      }}                                                      // NEW
       className={[
         'relative rounded-2xl bg-zinc-950/60 border border-zinc-800',
         'ring-1', baseRing, baseGlow, 'shadow-lg',
         'p-4',
+        onSelect ? 'cursor-pointer active:scale-[0.99] transition' : '',
       ].join(' ')}
     >
       {/* Header row: GAME + chips */}

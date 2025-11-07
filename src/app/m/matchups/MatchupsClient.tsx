@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { teamSlug } from "@/lib/slug";
 import MatchCard from "./MatchCard";
 
 type MatchRow = {
@@ -39,6 +40,38 @@ function gameNum(g: string): number {
   return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
 }
 
+/** Choose ONE team from q by checking against actual team names. */
+function pickTeamFilter(q: string, rows: MatchRow[]): string {
+  const tokens = (q || "")
+    .split(/[+\s]+/g)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!tokens.length) return "";
+
+  const allTeams = Array.from(
+    new Set(rows.flatMap((r) => [r.awayTeam, r.homeTeam]).filter(Boolean) as string[])
+  );
+  const teamBySlug = new Map(allTeams.map((t) => [teamSlug(t), t]));
+
+  // 1) exact slug match
+  for (const tok of tokens) {
+    const s = teamSlug(tok);
+    const exact = teamBySlug.get(s);
+    if (exact) return exact;
+  }
+  // 2) substring slug match (handles partials like "JAGGED")
+  for (const tok of tokens) {
+    const s = teamSlug(tok);
+    const found = allTeams.find((t) => {
+      const ts = teamSlug(t);
+      return ts.includes(s) || s.includes(ts);
+    });
+    if (found) return found;
+  }
+  // 3) fallback: first token (so generic search still works)
+  return tokens[0];
+}
+
 export default function MatchupsClient({ payload }: { payload: Payload }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -52,19 +85,20 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
     scheduleMap = {},
   } = payload ?? ({} as Payload);
 
-  // Initialize query from ?q so taps from Current carry the filter
-  const qFromUrl = (sp.get("q") ?? "").trim();
+  // Initialize from URL (?q may be "AWAY HOME" from Current)
+  const qFromUrlRaw = (sp.get("q") ?? "").trim();
+  const qFromUrlTeam = useMemo(() => pickTeamFilter(qFromUrlRaw, baseRows), [qFromUrlRaw, baseRows]);
   const wFromUrl = (sp.get("w") ?? "").trim();
 
-  const [query, setQuery] = useState(qFromUrl);
+  const [query, setQuery] = useState(qFromUrlTeam);
   const [onlyCompleted, setOnlyCompleted] = useState(false);
   const [onlyScheduled, setOnlyScheduled] = useState(false);
 
-  // Keep input in sync if the URL changes (e.g., tapping another matchup)
+  // Keep input in sync if the URL changes (e.g., tapping another series)
   useEffect(() => {
-    setQuery(qFromUrl);
+    setQuery(qFromUrlTeam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qFromUrl]);
+  }, [qFromUrlTeam]);
 
   // Week strip: Current + WEEK 1..active
   const activeNum = useMemo(() => parseWeekNum(activeWeek), [activeWeek]);
@@ -80,20 +114,37 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
     return Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1));
   }, [activeNum, activeWeek]);
 
-  // Schedule chips only if the page’s week equals the schedule’s week
+  // Show schedule chips only if the page’s week equals the schedule’s week
   const scheduleOn =
     Boolean(weekLabel) && Boolean(scheduleWeek) && weekLabel.trim() === scheduleWeek.trim();
 
+  // Filtering + ordering
   const rows = useMemo(() => {
-    const q = query.toLowerCase().trim();
+    const q = (query || "").toLowerCase().trim();
     let arr = Array.isArray(baseRows) ? [...baseRows] : [];
 
     if (q) {
-      arr = arr.filter((m) =>
-        [m.awayId, m.homeId, m.awayName, m.homeName, m.awayTeam, m.homeTeam, m.scenario]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q))
+      // Prefer TEAM filter if query resolves to a known team
+      const team = pickTeamFilter(query, baseRows);
+      const teamIsKnown = baseRows.some(
+        (r) =>
+          r.awayTeam.toLowerCase() === team.toLowerCase() ||
+          r.homeTeam.toLowerCase() === team.toLowerCase()
       );
+      if (team && teamIsKnown) {
+        arr = arr.filter(
+          (m) =>
+            m.awayTeam.toLowerCase() === team.toLowerCase() ||
+            m.homeTeam.toLowerCase() === team.toLowerCase()
+        );
+      } else {
+        // Fallback: generic substring search across common fields
+        arr = arr.filter((m) =>
+          [m.awayId, m.homeId, m.awayName, m.homeName, m.awayTeam, m.homeTeam, m.scenario]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(q))
+        );
+      }
     }
 
     arr = arr.filter((m) => {
@@ -106,6 +157,31 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
     arr.sort((a, b) => gameNum(String(a.game)) - gameNum(String(b.game)));
     return arr;
   }, [baseRows, query, onlyCompleted, onlyScheduled]);
+
+  function setUrlQuery(nextQ: string | null) {
+    const params = new URLSearchParams(Array.from(sp.entries()));
+    if (nextQ && nextQ.trim()) params.set("q", nextQ.trim());
+    else params.delete("q");
+    const next = params.toString();
+    const href = next ? `${pathname}?${next}` : pathname;
+    router.replace(href, { scroll: false });
+  }
+
+  function onSelectRow(row: MatchRow) {
+    // Keep URL-compatible "Away Home" format for sharing/back-compat...
+    const combined = `${row.awayTeam} ${row.homeTeam}`.trim();
+    setUrlQuery(combined);
+    // ...but set the input/query to ONE team so filtering works immediately
+    const singleTeam = pickTeamFilter(combined, baseRows) || row.awayTeam || row.homeTeam;
+    setQuery(singleTeam);
+
+    // Bring the filter bar into view on small screens
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLInputElement>('[aria-label="Filter matchups"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   function goWeek(wk: string) {
     const params = new URLSearchParams(Array.from(sp.entries()));
@@ -180,7 +256,7 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Filter matchups"
             />
-            <div className="flex gap-6 justify-between sm:justify-start text-sm text-zinc-300">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm text-zinc-300">
               <label className="inline-flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -207,6 +283,21 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
                 />
                 Scheduled
               </label>
+
+              {/* Clear chip appears when a URL or typed filter is active */}
+              {(qFromUrlRaw || query).trim() ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    setUrlQuery(null);
+                  }}
+                  className="ml-auto inline-flex items-center rounded-full border border-zinc-700 bg-zinc-800/70 px-3 py-1 text-[12px] text-zinc-200 hover:bg-zinc-800"
+                  aria-label="Clear filter"
+                >
+                  ✕ Clear
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -222,6 +313,7 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
                 row={row}
                 scheduleOn={scheduleOn}
                 scheduleMap={scheduleMap}
+                onSelect={onSelectRow} // tap a card → URL keeps "Away Home", UI filters by one team
               />
             ))}
           </div>

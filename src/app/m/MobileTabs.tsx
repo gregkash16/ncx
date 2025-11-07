@@ -19,19 +19,53 @@ export default function MobileTabs() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const active = (searchParams.get("tab") as TabKey) || "current";
+  // Determine active tab:
+  // - If we're on /m/matchups (route), force "matchups"
+  // - Otherwise, fall back to ?tab=... (default "current")
+  let active: TabKey = "current";
+  if (pathname.startsWith("/m/matchups")) {
+    active = "matchups";
+  } else {
+    active = (searchParams.get("tab") as TabKey) || "current";
+  }
 
   function go(tab: TabKey) {
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
-    if (tab === "current") params.delete("tab");
-    else params.set("tab", tab);
+    // Route-based navigation for Matchups; query-tab for everything else under /m
+    if (tab === "matchups") {
+      // Preserve existing week (w) and query (q) if present
+      const w = searchParams.get("w");
+      const q = searchParams.get("q");
+      const qs = new URLSearchParams();
+      if (w) qs.set("w", w);
+      if (q) qs.set("q", q);
+      const href = qs.toString() ? `/m/matchups?${qs.toString()}` : `/m/matchups`;
+      router.replace(href, { scroll: false });
+      return;
+    }
 
-    // Clear the matchups search when switching away from it (mirrors desktop)
-    if (tab !== "matchups") params.delete("q");
+    // Navigating to any non-matchups tab keeps us on /m
+    // - "current": remove tab (default) and KEEP 'w' so week view persists
+    // - other tabs: set tab, CLEAR 'q' (matchups search) and 'w' (week) to avoid cross-tab leakage
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    // Always clear the matchups search when leaving matchups
+    params.delete("q");
+
+    if (tab === "current") {
+      // Current is the default tab, so remove explicit tab marker
+      params.delete("tab");
+      // Keep 'w' as-is so week selection on Current persists
+      const next = params.toString();
+      router.replace(next ? `/m?${next}` : `/m`, { scroll: false });
+      return;
+    }
+
+    // Other tabs live under /m with ?tab=...
+    params.set("tab", tab);
+    // Don't carry week selection into unrelated tabs
+    params.delete("w");
 
     const next = params.toString();
-    const href = next ? `${pathname}?${next}` : pathname;
-    router.replace(href, { scroll: false });
+    router.replace(next ? `/m?${next}` : `/m`, { scroll: false });
   }
 
   return (
@@ -59,4 +93,3 @@ export default function MobileTabs() {
     </nav>
   );
 }
-
