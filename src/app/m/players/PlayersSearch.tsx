@@ -3,6 +3,11 @@
 
 import { useEffect, useRef, useState } from "react";
 
+// 🥚 Easter Egg Map
+const SMASH_COUNTS: Record<string, number> = {
+  NCX94: 69, // ← edit this whenever you want
+};
+
 type Player = {
   ncxid: string;
   first: string;
@@ -89,23 +94,33 @@ export default function PlayersSearch() {
         </form>
 
         {!touched && (
-          <div className="mt-4 text-center text-sm text-neutral-400">Start by searching for a player.</div>
+          <div className="mt-4 text-center text-sm text-neutral-400">
+            Start by searching for a player.
+          </div>
         )}
         {loading && (
-          <div className="mt-4 text-center text-sm text-neutral-300">Searching…</div>
+          <div className="mt-4 text-center text-sm text-neutral-300">
+            Searching…
+          </div>
         )}
         {touched && !loading && items.length === 0 && (
-          <div className="mt-4 text-center text-sm text-neutral-400">No players matched “{q}”.</div>
+          <div className="mt-4 text-center text-sm text-neutral-400">
+            No players matched “{q}”.
+          </div>
         )}
 
         {items.length > 0 && (
           <ul className="mt-4 space-y-2">
             {items.map((p, i) => {
-              const name = `${(p.first || "").trim()} ${(p.last || "").trim()}`.trim() || p.ncxid;
-              const wl = `${p.wins}-${p.losses}`;
+              const name =
+                `${(p.first || "").trim()} ${(p.last || "").trim()}`.trim() || p.ncxid;
+
               return (
-                <li key={`${p.ncxid}-${i}`} className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3">
-                  {/* Header row: NCXID • Name • Discord • Champs */}
+                <li
+                  key={`${p.ncxid}-${i}`}
+                  className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3"
+                >
+                  {/* Header */}
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold text-neutral-100">
@@ -113,7 +128,9 @@ export default function PlayersSearch() {
                         <span className="text-cyan-400">{name}</span>
                       </div>
                       {p.discord && (
-                        <div className="truncate text-[11px] text-neutral-400">{p.discord}</div>
+                        <div className="truncate text-[11px] text-neutral-400">
+                          {p.discord}
+                        </div>
                       )}
                     </div>
                     {p.championships && (
@@ -132,9 +149,14 @@ export default function PlayersSearch() {
                     <Stat label="Games" value={p.games} />
                     <Stat label="Win %" value={fmtPct(p.winPct)} />
                     <Stat label="PPG" value={fmtNum(p.ppg)} />
+
+                    {/* 🥚 Easter Egg for NCX94 */}
+                    {p.ncxid in SMASH_COUNTS && (
+                      <Stat label="Smash Count" value={SMASH_COUNTS[p.ncxid]} />
+                    )}
                   </div>
 
-                  {/* Seasons table like desktop, but stacked */}
+                  {/* Seasons table */}
                   <div className="mt-3 rounded-lg border border-neutral-800">
                     <div className="bg-neutral-950/70 px-3 py-2 text-[12px] font-semibold text-neutral-300">
                       Season Teams
@@ -142,18 +164,36 @@ export default function PlayersSearch() {
                     <ul className="divide-y divide-neutral-800">
                       {p.seasons.map((team, idx) => {
                         const seasonNum = idx + 1;
-                        const champ = team &&
+                        const champ =
+                          team &&
                           CHAMPIONS_BY_SEASON[seasonNum] &&
-                          team.toUpperCase().trim() === CHAMPIONS_BY_SEASON[seasonNum];
+                          team.toUpperCase().trim() ===
+                            CHAMPIONS_BY_SEASON[seasonNum];
                         return (
                           <li
                             key={idx}
-                            className={champ ? "bg-amber-500/5 border-l border-amber-400/60" : ""}
+                            className={
+                              champ
+                                ? "bg-amber-500/5 border-l border-amber-400/60"
+                                : ""
+                            }
                           >
                             <div className="flex items-center justify-between px-3 py-2">
-                              <div className="text-neutral-300">Season {seasonNum}</div>
-                              <div className={champ ? "font-semibold text-amber-300" : "text-neutral-100"}>
-                                {team && team.trim() ? team : <span className="text-neutral-500">—</span>}
+                              <div className="text-neutral-300">
+                                Season {seasonNum}
+                              </div>
+                              <div
+                                className={
+                                  champ
+                                    ? "font-semibold text-amber-300"
+                                    : "text-neutral-100"
+                                }
+                              >
+                                {team && team.trim() ? (
+                                  team
+                                ) : (
+                                  <span className="text-neutral-500">—</span>
+                                )}
                               </div>
                             </div>
                           </li>
@@ -174,8 +214,12 @@ export default function PlayersSearch() {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-lg bg-neutral-900/60 px-2 py-1">
-      <div className="uppercase text-[10px] tracking-wide text-neutral-400">{label}</div>
-      <div className="font-semibold tabular-nums text-neutral-200">{String(value ?? "—")}</div>
+      <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+        {label}
+      </div>
+      <div className="font-semibold tabular-nums text-neutral-200">
+        {String(value ?? "—")}
+      </div>
     </div>
   );
 }

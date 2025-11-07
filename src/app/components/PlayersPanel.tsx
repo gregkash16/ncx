@@ -21,6 +21,14 @@ const CHAMPIONS_BY_SEASON: Record<number, string> = {
   7: "MEATBAGS",
 };
 
+/**
+ * Easter egg override: set Smash Count per NCXID here.
+ * Change the number below to update the displayed value.
+ */
+const SMASH_COUNTS: Record<string, number> = {
+  NCX94: 69, // 🔧 <-- edit this number whenever you want
+};
+
 export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
   const [q, setQ] = useState("");
 
@@ -116,25 +124,41 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
 
             {/* Stats grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {[
-                ["Wins", selected.wins],
-                ["Losses", selected.losses],
-                ["Points", selected.points],
-                ["PL/MS", selected.plms],
-                ["Games", selected.games],
-                ["Win %", selected.winPct],
-                ["PPG", selected.ppg],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-lg bg-zinc-950/50 border border-zinc-800 p-3"
-                >
-                  <div className="text-xs uppercase text-zinc-400">{label}</div>
-                  <div className="text-lg font-mono text-zinc-100">
-                    {value || "-"}
+              {(() => {
+                const stats: Array<[string, string]> = [
+                  ["Wins", selected.wins],
+                  ["Losses", selected.losses],
+                  ["Points", selected.points],
+                  ["PL/MS", selected.plms],
+                  ["Games", selected.games],
+                  ["Win %", selected.winPct],
+                  ["PPG", selected.ppg],
+                ];
+
+                // 🥚 Insert Smash Count right AFTER "PPG" for NCX94
+                if (selected.ncxid in SMASH_COUNTS) {
+                  const ppgIndex = stats.findIndex(([label]) => label === "PPG");
+                  const insertAt = ppgIndex >= 0 ? ppgIndex + 1 : stats.length;
+                  stats.splice(insertAt, 0, [
+                    "Smash Count",
+                    String(SMASH_COUNTS[selected.ncxid]),
+                  ]);
+                }
+
+                return stats.map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-lg bg-zinc-950/50 border border-zinc-800 p-3"
+                  >
+                    <div className="text-xs uppercase text-zinc-400">
+                      {label}
+                    </div>
+                    <div className="text-lg font-mono text-zinc-100">
+                      {value || "-"}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
 
             {/* Seasons table */}
@@ -155,8 +179,7 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                     const isChampion =
                       !!team &&
                       !!CHAMPIONS_BY_SEASON[seasonNum] &&
-                      team.toUpperCase().trim() ===
-                        CHAMPIONS_BY_SEASON[seasonNum];
+                      team.toUpperCase().trim() === CHAMPIONS_BY_SEASON[seasonNum];
                     return (
                       <tr
                         key={idx}
