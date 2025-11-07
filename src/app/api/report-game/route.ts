@@ -387,11 +387,13 @@ export async function POST(req: Request) {
     let pushed = 0;
     try {
       const gameNo   = norm(row?.[0]);   // e.g., "12"
+      const awayName = norm(row?.[2]);
       const awayTeam = norm(row?.[3]);   // team (not faction)
+      const homeName = norm(row?.[10]);
       const homeTeam = norm(row?.[11]);  // team (not faction)
 
       const title    = `Game ${gameNo}`;
-      const bodyText = `${awayTeam} ${a} — ${homeTeam} ${h}`;
+      const bodyText = `${awayName} - ${awayTeam} ${a} — ${h} ${homeTeam} - ${homeName}`;
       const url      = `/matchups?game=${encodeURIComponent(gameNo)}`;
 
       pushed = await sendPushToAll({ title, body: bodyText, url });
