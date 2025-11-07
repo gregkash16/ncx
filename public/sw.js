@@ -29,16 +29,16 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const path = (event.notification.data && event.notification.data.url) || "/";
-  const full = new URL(path, self.location.origin).toString();
 
   event.waitUntil(
     (async () => {
       const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+      // If there's already an NCX window open, focus it
       for (const c of allClients) {
-        if ("focus" in c && c.url === full) return c.focus();
+        if ("focus" in c) return c.focus();
       }
-      return clients.openWindow(full);
+      // Otherwise open the root of the app
+      return clients.openWindow("/");
     })()
   );
 });
