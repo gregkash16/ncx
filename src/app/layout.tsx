@@ -1,5 +1,6 @@
 import "./globals.css";
 import Providers from "./providers";
+import DesktopHeader from "./components/DesktopHeader";
 
 export const metadata = {
   title: "Nickel City X-Wing",
@@ -20,16 +21,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       <body className="bg-zinc-950 text-zinc-100">
         <Providers>
+          <DesktopHeader />
           <main className="min-h-screen">{children}</main>
         </Providers>
 
-        {/* 👇 Register the service worker globally (runs on every page) */}
+        {/* Register the service worker globally */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function () {
                 if ('serviceWorker' in navigator) {
-                  // Register at root scope so it controls the whole site
                   navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
                 }
               })();
@@ -37,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
 
-        {/* 👇 Your viewport width tracking script */}
+        {/* viewport width tracking script */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -58,18 +59,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             `,
           }}
         />
-        <script
-  dangerouslySetInnerHTML={{
-    __html: `
-      (function () {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
-        }
-      })();
-    `,
-  }}
-/>
-
       </body>
     </html>
   );

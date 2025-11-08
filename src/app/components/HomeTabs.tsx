@@ -9,7 +9,7 @@ import React, {
   useEffect,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import PushToggle from "./PushToggle"; // same folder
+
 
 export type TabKey =
   | "current"
@@ -127,11 +127,6 @@ export default function HomeTabs({
               </button>
             ))}
 
-            {/* divider + toggle snug beside tabs */}
-            <span className="h-6 w-px bg-zinc-700/60 mx-1" />
-            <div className="shrink-0">
-              <PushToggle />
-            </div>
           </div>
         </div>
       )}

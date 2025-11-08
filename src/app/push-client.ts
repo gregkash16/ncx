@@ -1,4 +1,4 @@
-export async function enablePush() {
+/* export async function enablePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     alert('Push not supported in this browser'); return;
   }
@@ -21,12 +21,15 @@ export async function enablePush() {
   });
 }
 
+
 export async function disablePush() {
   const reg = await navigator.serviceWorker.getRegistration();
   const sub = await reg?.pushManager.getSubscription();
   await sub?.unsubscribe();
   await fetch('/api/push/unsubscribe', { method: 'POST' });
 }
+
+*/ 
 
 function urlBase64ToUint8Array(s: string) {
   const pad = '='.repeat((4 - (s.length % 4)) % 4);
