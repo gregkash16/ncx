@@ -8,18 +8,7 @@ export default function DesktopHeader() {
     <header className="sticky top-0 z-30 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
-          <NotificationsDrawer
-            title="Menu & Notifications"
-            navLinks={[
-              { href: "/", label: "Home" },
-              { href: "/standings", label: "Standings" },
-              { href: "/matchups", label: "Matchups" },
-              { href: "/statistics", label: "Statistics" },
-              { href: "/adv", label: "Adv. Statistics" },
-              { href: "/report", label: "Report Game" },
-              { href: "/players", label: "Players" },
-            ]}
-          >
+          <NotificationsDrawer title="Notifications">
             <button
               aria-label="Open menu"
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900/70 hover:bg-neutral-800 active:scale-95"
