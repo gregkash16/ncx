@@ -15,11 +15,18 @@ export default async function MobileLayout({ children }: { children: ReactNode }
   // Server-side session (works in mobile + PWA, no client component required)
   const session = await getServerSession(authOptions);
   const user = session?.user as
-    | (typeof session extends { user: infer U } ? U : { name?: string | null; image?: string | null })
+    | (typeof session extends { user: infer U }
+        ? U
+        : { name?: string | null; image?: string | null })
     | undefined;
 
+  // Height of the fixed bottom nav (keep in sync with the wrapper below)
+  const NAV_PX = 64;
+
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-neutral-950 text-neutral-100">
+    // Use the "small viewport" unit to avoid iOS address bar jumps.
+    // Prevent viewport scroll; only <main> scrolls.
+    <div className="flex h-[100svh] flex-col overflow-hidden bg-neutral-950 text-neutral-100">
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
         <div className="flex items-center justify-between gap-3 p-3">
@@ -42,7 +49,6 @@ export default async function MobileLayout({ children }: { children: ReactNode }
 
           {/* Right cluster: Auth status + desktop link */}
           <div className="flex items-center gap-2">
-            {/* Auth status (server-rendered) */}
             {user ? (
               <div className="flex items-center gap-2">
                 {user.image ? (
@@ -86,15 +92,32 @@ export default async function MobileLayout({ children }: { children: ReactNode }
         </div>
       </header>
 
-      {/* Main content (scrollable even with bottom nav); respect iOS safe areas */}
-      <main className="flex-1 overflow-y-auto pb-[76px] pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto max-w-screen-sm px-3 pb-[env(safe-area-inset-bottom)]">
+      {/* Main content:
+          - Only this area scrolls
+          - Bottom padding reserves space for the fixed nav + safe area */}
+      <main
+        className="flex-1 overflow-y-auto pt-[env(safe-area-inset-top)]"
+        style={{
+          paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
+        }}
+      >
+        <div className="mx-auto max-w-screen-sm px-3">
           {children}
         </div>
       </main>
 
-      {/* Bottom nav (fixed) */}
-      <MobileBottomNav />
+      {/* Fixed bottom nav wrapper:
+          - Fixed to viewport bottom
+          - Height must match NAV_PX above */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-30"
+        style={{
+          height: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        <MobileBottomNav />
+      </div>
     </div>
   );
 }

@@ -26,8 +26,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 border-t border-neutral-800 bg-neutral-950/95 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="h-full border-t border-neutral-800 bg-neutral-950/95 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md will-change-transform transform-gpu"
       aria-label="Mobile tabs"
     >
       <ul className="mx-auto flex max-w-screen-sm justify-between px-3">
