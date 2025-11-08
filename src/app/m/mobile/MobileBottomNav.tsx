@@ -7,7 +7,8 @@ import {
   Trophy as TrophyIcon,
   BarChart3,
   Users as UsersIcon,
-  List as ListIcon, // ✅ new for "Matchups"
+  List as ListIcon,
+  ClipboardEdit, // 📝 Report icon
 } from "lucide-react";
 
 const TABS = [
@@ -17,8 +18,8 @@ const TABS = [
   { href: "/m/indstats",   label: "Ind Stats", icon: BarChart3 },
   { href: "/m/advstats",   label: "Adv",       icon: BarChart3 },
   { href: "/m/players",    label: "Players",   icon: UsersIcon },
+  { href: "/m/report",     label: "Report",    icon: ClipboardEdit }, // ✅ new tab
 ];
-
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
@@ -29,18 +30,17 @@ export default function MobileBottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Mobile tabs"
     >
-      {/* use flex + justify-center to center the nav */}
-      <ul className="mx-auto flex max-w-screen-sm justify-center gap-4 px-2">
+      <ul className="mx-auto flex max-w-screen-sm justify-between px-3">
         {TABS.map((t) => {
           const active =
             t.href === "/m" ? pathname === "/m" : pathname.startsWith(t.href);
           const Icon = t.icon;
 
           return (
-            <li key={t.href}>
+            <li key={t.href} className="flex-1 text-center">
               <Link
                 href={t.href}
-                className={`flex flex-col items-center justify-center px-2 py-2 text-[10px] transition-colors ${
+                className={`flex flex-col items-center justify-center py-3 text-[11px] transition-colors ${
                   active
                     ? "text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 font-semibold"
                     : "text-neutral-400 hover:text-neutral-200"
@@ -48,13 +48,13 @@ export default function MobileBottomNav() {
                 aria-current={active ? "page" : undefined}
               >
                 <Icon
-                  size={20}
+                  size={22}
                   strokeWidth={2}
-                  className={`mb-0.5 ${
+                  className={`mb-0.5 transition-all duration-200 ${
                     active
                       ? "text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400"
                       : "text-neutral-400"
-                  } transition-all duration-200`}
+                  }`}
                 />
                 {t.label}
               </Link>

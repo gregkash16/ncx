@@ -42,3 +42,28 @@ self.addEventListener("notificationclick", (event) => {
     })()
   );
 });
+
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith("/api/auth")) {
+    // Never cache or intercept NextAuth
+    return; // allow default browser handling
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil((async () => {
+    const all = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const c of all) {
+      // Focus an existing tab and navigate if needed
+      if ("focus" in c) {
+        await c.focus();
+        try { c.navigate && c.navigate(target); } catch {}
+        return;
+      }
+    }
+    return clients.openWindow(target);
+  })());
+});
