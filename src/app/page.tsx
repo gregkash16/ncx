@@ -106,8 +106,8 @@ export default async function HomePage({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,0,150,0.25),transparent_70%)] animate-pulse"></div>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_120%,rgba(0,255,255,0.15),transparent_60%)] blur-3xl"></div>
         </div>
-
-        <div className="flex flex-col items-center space-y-6">
+        
+        {/* <div className="flex flex-col items-center space-y-6">
           <Image
             src="/logo.png"
             alt="NCX Draft League Season 8"
@@ -115,12 +115,13 @@ export default async function HomePage({
             height={240}
             priority
             className="drop-shadow-[0_0_30px_rgba(255,0,150,0.5)] hover:scale-105 transition-transform duration-500"
-          />
+          /> 
+          */}
 
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
             DRAFT LEAGUE • SEASON 8
           </h1>
-
+        <div>    
           <p className="text-zinc-300 text-lg font-medium">{message}</p>
         </div>
       </section>
