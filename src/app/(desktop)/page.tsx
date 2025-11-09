@@ -2,14 +2,14 @@
 export const revalidate = 60;
 
 import Image from "next/image";
-import CurrentWeekCard from "./components/CurrentWeekCard";
-import StandingsPanel from "./components/StandingsPanel";
-import MatchupsPanel from "./components/MatchupsPanel";
-import IndStatsPanel from "./components/IndStatsPanel";
-import ReportPanel from "./components/ReportPanel";
-import PlayersPanelServer from "./components/PlayersPanelServer";
-import AdvStatsPanelServer from "./components/AdvStatsPanelServer";
-import HomeTabs from "./components/HomeTabs";
+import CurrentWeekCard from "../components/CurrentWeekCard";
+import StandingsPanel from "../components/StandingsPanel";
+import MatchupsPanel from "../components/MatchupsPanel";
+import IndStatsPanel from "../components/IndStatsPanel";
+import ReportPanel from "../components/ReportPanel";
+import PlayersPanelServer from "../components/PlayersPanelServer";
+import AdvStatsPanelServer from "../components/AdvStatsPanelServer";
+import HomeTabs from "../components/HomeTabs";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";

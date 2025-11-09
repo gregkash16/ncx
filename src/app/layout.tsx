@@ -1,6 +1,6 @@
+// app/layout.tsx
 import "./globals.css";
 import Providers from "./providers";
-import DesktopHeader from "./components/DesktopHeader";
 
 export const metadata = {
   title: "Nickel City X-Wing",
@@ -11,7 +11,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        {/* PWA meta & manifest */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#ff00ff" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -21,41 +20,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       <body className="bg-zinc-950 text-zinc-100">
         <Providers>
-          <DesktopHeader />
-          <main className="min-h-screen">{children}</main>
+          {children}
         </Providers>
 
-        {/* Register the service worker globally */}
+        {/* Global scripts stay here */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              (function () {
-                if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(){});
-                }
-              })();
-            `,
-          }}
-        />
-
-        {/* viewport width tracking script */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                function setVW() {
-                  try {
-                    var vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
-                    document.cookie = "vw=" + vw + "; path=/; samesite=lax";
-                  } catch (e) {}
-                }
-                setVW();
-                var tid;
-                window.addEventListener('resize', function() {
-                  clearTimeout(tid);
-                  tid = setTimeout(setVW, 200);
-                }, { passive: true });
-              })();
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(()=>{});
+              }
             `,
           }}
         />
@@ -63,10 +37,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-
-export const viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-  ],
-};
