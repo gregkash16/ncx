@@ -1,0 +1,14 @@
+{
+  // Let Tailwind IntelliSense handle PostCSS/Tailwind syntax
+  "postcss.validate": true,
+
+  // Silence “Unknown at rule” errors in CSS/SCSS/LESS
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "less.lint.unknownAtRules": "ignore",
+
+  // Treat .css files as PostCSS for better syntax highlighting
+  "files.associations": {
+    "*.css": "postcss"
+  }
+}
