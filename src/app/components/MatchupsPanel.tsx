@@ -5,13 +5,21 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import type { IndRow, FactionMap, MatchRow } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
+import PlayerDMLink from "@/app/components/PlayerDMLink";
 
 type ScheduleMap = Record<string, { day: string; slot: string }>;
 
+interface MatchRowWithDiscord extends MatchRow {
+  awayDiscordId?: string | null;
+  homeDiscordId?: string | null;
+  awayDiscordTag?: string | null;
+  homeDiscordTag?: string | null;
+}
+
 type Props = {
-  data: MatchRow[];
-  weekLabel?: string;               // the week data being shown
-  activeWeek?: string;              // the true active week (from SCHEDULE!U2)
+  data: MatchRow[];              // we accept MatchRow[]; extra fields are read via the extended interface above
+  weekLabel?: string;
+  activeWeek?: string;
   scheduleWeek?: string;
   scheduleMap?: ScheduleMap;
   indStats?: IndRow[];
@@ -116,11 +124,6 @@ export default function MatchupsPanel({
     if (!activeNum || activeNum <= 0) return [] as string[];
     return Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1));
   }, [activeNum]);
-
-  const isCurrentSelected = useMemo(() => {
-    if (!activeNum) return true;
-    return !selectedNum || selectedNum === activeNum;
-  }, [activeNum, selectedNum]);
 
   // Clean the incoming data
   const cleaned = useMemo(() => {
@@ -285,7 +288,8 @@ export default function MatchupsPanel({
         <p className="text-center text-zinc-500 italic">No matchups found.</p>
       ) : (
         <div className="space-y-6">
-          {filtered.map((row, i) => {
+          {filtered.map((rawRow, i) => {
+            const row = rawRow as MatchRowWithDiscord;
             const awayScore = parseIntSafe(row.awayPts);
             const homeScore = parseIntSafe(row.homePts);
             const isDone = Boolean((row.scenario || "").trim());
@@ -319,6 +323,10 @@ export default function MatchupsPanel({
             // Faction icons (from factionMap + /public/factions)
             const awayFactionIcon = factionIconSrc(factionMap?.[row.awayId]);
             const homeFactionIcon = factionIconSrc(factionMap?.[row.homeId]);
+
+            // Optional tooltip helpers if you store handles like name#1234
+            const awayTooltip = row.awayDiscordTag ? `@${row.awayDiscordTag}` : "Open DM";
+            const homeTooltip = row.homeDiscordTag ? `@${row.homeDiscordTag}` : "Open DM";
 
             return (
               <div
@@ -413,7 +421,12 @@ export default function MatchupsPanel({
                         decoding="async"
                       />
                     )}
-                    <span className="text-pink-400 font-semibold">{row.awayName || "—"}</span>
+                    <PlayerDMLink
+                      name={row.awayName || "—"}
+                      discordId={row.awayDiscordId}
+                      titleSuffix={awayTooltip}
+                      className="text-pink-400 font-semibold"
+                    />
                     {row.awayId ? (
                       <span className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono">
                         {row.awayId}
@@ -427,9 +440,12 @@ export default function MatchupsPanel({
                         {row.homeId}
                       </span>
                     ) : null}
-                    <span className="text-cyan-400 font-semibold text-right">
-                      {row.homeName || "—"}
-                    </span>
+                    <PlayerDMLink
+                      name={row.homeName || "—"}
+                      discordId={row.homeDiscordId}
+                      titleSuffix={homeTooltip}
+                      className="text-cyan-400 font-semibold text-right"
+                    />
                     {homeFactionIcon && (
                       <Image
                         src={homeFactionIcon}

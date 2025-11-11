@@ -7,6 +7,7 @@ import {
   fetchIndStatsDataCached,      // returns IndRow[]
   fetchStreamScheduleCached,    // returns { scheduleWeek, scheduleMap }
   fetchFactionMapCached,        // returns Record<ncxid, Faction>
+  getDiscordMapCached,          // returns { [discordId]: { ncxid, first, last } }
 } from "../../../lib/googleSheets";
 
 type ScheduleMap = StreamSchedule["scheduleMap"];
@@ -23,7 +24,12 @@ function parseWeekNum(label?: string | null): number | null {
  * can render the week strip and guard selection.
  */
 export async function getMobileMatchupsData(selectedWeek?: string): Promise<{
-  rows: MatchRow[];
+  rows: (MatchRow & {
+    awayDiscordId?: string | null;
+    homeDiscordId?: string | null;
+    awayDiscordTag?: string | null;
+    homeDiscordTag?: string | null;
+  })[];
   weekLabel: string;               // label of the *shown* data (selected or active)
   activeWeek: string;              // true active week (SCHEDULE!U2)
   scheduleWeek: string;
@@ -53,7 +59,27 @@ export async function getMobileMatchupsData(selectedWeek?: string): Promise<{
       : await fetchMatchupsDataCached(weekToShow);
 
   // Keep only rows with numeric game id (mirrors desktop behavior)
-  const rows = (matches || []).filter((m) => /^\d+$/.test((m.game || "").trim()));
+  const base = (matches || []).filter((m) => /^\d+$/.test((m.game || "").trim()));
+
+  // ---- NEW: Join Discord IDs (cached) so mobile can deep-link to DMs ----
+  // getDiscordMapCached returns: { [discordId]: { ncxid, first, last } }
+  const discordMap = await getDiscordMapCached();
+  const ncxToDiscord: Record<string, string> = {};
+  for (const [discordId, payload] of Object.entries(discordMap ?? {})) {
+    const ncxid = (payload as any)?.ncxid?.trim?.() ?? "";
+    if (ncxid && /^\d{5,}$/.test(discordId)) {
+      ncxToDiscord[ncxid] = discordId;
+    }
+  }
+
+  const rows = base.map((m) => ({
+    ...m,
+    awayDiscordId: m.awayId ? ncxToDiscord[m.awayId] ?? null : null,
+    homeDiscordId: m.homeId ? ncxToDiscord[m.homeId] ?? null : null,
+    // If you later store Discord tags/handles, add them here:
+    // awayDiscordTag: ...,
+    // homeDiscordTag: ...,
+  }));
 
   return {
     rows,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import PlayerDMLink from '@/app/components/PlayerDMLink';
 
 type Row = {
   game: string;
@@ -9,6 +10,12 @@ type Row = {
   awayId?: string; homeId?: string;
   awayPts?: string | number; homePts?: string | number;
   scenario?: string;
+
+  // NEW for deep links:
+  awayDiscordId?: string | null;
+  homeDiscordId?: string | null;
+  awayDiscordTag?: string | null;
+  homeDiscordTag?: string | null;
 };
 type ScheduleMap = Record<string, { day: string; slot: string }>;
 
@@ -21,12 +28,12 @@ export default function MatchCard({
   row,
   scheduleOn,
   scheduleMap,
-  onSelect,               // NEW
+  onSelect,
 }: {
   row: Row;
   scheduleOn: boolean;
   scheduleMap: ScheduleMap;
-  onSelect?: (row: Row) => void;   // NEW
+  onSelect?: (row: Row) => void;
 }) {
   const awayScore = parseIntSafe(row.awayPts);
   const homeScore = parseIntSafe(row.homePts);
@@ -58,11 +65,11 @@ export default function MatchCard({
     <article
       role={onSelect ? 'button' : undefined}
       tabIndex={onSelect ? 0 : undefined}
-      onClick={() => onSelect?.(row)}                         // NEW
+      onClick={() => onSelect?.(row)}
       onKeyDown={(e) => {
         if (!onSelect) return;
         if (e.key === 'Enter' || e.key === ' ') onSelect(row);
-      }}                                                      // NEW
+      }}
       className={[
         'relative rounded-2xl bg-zinc-950/60 border border-zinc-800',
         'ring-1', baseRing, baseGlow, 'shadow-lg',
@@ -127,10 +134,15 @@ export default function MatchCard({
         </div>
       </div>
 
-      {/* Players */}
+      {/* Players with Discord deep links */}
       <footer className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px] text-zinc-200">
         <div className="flex items-center gap-2">
-          <span className="truncate font-medium text-pink-300">{row.awayName || '—'}</span>
+          <PlayerDMLink
+            name={row.awayName || '—'}
+            discordId={row.awayDiscordId}
+            titleSuffix={row.awayDiscordTag ? `@${row.awayDiscordTag}` : 'Open DM'}
+            className="truncate font-medium text-pink-300"
+          />
           {row.awayId ? (
             <span className="shrink-0 rounded-full bg-zinc-900/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-300 font-mono">
               {row.awayId}
@@ -143,7 +155,12 @@ export default function MatchCard({
               {row.homeId}
             </span>
           ) : null}
-          <span className="truncate font-medium text-cyan-300 text-right">{row.homeName || '—'}</span>
+          <PlayerDMLink
+            name={row.homeName || '—'}
+            discordId={row.homeDiscordId}
+            titleSuffix={row.homeDiscordTag ? `@${row.homeDiscordTag}` : 'Open DM'}
+            className="truncate font-medium text-cyan-300 text-right"
+          />
         </div>
       </footer>
     </article>

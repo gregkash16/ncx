@@ -98,6 +98,29 @@ export default async function HomePage({
     ? await fetchMatchupsDataCached(selectedWeek)
     : { matches: activeMatches, weekTab: activeWeek };
 
+  // --- NEW: Attach Discord IDs to each matchup row (NCXID -> DiscordID) ---
+  // getDiscordMapCached returns: { [discordId]: { ncxid, first, last } }
+  const discordMap = await getDiscordMapCached();
+
+  // Invert to { [ncxid]: discordId } once:
+  const ncxToDiscord: Record<string, string> = {};
+  for (const [discordId, payload] of Object.entries(discordMap ?? {})) {
+    const ncxid = (payload as any)?.ncxid?.trim?.() ?? "";
+    if (ncxid && /^\d{5,}$/.test(discordId)) {
+      ncxToDiscord[ncxid] = discordId;
+    }
+  }
+
+  // Decorate rows with awayDiscordId/homeDiscordId (optional tooltip fields too, if you have them)
+  const dataWithDiscord = matchesToUse.map((m) => ({
+    ...m,
+    awayDiscordId: m.awayId ? ncxToDiscord[m.awayId] ?? null : null,
+    homeDiscordId: m.homeId ? ncxToDiscord[m.homeId] ?? null : null,
+    // If you also cache Discord tags somewhere, add:
+    // awayDiscordTag: ...,
+    // homeDiscordTag: ...,
+  })) as unknown as MatchRow[]; // keep prop type happy; extra fields are read inside the panel
+
   return (
     <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
       {/* HERO */}
@@ -106,22 +129,11 @@ export default async function HomePage({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,0,150,0.25),transparent_70%)] animate-pulse"></div>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_120%,rgba(0,255,255,0.15),transparent_60%)] blur-3xl"></div>
         </div>
-        
-        {/* <div className="flex flex-col items-center space-y-6">
-          <Image
-            src="/logo.png"
-            alt="NCX Draft League Season 8"
-            width={240}
-            height={240}
-            priority
-            className="drop-shadow-[0_0_30px_rgba(255,0,150,0.5)] hover:scale-105 transition-transform duration-500"
-          /> 
-          */}
 
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
-            DRAFT LEAGUE • SEASON 8
-          </h1>
-        <div>    
+        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
+          DRAFT LEAGUE • SEASON 8
+        </h1>
+        <div>
           <p className="text-zinc-300 text-lg font-medium">{message}</p>
         </div>
       </section>
@@ -133,7 +145,6 @@ export default async function HomePage({
             currentWeekPanel={
               <CurrentWeekCard
                 key="current-week"
-                // Pass both the true active and the validated selection
                 activeWeek={activeWeek}
                 selectedWeek={selectedWeek}
               />
@@ -141,9 +152,9 @@ export default async function HomePage({
             matchupsPanel={
               <MatchupsPanel
                 key="matchups"
-                data={matchesToUse}
-                weekLabel={weekLabelForPanel}      // label of the shown data (selected or active)
-                activeWeek={activeWeek}             // the true current week for the pills/max bound
+                data={dataWithDiscord}
+                weekLabel={weekLabelForPanel}
+                activeWeek={activeWeek}
                 scheduleWeek={streamSched.scheduleWeek}
                 scheduleMap={streamSched.scheduleMap}
                 indStats={indStats ?? []}

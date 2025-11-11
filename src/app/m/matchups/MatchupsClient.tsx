@@ -17,6 +17,12 @@ type MatchRow = {
   awayPts?: string | number;
   homePts?: string | number;
   scenario?: string;
+
+  // NEW: optional Discord deep-link data
+  awayDiscordId?: string | null;
+  homeDiscordId?: string | null;
+  awayDiscordTag?: string | null;
+  homeDiscordTag?: string | null;
 };
 
 type Payload = {
@@ -53,13 +59,11 @@ function pickTeamFilter(q: string, rows: MatchRow[]): string {
   );
   const teamBySlug = new Map(allTeams.map((t) => [teamSlug(t), t]));
 
-  // 1) exact slug match
   for (const tok of tokens) {
     const s = teamSlug(tok);
     const exact = teamBySlug.get(s);
     if (exact) return exact;
   }
-  // 2) substring slug match (handles partials like "JAGGED")
   for (const tok of tokens) {
     const s = teamSlug(tok);
     const found = allTeams.find((t) => {
@@ -68,7 +72,6 @@ function pickTeamFilter(q: string, rows: MatchRow[]): string {
     });
     if (found) return found;
   }
-  // 3) fallback: first token (so generic search still works)
   return tokens[0];
 }
 
@@ -94,13 +97,11 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
   const [onlyCompleted, setOnlyCompleted] = useState(false);
   const [onlyScheduled, setOnlyScheduled] = useState(false);
 
-  // Keep input in sync if the URL changes (e.g., tapping another series)
   useEffect(() => {
     setQuery(qFromUrlTeam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qFromUrlTeam]);
 
-  // Week strip: Current + WEEK 1..active
   const activeNum = useMemo(() => parseWeekNum(activeWeek), [activeWeek]);
   const selectedNum = useMemo(() => parseWeekNum(wFromUrl || weekLabel), [wFromUrl, weekLabel]);
 
@@ -114,17 +115,14 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
     return Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1));
   }, [activeNum, activeWeek]);
 
-  // Show schedule chips only if the page’s week equals the schedule’s week
   const scheduleOn =
     Boolean(weekLabel) && Boolean(scheduleWeek) && weekLabel.trim() === scheduleWeek.trim();
 
-  // Filtering + ordering
   const rows = useMemo(() => {
     const q = (query || "").toLowerCase().trim();
     let arr = Array.isArray(baseRows) ? [...baseRows] : [];
 
     if (q) {
-      // Prefer TEAM filter if query resolves to a known team
       const team = pickTeamFilter(query, baseRows);
       const teamIsKnown = baseRows.some(
         (r) =>
@@ -138,7 +136,6 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
             m.homeTeam.toLowerCase() === team.toLowerCase()
         );
       } else {
-        // Fallback: generic substring search across common fields
         arr = arr.filter((m) =>
           [m.awayId, m.homeId, m.awayName, m.homeName, m.awayTeam, m.homeTeam, m.scenario]
             .filter(Boolean)
@@ -168,14 +165,11 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
   }
 
   function onSelectRow(row: MatchRow) {
-    // Keep URL-compatible "Away Home" format for sharing/back-compat...
     const combined = `${row.awayTeam} ${row.homeTeam}`.trim();
     setUrlQuery(combined);
-    // ...but set the input/query to ONE team so filtering works immediately
     const singleTeam = pickTeamFilter(combined, baseRows) || row.awayTeam || row.homeTeam;
     setQuery(singleTeam);
 
-    // Bring the filter bar into view on small screens
     requestAnimationFrame(() => {
       document
         .querySelector<HTMLInputElement>('[aria-label="Filter matchups"]')
@@ -187,7 +181,6 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
     const params = new URLSearchParams(Array.from(sp.entries()));
     if (wk.toUpperCase() === activeWeek.toUpperCase()) params.delete("w");
     else params.set("w", wk);
-    // keep q so deep links from Current still filter
     const next = params.toString();
     const href = next ? `${pathname}?${next}` : pathname;
     router.replace(href, { scroll: false });
@@ -200,10 +193,8 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
           WEEKLY MATCHUPS {weekLabel ? <span className="text-zinc-400">• {weekLabel}</span> : null}
         </h2>
 
-        {/* Week selector strip (Current + WEEK 1..active) */}
         {activeNum && activeNum > 1 && (
           <div className="mb-4 flex flex-wrap justify-center gap-2">
-            {/* Current */}
             <button
               type="button"
               onClick={() => goWeek(activeWeek)}
@@ -244,7 +235,6 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
           </div>
         )}
 
-        {/* Sticky filter bar */}
         <div className="sticky top-0 z-20 -mx-3 px-3 py-3 mb-4 bg-zinc-900/85 backdrop-blur supports-[backdrop-filter]:bg-zinc-900/60 border-b border-zinc-800 rounded-none">
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
             <input
@@ -284,7 +274,6 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
                 Scheduled
               </label>
 
-              {/* Clear chip appears when a URL or typed filter is active */}
               {(qFromUrlRaw || query).trim() ? (
                 <button
                   type="button"
@@ -302,7 +291,6 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
           </div>
         </div>
 
-        {/* Cards */}
         {rows.length === 0 ? (
           <div className="px-3 py-6 text-center text-zinc-400">No matchups found.</div>
         ) : (
@@ -313,7 +301,7 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
                 row={row}
                 scheduleOn={scheduleOn}
                 scheduleMap={scheduleMap}
-                onSelect={onSelectRow} // tap a card → URL keeps "Away Home", UI filters by one team
+                onSelect={onSelectRow}
               />
             ))}
           </div>
