@@ -1,19 +1,19 @@
 // /src/app/(desktop)/page.tsx
-// Cache the rendered page for 60s so we don't re-hit Sheets every request
 export const revalidate = 60;
 
 import Image from "next/image";
 
-// components live at /src/app/components relative to (desktop)
-import CurrentWeekCard from "../components/CurrentWeekCard";
-import StandingsPanel from "../components/StandingsPanel";
-import MatchupsPanel from "../components/MatchupsPanel";
-import IndStatsPanel from "../components/IndStatsPanel";
-import ReportPanel from "../components/ReportPanel";
-import PlayersPanelServer from "../components/PlayersPanelServer";
-import AdvStatsPanelServer from "../components/AdvStatsPanelServer";
-import TeamSchedulePanel from "../components/TeamSchedulePanel";
-import HomeTabs from "../components/HomeTabs";
+// Components live in /src/app/components
+import CurrentWeekCard from "../../components/CurrentWeekCard";
+import StandingsPanel from "../../components/StandingsPanel";
+import MatchupsPanel from "../../components/MatchupsPanel";
+import IndStatsPanel from "../../components/IndStatsPanel";
+import ReportPanel from "../../components/ReportPanel";
+import PlayersPanelServer from "../../components/PlayersPanelServer";
+import AdvStatsPanelServer from "../../components/AdvStatsPanelServer";
+import TeamSchedulePanel from "../../components/TeamSchedulePanel";
+
+import HomeTabs from "@/components/HomeTabs";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -36,7 +36,6 @@ function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
 }
 
-// NOTE: searchParams is a Promise in Next 15 server components
 export default async function HomePage({
   searchParams,
 }: {
@@ -44,10 +43,11 @@ export default async function HomePage({
 }) {
   const sp = await searchParams;
 
-  // Read team param for the Team tab
+  // 👇 read team param for Team tab
   const teamParam = (sp?.team as string | undefined) || undefined;
+  const tabParam = (sp?.tab as string | undefined) || undefined;
 
-  // --- Welcome banner (Discord -> NCXID lookup, cached) ---
+  // Welcome banner
   const session = await getServerSession(authOptions);
   let message = "Please log in with your Discord.";
 
@@ -69,37 +69,33 @@ export default async function HomePage({
       } else {
         message = `Welcome ${session.user.name ?? "Pilot"}! – No Discord ID found`;
       }
-    } catch (err) {
-      console.error("Error fetching NCX info:", err);
+    } catch {
       message = `Welcome ${session.user.name ?? "Pilot"}! – (Error fetching NCXID)`;
     }
   }
 
-  // 1) Get the true active week + default matches
+  // Active week + data
   const [
     { weekTab: activeWeek, matches: activeMatches },
-    indStats,
-    streamSched,
-    factionMap,
+  , indStats
+  , streamSched
+  , factionMap
   ] = await Promise.all([
-    fetchMatchupsDataCached(), // active week (cached 60s)
-    fetchIndStatsDataCached(), // cached 5m
-    fetchStreamScheduleCached(), // cached 5m
-    fetchFactionMapCached(), // tiny in-memory cache + live read
+    fetchMatchupsDataCached(),
+    fetchIndStatsDataCached(),
+    fetchStreamScheduleCached(),
+    fetchFactionMapCached(),
   ]);
 
-  // 2) Read ?w=WEEK N and enforce "only up to active"
+  // Handle ?w=WEEK N (only up to active)
   const requestedWeekRaw = (sp?.w as string | undefined) || undefined;
   const reqNum = parseWeekNum(requestedWeekRaw);
   const activeNum = parseWeekNum(activeWeek);
   const selectedWeek =
     reqNum && activeNum && reqNum <= activeNum ? requestedWeekRaw : undefined;
 
-  // 3) If a valid past week is requested, fetch that week’s matches (cached by week key)
-  const {
-    matches: matchesToUse,
-    weekTab: weekLabelForPanel,
-  }: { matches: MatchRow[]; weekTab: string } = selectedWeek
+  // Pull matches for selected week (or active)
+  const { matches: matchesToUse, weekTab: weekLabelForPanel } = selectedWeek
     ? await fetchMatchupsDataCached(selectedWeek)
     : { matches: activeMatches, weekTab: activeWeek };
 
@@ -130,9 +126,7 @@ export default async function HomePage({
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
           DRAFT LEAGUE • SEASON 8
         </h1>
-        <div>
-          <p className="text-zinc-300 text-lg font-medium">{message}</p>
-        </div>
+        <p className="text-zinc-300 text-lg font-medium">{message}</p>
       </section>
 
       {/* TABS + PANELS */}
@@ -163,7 +157,7 @@ export default async function HomePage({
             advStatsPanel={<AdvStatsPanelServer key="advstats" />}
             playersPanel={<PlayersPanelServer key="players" />}
             reportPanel={<ReportPanel key="report" />}
-            /* Provide the Team tab when ?team= is present */
+            // 👇 THIS IS THE IMPORTANT PART
             teamPanel={
               teamParam ? (
                 <TeamSchedulePanel key={`team-${teamParam}`} team={teamParam} />

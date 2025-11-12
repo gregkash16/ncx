@@ -1,4 +1,3 @@
-// src/components/HomeTabs.tsx
 'use client';
 
 import React, {
@@ -10,7 +9,6 @@ import React, {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-
 export type TabKey =
   | "current"
   | "matchups"
@@ -18,7 +16,13 @@ export type TabKey =
   | "indstats"
   | "advstats"
   | "players"
-  | "report";
+  | "report"
+  | "team";
+
+const MATCHUPS: TabKey = "matchups";
+function isMatchups(k: TabKey): k is "matchups" {
+  return k === MATCHUPS;
+}
 
 type ReportPanelLikeProps = {
   goToTab?: (key: TabKey) => void;
@@ -32,6 +36,7 @@ type HomeTabsProps = {
   advStatsPanel?: React.ReactNode;
   playersPanel?: React.ReactNode;
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
+  teamPanel?: React.ReactNode; // still supported, just hidden
   hideButtons?: boolean;
 };
 
@@ -43,13 +48,19 @@ export default function HomeTabs({
   advStatsPanel,
   playersPanel,
   reportPanel,
+  teamPanel,
   hideButtons = false,
 }: HomeTabsProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
 
-  const urlTab = (searchParams.get("tab") as TabKey) || "current";
+  const hasTeam = !!teamPanel;
+
+  const urlTabRaw = (searchParams.get("tab") as TabKey) || "current";
+  const urlTab: TabKey =
+    urlTabRaw === "team" && !hasTeam ? "current" : urlTabRaw;
+
   const [active, setActive] = useState<TabKey>(urlTab);
 
   useEffect(() => {
@@ -65,13 +76,18 @@ export default function HomeTabs({
 
   const isActive = (key: TabKey) => active === key;
 
+  // Sync URL <-> state
   useEffect(() => {
     const params = new URLSearchParams(Array.from(searchParams.entries()));
 
     if (active === "current") params.delete("tab");
     else params.set("tab", active);
 
-    if (active !== "matchups") params.delete("q");
+    if (!isMatchups(active)) params.delete("q");
+
+    if (!hasTeam && params.get("tab") === "team") {
+      params.delete("tab");
+    }
 
     const next = params.toString();
     const href = next ? `${pathname}?${next}` : pathname;
@@ -79,16 +95,33 @@ export default function HomeTabs({
 
     if (curr !== next) router.replace(href, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  }, [active, hasTeam]);
 
   function goToTab(key: TabKey) {
-    if (key === "matchups") {
-      const params = new URLSearchParams(Array.from(searchParams.entries()));
-      params.set("tab", "matchups");
-      params.delete("q");
-      const href = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+
+    if (isMatchups(key)) {
+      params.set("tab", MATCHUPS);
+      const href = params.toString() ? `${pathname}?${params}` : pathname;
       router.replace(href, { scroll: false });
+      setActive(key);
+      return;
     }
+
+    if (key === "team") {
+      if (hasTeam) {
+        params.set("tab", "team");
+        const href = params.toString() ? `${pathname}?${params}` : pathname;
+        router.replace(href, { scroll: false });
+        setActive(key);
+      }
+      return;
+    }
+
+    params.set("tab", key);
+    if (!isMatchups(key)) params.delete("q");
+    const href = params.toString() ? `${pathname}?${params}` : pathname;
+    router.replace(href, { scroll: false });
     setActive(key);
   }
 
@@ -97,21 +130,23 @@ export default function HomeTabs({
       ? cloneElement(reportPanel, { goToTab })
       : reportPanel;
 
+  // 🔥 Notice we do NOT include the Team tab in the button list anymore
+  const buttons: Array<{ key: TabKey; label: string }> = [
+    { key: "current", label: "Current Week" },
+    { key: MATCHUPS, label: "Matchups" },
+    { key: "standings", label: "Standings" },
+    { key: "indstats", label: "Ind. Stats" },
+    { key: "advstats", label: "Adv. Stats" },
+    { key: "players", label: "Players" },
+    { key: "report", label: "Report a Game" },
+  ];
+
   return (
     <div className="w-full">
-      {/* Header: perfectly centered tab row + compact toggle */}
       {!hideButtons && (
         <div className="mt-3 mb-4 flex justify-center">
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {[
-              { key: "current" as const, label: "Current Week" },
-              { key: "matchups" as const, label: "Matchups" },
-              { key: "standings" as const, label: "Standings" },
-              { key: "indstats" as const, label: "Ind. Stats" },
-              { key: "advstats" as const, label: "Adv. Stats" },
-              { key: "players" as const, label: "Players" },
-              { key: "report" as const, label: "Report a Game" },
-            ].map(({ key, label }) => (
+            {buttons.map(({ key, label }) => (
               <button
                 key={key}
                 type="button"
@@ -126,14 +161,10 @@ export default function HomeTabs({
                 <span className={labelLayer}>{label}</span>
               </button>
             ))}
-
           </div>
         </div>
       )}
 
-
-
-      {/* Panels */}
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
           active === "indstats" || active === "advstats"
@@ -142,12 +173,14 @@ export default function HomeTabs({
         }`}
       >
         {active === "current" && currentWeekPanel}
-        {active === "matchups" && matchupsPanel}
+        {isMatchups(active) && matchupsPanel}
         {active === "standings" && standingsPanel}
         {active === "indstats" && indStatsPanel}
         {active === "advstats" && advStatsPanel}
         {active === "players" && playersPanel}
         {active === "report" && reportWithProp}
+        {/* ✅ still render Team panel when tab=team, even without a button */}
+        {active === "team" && hasTeam && teamPanel}
       </div>
     </div>
   );

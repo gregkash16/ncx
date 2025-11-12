@@ -495,3 +495,140 @@ export const fetchAllTimeStatsCached = unstable_cache(
   ["alltime-stats-data"],
   { revalidate: 600 } // 10 minutes
 );
+
+/** ------------------------ Team Schedule (SCHEDULE!A2:D121) ---------- **/
+export type TeamScheduleRow = {
+  week: string; // A = WEEK (e.g. "WEEK 1")
+  away: string; // B = AWAY
+  home: string; // D = HOME (C is ignored)
+};
+
+const SCHEDULE_OVERVIEW_RANGE = "'SCHEDULE'!A2:D121";
+
+function normalizeWeekLabel(label: string): string {
+  const s = String(label ?? "").trim();
+  if (!s) return "WEEK 1";
+  // already like "WEEK 3"
+  const m1 = s.match(/week\s*(\d+)/i);
+  if (m1) return `WEEK ${parseInt(m1[1], 10)}`;
+  // raw number "3"
+  const n = parseInt(s, 10);
+  if (Number.isFinite(n) && n > 0) return `WEEK ${n}`;
+  return s.toUpperCase();
+}
+
+async function fetchTeamScheduleAll(): Promise<TeamScheduleRow[]> {
+  const sheets = getSheets();
+  const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
+  const res = await withBackoff(() =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: SCHEDULE_OVERVIEW_RANGE,
+      valueRenderOption: "FORMATTED_VALUE",
+    })
+  );
+
+  const rows = (res.data.values ?? []) as string[][];
+  return rows
+    .map((r) => ({
+      week: normalizeWeekLabel(String(r?.[0] ?? "")), // ✅ normalize to "WEEK N"
+      away: norm(r?.[1]),
+      home: norm(r?.[3]), // D
+    }))
+    .filter((r) => r.week !== "" && (r.away !== "" || r.home !== ""));
+}
+
+
+export const fetchTeamScheduleAllCached = unstable_cache(
+  async (): Promise<TeamScheduleRow[]> => fetchTeamScheduleAll(),
+  ["team-schedule-all"],
+  { revalidate: 300 }
+);
+
+/**
+ * Accepts a team name or slug. Returns the canonical team name (as written in the sheet)
+ * and all WEEK rows (1..10) where that team appears (away or home), sorted by week number.
+ */
+export async function fetchScheduleForTeam(teamKey: string): Promise<{
+  teamName: string;
+  rows: TeamScheduleRow[];
+}> {
+  const all = await fetchTeamScheduleAllCached();
+
+  const key = teamKey.trim();
+  const toSlug = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/-+/g, "-")
+      .replace(/(^-|-$)/g, "");
+
+  // find any row that matches by exact or slug
+  const candidate = all.find(
+    (r) =>
+      r.away.toLowerCase() === key.toLowerCase() ||
+      r.home.toLowerCase() === key.toLowerCase() ||
+      toSlug(r.away) === key ||
+      toSlug(r.home) === key
+  );
+  if (!candidate) return { teamName: key, rows: [] };
+
+  // canonical name = whichever side matched first
+  const canonical =
+    candidate.away.toLowerCase() === key.toLowerCase() || toSlug(candidate.away) === key
+      ? candidate.away
+      : candidate.home;
+
+  const teamRows = all
+    .filter((r) => r.away === canonical || r.home === canonical)
+    .sort((a, b) => {
+      const aw = parseInt(a.week.replace(/[^0-9]/g, ""), 10) || 0;
+      const bw = parseInt(b.week.replace(/[^0-9]/g, ""), 10) || 0;
+      return aw - bw;
+    });
+
+  return { teamName: canonical, rows: teamRows };
+};
+
+// --- Overall standings (OVERALL RECORD!A2:F25) -------------------------
+export type OverallRow = {
+  rank: string;
+  team: string;
+  wins: string;
+  losses: string;
+  gameWins: string;
+  points: string;
+};
+
+export const fetchOverallStandingsCached = unstable_cache(
+  async (): Promise<OverallRow[]> => {
+    const sheets = getSheets();
+    const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
+    const res = await withBackoff(() =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: "OVERALL RECORD!A2:F25",
+        valueRenderOption: "FORMATTED_VALUE",
+      })
+    );
+    const values = (res.data.values ?? []) as string[][];
+    return values
+      .filter(
+        (r) =>
+          String(r?.[0] ?? "").trim() !== "" &&
+          String(r?.[1] ?? "").trim() !== ""
+      )
+      .map((r) => ({
+        rank: String(r?.[0] ?? ""),
+        team: String(r?.[1] ?? ""),
+        wins: String(r?.[2] ?? ""),
+        losses: String(r?.[3] ?? ""),
+        gameWins: String(r?.[4] ?? ""),
+        points: String(r?.[5] ?? ""),
+      }));
+  },
+  ["overall-standings"],
+  { revalidate: 120 } // cache for 2 minutes to smooth out spikes
+);
+

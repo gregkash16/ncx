@@ -20,11 +20,8 @@ function WinBoxes({ wins, direction = "right" }: { wins: number; direction?: "le
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: 4 }).map((_, i) => {
-        // fill left→right or right→left depending on direction
         const filled =
-          direction === "left"
-            ? i < count            // fill first N boxes
-            : i >= 4 - count;      // fill last N boxes
+          direction === "left" ? i < count : i >= 4 - count;
         return (
           <span
             key={i}
@@ -78,6 +75,11 @@ function parseWeekNum(label: string | undefined): number | null {
 function formatWeekLabel(n: number) {
   return `WEEK ${n}`;
 }
+function normalizeWeekTab(label?: string | null) {
+  const n = parseWeekNum(label ?? undefined);
+  if (n) return `WEEK ${n}`;
+  return String(label ?? "").trim().toUpperCase() || "WEEK 1";
+}
 
 export default async function CurrentWeekCard({
   activeWeek,
@@ -104,6 +106,7 @@ export default async function CurrentWeekCard({
 
   // Determine which week to display
   const showWeek = (selectedWeek && selectedWeek.trim()) || activeWeek || "WEEK 1";
+  const targetTab = normalizeWeekTab(showWeek);
 
   const activeNum = parseWeekNum(activeWeek);
   const pastWeeks =
@@ -111,12 +114,32 @@ export default async function CurrentWeekCard({
       ? Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1))
       : [];
 
-  // Fetch data for showWeek
-  const resp = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${showWeek}!A1:Q120`,
-  });
-  const data = resp.data.values ?? [];
+  // Fetch data for targetTab with graceful handling
+  let data: any[][] = [];
+  try {
+    const resp = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${targetTab}!A1:Q120`,
+      valueRenderOption: "FORMATTED_VALUE",
+    });
+    data = resp.data.values ?? [];
+  } catch (err: any) {
+    return (
+      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-red-800/60">
+        <h2 className="text-xl font-semibold text-red-400">Couldn’t load {targetTab}</h2>
+        <p className="mt-2 text-zinc-400">
+          {process.env.NODE_ENV !== "production" && (
+            <>
+              <span className="block">{String(err?.message ?? "Sheets API error")}</span>
+              <span className="block mt-1 text-zinc-500">
+                Checked range: <code>{`${targetTab}!A1:Q120`}</code>
+              </span>
+            </>
+          )}
+        </p>
+      </div>
+    );
+  }
 
   const series: SeriesRow[] = [];
   for (let rowNum = 9; rowNum < 120; rowNum += 10) {
@@ -161,17 +184,16 @@ export default async function CurrentWeekCard({
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 hover:border-purple-500/40 transition w-full">
       <h2 className="text-2xl font-extrabold text-center uppercase bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_20px_rgba(255,0,255,0.25)] mb-4 tracking-wide">
-        {showWeek === activeWeek ? "Current Week" : "Week View"} — {showWeek}
+        {targetTab === normalizeWeekTab(activeWeek) ? "Current Week" : "Week View"} — {targetTab}
       </h2>
 
       {/* Week selector strip */}
       {activeNum && activeNum > 1 && (
         <div className="flex flex-wrap justify-center gap-2 mb-5">
           {pastWeeks.map((wk) => {
-            const selected = wk.toUpperCase() === showWeek.toUpperCase();
-            const isActive = wk.toUpperCase() === activeWeek.toUpperCase();
-            const href =
-              wk === activeWeek ? "?tab=current" : `?tab=current&w=${encodeURIComponent(wk)}`;
+            const selected = wk.toUpperCase() === targetTab.toUpperCase();
+            const isActive = wk.toUpperCase() === normalizeWeekTab(activeWeek).toUpperCase();
+            const href = wk === activeWeek ? "?" : `?w=${encodeURIComponent(wk)}`;
 
             return (
               <Link
@@ -180,7 +202,11 @@ export default async function CurrentWeekCard({
                 scroll={false}
                 className={[
                   btnBase,
-                  isActive ? "border-yellow-400/70" : selected ? "border-cyan-400/60" : "border-purple-500/40",
+                  isActive
+                    ? "border-yellow-400/70"
+                    : selected
+                    ? "border-cyan-400/60"
+                    : "border-purple-500/40",
                 ].join(" ")}
               >
                 <span
@@ -218,8 +244,7 @@ export default async function CurrentWeekCard({
               : {};
 
             const q = `${m.awayTeam} ${m.homeTeam}`;
-            const href = `?tab=matchups&w=${encodeURIComponent(showWeek)}&q=${encodeURIComponent(q)}`;
-
+            const href = `/?tab=matchups&w=${encodeURIComponent(showWeek)}&q=${encodeURIComponent(q)}`;
 
             return (
               <li key={i} className="list-none">
@@ -242,14 +267,14 @@ export default async function CurrentWeekCard({
 
                   {/* Center */}
                   <div className="flex items-center justify-center gap-3 z-10">
-                    <WinBoxes wins={m.awayWins} direction="left" />   {/* ✅ fill left→right */}
+                    <WinBoxes wins={m.awayWins} direction="left" />
                     <div className="text-center min-w-[5.5rem] font-semibold text-zinc-100">
                       {m.awayWins} : {m.homeWins}
                     </div>
-                    <WinBoxes wins={m.homeWins} direction="right" />  {/* ✅ fill right→left */}
+                    <WinBoxes wins={m.homeWins} direction="right" />
                   </div>
 
-                   {/* Home */}
+                  {/* Home */}
                   <div
                     className={[
                       "flex items-center justify-end text-zinc-300",
