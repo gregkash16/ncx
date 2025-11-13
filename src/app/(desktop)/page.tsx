@@ -1,6 +1,9 @@
 // /src/app/(desktop)/page.tsx
 // Cache the rendered page for 60s so we don't re-hit Sheets every request
-export const revalidate = 60;
+// /src/app/(desktop)/page.tsx
+export const dynamic = "force-dynamic";
+// and REMOVE: export const revalidate = 60;
+
 
 import Image from "next/image";
 
