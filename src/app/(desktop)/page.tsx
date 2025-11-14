@@ -2,8 +2,6 @@
 // Cache the rendered page for 60s so we don't re-hit Sheets every request
 export const revalidate = 60;
 
-import Image from "next/image";
-
 // components live at /src/app/components relative to (desktop)
 import CurrentWeekCard from "../components/CurrentWeekCard";
 import StandingsPanel from "../components/StandingsPanel";
@@ -14,6 +12,7 @@ import PlayersPanelServer from "../components/PlayersPanelServer";
 import AdvStatsPanelServer from "../components/AdvStatsPanelServer";
 import TeamSchedulePanel from "../components/TeamSchedulePanel";
 import HomeTabs from "../components/HomeTabs";
+import DesktopNavTabs from "../components/DesktopNavTabs";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -123,8 +122,8 @@ export default async function HomePage({
       {/* HERO */}
       <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-6 text-center">
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,0,150,0.25),transparent_70%)] animate-pulse"></div>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_120%,rgba(0,255,255,0.15),transparent_60%)] blur-3xl"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,0,150,0.25),transparent_70%)] animate-pulse" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_120%,rgba(0,255,255,0.15),transparent_60%)] blur-3xl" />
         </div>
 
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
@@ -138,7 +137,11 @@ export default async function HomePage({
       {/* TABS + PANELS */}
       <section className="w-full px-4 pb-24">
         <div className="w-full max-w-[110rem] mx-auto">
+          {/* Top-level desktop nav buttons (used here and on /rules) */}
+          <DesktopNavTabs />
+
           <HomeTabs
+            hideButtons
             currentWeekPanel={
               <CurrentWeekCard
                 key="current-week"
