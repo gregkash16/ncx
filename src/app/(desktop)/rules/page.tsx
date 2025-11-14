@@ -1,5 +1,6 @@
 // /src/app/(desktop)/rules/page.tsx
 
+import { Suspense } from "react";
 import DesktopNavTabs from "../../components/DesktopNavTabs";
 
 const RULES_DOC_EMBED_URL =
@@ -26,7 +27,10 @@ export default function RulesPage() {
       {/* Nav + rules panel */}
       <section className="w-full px-4 pb-24">
         <div className="w-full max-w-[110rem] mx-auto">
-          <DesktopNavTabs />
+          {/* Wrap DesktopNavTabs in Suspense to satisfy useSearchParams requirement */}
+          <Suspense fallback={null}>
+            <DesktopNavTabs />
+          </Suspense>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 shadow-lg overflow-hidden min-h-[70vh]">
             <div className="h-full w-full flex justify-center dark:invert dark:hue-rotate-180">

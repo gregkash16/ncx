@@ -2,6 +2,8 @@
 // Cache the rendered page for 60s so we don't re-hit Sheets every request
 export const revalidate = 60;
 
+import { Suspense } from "react";
+
 // components live at /src/app/components relative to (desktop)
 import CurrentWeekCard from "../components/CurrentWeekCard";
 import StandingsPanel from "../components/StandingsPanel";
@@ -137,8 +139,10 @@ export default async function HomePage({
       {/* TABS + PANELS */}
       <section className="w-full px-4 pb-24">
         <div className="w-full max-w-[110rem] mx-auto">
-          {/* Top-level desktop nav buttons (used here and on /rules) */}
-          <DesktopNavTabs />
+          {/* Wrap DesktopNavTabs (client hook user) in Suspense */}
+          <Suspense fallback={null}>
+            <DesktopNavTabs />
+          </Suspense>
 
           <HomeTabs
             hideButtons
