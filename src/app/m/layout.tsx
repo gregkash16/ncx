@@ -24,9 +24,9 @@ export default async function MobileLayout({ children }: { children: ReactNode }
   const NAV_PX = 64;
 
   return (
+    // Let the *page* scroll (no overflow-hidden / fixed height here)
     // Use the "small viewport" unit to avoid iOS address bar jumps.
-    // Prevent viewport scroll; only <main> scrolls.
-    <div className="flex h-[100svh] flex-col overflow-hidden bg-neutral-950 text-neutral-100">
+    <div className="min-h-[100svh] flex flex-col bg-neutral-950 text-neutral-100">
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
         <div className="flex items-center justify-between gap-3 p-3">
@@ -93,10 +93,10 @@ export default async function MobileLayout({ children }: { children: ReactNode }
       </header>
 
       {/* Main content:
-          - Only this area scrolls
+          - Now uses normal document scroll (no overflow-y-auto)
           - Bottom padding reserves space for the fixed nav + safe area */}
       <main
-        className="flex-1 overflow-y-auto pt-[env(safe-area-inset-top)]"
+        className="flex-1 pt-[env(safe-area-inset-top)]"
         style={{
           paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
         }}

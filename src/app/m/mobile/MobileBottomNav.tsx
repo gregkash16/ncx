@@ -8,7 +8,7 @@ import {
   BarChart3,
   Users as UsersIcon,
   List as ListIcon,
-  ClipboardEdit, // 📝 Report icon
+  ClipboardEdit,
 } from "lucide-react";
 
 const TABS = [
@@ -16,9 +16,9 @@ const TABS = [
   { href: "/m/matchups",   label: "Matchups",  icon: ListIcon },
   { href: "/m/standings",  label: "Standings", icon: TrophyIcon },
   { href: "/m/indstats",   label: "Ind Stats", icon: BarChart3 },
-  { href: "/m/advstats",   label: "Adv",       icon: BarChart3 },
+  /* { href: "/m/advstats",   label: "Adv",       icon: BarChart3 }, */
   { href: "/m/players",    label: "Players",   icon: UsersIcon },
-  { href: "/m/report",     label: "Report",    icon: ClipboardEdit }, // ✅ new tab
+  { href: "/m/report",     label: "Report",    icon: ClipboardEdit },
 ];
 
 export default function MobileBottomNav() {
@@ -26,7 +26,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="h-full border-t border-neutral-800 bg-neutral-950/95 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md will-change-transform transform-gpu"
+      className="h-full border-t border-neutral-800 bg-neutral-950/95 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md"
       aria-label="Mobile tabs"
     >
       <ul className="mx-auto flex max-w-screen-sm justify-between px-3">
@@ -41,7 +41,7 @@ export default function MobileBottomNav() {
                 href={t.href}
                 className={`flex flex-col items-center justify-center py-3 text-[11px] transition-colors ${
                   active
-                    ? "text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 font-semibold"
+                    ? "font-semibold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400"
                     : "text-neutral-400 hover:text-neutral-200"
                 }`}
                 aria-current={active ? "page" : undefined}
@@ -50,9 +50,7 @@ export default function MobileBottomNav() {
                   size={22}
                   strokeWidth={2}
                   className={`mb-0.5 transition-all duration-200 ${
-                    active
-                      ? "text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400"
-                      : "text-neutral-400"
+                    active ? "text-pink-400" : "text-neutral-400"
                   }`}
                 />
                 {t.label}
