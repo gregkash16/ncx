@@ -1,9 +1,11 @@
 // src/app/m/standings/MobileStandings.tsx
 // Server component (no 'use client')
+import Link from "next/link";
 import Image from "next/image";
 import { teamSlug } from "@/lib/slug";
 import { getSheets } from "@/lib/googleSheets";
-console.log('[SSR] MobileStandings render', new Date().toISOString());
+
+console.log("[SSR] MobileStandings render", new Date().toISOString());
 
 type Row = {
   rank: string;
@@ -80,45 +82,74 @@ export default async function MobileStandings() {
         </h2>
 
         <ul className="space-y-2">
-          {data.map((t, i) => (
-            <li
-              key={`${t.rank}-${t.team}`}
-              className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-2.5"
-            >
-              {/* Top row: rank + team */}
-              <div className="flex items-center gap-2">
-                <span className="w-6 text-right text-sm font-semibold text-neutral-400">
-                  {t.rank || i + 1}
-                </span>
-                <Logo name={t.team} size={24} />
-                <span className="truncate text-sm font-medium text-neutral-200">
-                  {t.team}
-                </span>
-              </div>
+          {data.map((t, i) => {
+            const slug = teamSlug(t.team);
+            const href = slug ? `/m/team/${encodeURIComponent(slug)}` : undefined;
 
-              {/* Bottom row: stats — never wraps horizontally */}
-              <div className="mt-2 grid grid-cols-4 gap-2 text-xs text-neutral-300">
-                <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
-                  <div className="uppercase text-[10px] tracking-wide text-neutral-400">W</div>
-                  <div className="font-semibold tabular-nums">{t.wins}</div>
+            const content = (
+              <>
+                {/* Top row: rank + team */}
+                <div className="flex items-center gap-2">
+                  <span className="w-6 text-right text-sm font-semibold text-neutral-400">
+                    {t.rank || i + 1}
+                  </span>
+                  <Logo name={t.team} size={24} />
+                  <span className="truncate text-sm font-medium text-neutral-200">
+                    {t.team}
+                  </span>
                 </div>
-                <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
-                  <div className="uppercase text-[10px] tracking-wide text-neutral-400">L</div>
-                  <div className="font-semibold tabular-nums">{t.losses}</div>
-                </div>
-                <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
-                  <div className="uppercase text-[10px] tracking-wide text-neutral-400">GW</div>
-                  <div className="font-semibold tabular-nums">{t.gameWins}</div>
-                </div>
-                <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
-                  <div className="uppercase text-[10px] tracking-wide text-neutral-400">Pts</div>
-                  <div className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 tabular-nums">
-                    {t.points}
+
+                {/* Bottom row: stats — never wraps horizontally */}
+                <div className="mt-2 grid grid-cols-4 gap-2 text-xs text-neutral-300">
+                  <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
+                    <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+                      W
+                    </div>
+                    <div className="font-semibold tabular-nums">{t.wins}</div>
+                  </div>
+                  <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
+                    <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+                      L
+                    </div>
+                    <div className="font-semibold tabular-nums">{t.losses}</div>
+                  </div>
+                  <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
+                    <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+                      GW
+                    </div>
+                    <div className="font-semibold tabular-nums">{t.gameWins}</div>
+                  </div>
+                  <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
+                    <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+                      Pts
+                    </div>
+                    <div className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 tabular-nums">
+                      {t.points}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </li>
-          ))}
+              </>
+            );
+
+            return (
+              <li
+                key={`${t.rank}-${t.team}`}
+                className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-2.5"
+              >
+                {href ? (
+                  <Link
+                    href={href}
+                    className="block"
+                    prefetch={false}
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  content
+                )}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </section>
