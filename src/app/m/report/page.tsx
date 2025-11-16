@@ -131,12 +131,49 @@ export default function MobileReportPage() {
     return data.games[selectedIndex];
   }, [data, selectedIndex]);
 
+  // Match desktop: detect if scores or IDs are actually being edited
+  const editingScores = useMemo(() => {
+    if (!selectedGame) return false;
+    return (
+      awayPts !== (selectedGame.away.pts || "") ||
+      homePts !== (selectedGame.home.pts || "") ||
+      scenario !== (selectedGame.scenario || "")
+    );
+  }, [selectedGame, awayPts, homePts, scenario]);
+
+  const editingIds = useMemo(() => {
+    if (!selectedGame) return false;
+    return (
+      awayId !== (selectedGame.away.id || "") ||
+      homeId !== (selectedGame.home.id || "")
+    );
+  }, [selectedGame, awayId, homeId]);
+
   const canSubmit = useMemo(() => {
     if (!data || !data.ok || !selectedGame) return false;
-    if (awayPts === "" || homePts === "" || !scenario) return false;
-    if (selectedGame.alreadyFilled && !confirmOverwrite) return false;
+
+    // Nothing changed? No submit.
+    if (!editingScores && !editingIds) return false;
+
+    // If we’re editing scores, require scores + scenario,
+    // and confirm overwrite if scores already exist.
+    if (editingScores) {
+      if (awayPts === "" || homePts === "" || !scenario) return false;
+      if (selectedGame.alreadyFilled && !confirmOverwrite) return false;
+    }
+
+    // If only IDs changed, that’s fine – backend enforces perms.
     return true;
-  }, [data, selectedGame, awayPts, homePts, scenario, confirmOverwrite]);
+  }, [
+    data,
+    selectedGame,
+    editingScores,
+    editingIds,
+    awayPts,
+    homePts,
+    scenario,
+    confirmOverwrite,
+  ]);
 
   async function submit() {
     if (!data || !data.ok || !selectedGame) return;
@@ -144,18 +181,24 @@ export default function MobileReportPage() {
     setNotice("");
 
     try {
+      const payload: any = {
+        rowIndex: selectedGame.rowIndex,
+        force: confirmOverwrite,
+        newAwayId: awayId,
+        newHomeId: homeId,
+      };
+
+      // Only send scores + scenario if they actually changed
+      if (editingScores) {
+        payload.awayPts = Number(awayPts);
+        payload.homePts = Number(homePts);
+        payload.scenario = scenario;
+      }
+
       const res = await fetch("/api/report-game", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rowIndex: selectedGame.rowIndex,
-          awayPts: Number(awayPts),
-          homePts: Number(homePts),
-          scenario,
-          force: confirmOverwrite,
-          newAwayId: awayId,
-          newHomeId: homeId,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
@@ -449,7 +492,7 @@ export default function MobileReportPage() {
         </label>
       </div>
 
-      {alreadyFilled && (
+      {alreadyFilled && editingScores && (
         <label className="flex items-center gap-2 text-sm text-neutral-300">
           <input
             type="checkbox"

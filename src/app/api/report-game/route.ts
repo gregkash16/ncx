@@ -256,40 +256,38 @@ export async function GET() {
 
     const games: GameRow[] = [];
 
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
-    const rowIndex = i + 2; // header consumed
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const rowIndex = i + 2; // header consumed
 
-    const gameCell = norm(r?.[0]); // A
-    const awayId = norm(r?.[1]); // B
-    const awayName = norm(r?.[2]); // C
-    const awayTeam = norm(r?.[3]); // D
-    const awayW = norm(r?.[4]); // E
-    const awayL = norm(r?.[5]); // F
-    const awayPts = norm(r?.[6]); // G
-    const awayPlms = norm(r?.[7]); // H
-    const homeId = norm(r?.[9]); // J
-    const homeName = norm(r?.[10]); // K
-    const homeTeam = norm(r?.[11]); // L
-    const homeW = norm(r?.[12]); // M
-    const homeL = norm(r?.[13]); // N
-    const homePts = norm(r?.[14]); // O
-    const homePlms = norm(r?.[15]); // P
-    const scenario = norm(r?.[16]); // Q
+      const gameCell = norm(r?.[0]); // A
+      const awayId = norm(r?.[1]); // B
+      const awayName = norm(r?.[2]); // C
+      const awayTeam = norm(r?.[3]); // D
+      const awayW = norm(r?.[4]); // E
+      const awayL = norm(r?.[5]); // F
+      const awayPts = norm(r?.[6]); // G
+      const awayPlms = norm(r?.[7]); // H
+      const homeId = norm(r?.[9]); // J
+      const homeName = norm(r?.[10]); // K
+      const homeTeam = norm(r?.[11]); // L
+      const homeW = norm(r?.[12]); // M
+      const homeL = norm(r?.[13]); // N
+      const homePts = norm(r?.[14]); // O
+      const homePlms = norm(r?.[15]); // P
+      const scenario = norm(r?.[16]); // Q
 
-    // 🔹 Only keep rows where Game is a real number (e.g. "1", "12")
-    const gameNumber = parseInt(gameCell, 10);
-    const hasNumericGame =
-      Number.isFinite(gameNumber) && gameCell.trim() !== "";
+      // 🔹 Only keep rows where Game is a real number (e.g. "1", "12")
+      const gameNumber = parseInt(gameCell, 10);
+      const hasNumericGame =
+        Number.isFinite(gameNumber) && gameCell.trim() !== "";
 
-    if (!hasNumericGame || (!awayTeam && !homeTeam)) continue;
+      if (!hasNumericGame || (!awayTeam && !homeTeam)) continue;
 
-    // Use the numeric string as the canonical game value
-    const game = String(gameNumber);
+      // Use the numeric string as the canonical game value
+      const game = String(gameNumber);
 
-
-    if (!game || (!awayTeam && !homeTeam)) continue;
-
+      if (!game || (!awayTeam && !homeTeam)) continue;
 
       const alreadyFilled = !(awayPts === "" && homePts === "" && scenario === "");
 
@@ -516,7 +514,9 @@ export async function POST(req: Request) {
     const curHome = norm(row?.[14]);
     const curScen = norm(row?.[16]);
     const alreadyFilled = !(curAway === "" && curHome === "" && curScen === "");
-    if (alreadyFilled && !force) {
+
+    // Only require overwrite confirmation if we are actually changing scores.
+    if (hasScoreInputs && alreadyFilled && !force) {
       return NextResponse.json(
         {
           ok: false,
