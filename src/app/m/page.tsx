@@ -1,32 +1,30 @@
 // src/app/m/page.tsx
 import HomeLanding from "@/app/components/HomeLanding";
-import MobileCurrent from "./MobileCurrent";
 
 export const revalidate = 60;
 
-// Next 15: searchParams is a Promise on server components
-export default async function MobileHomePage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const sp = await searchParams;
-  const selectedWeek = (sp?.w as string | undefined) || undefined;
-
+export default function MobileHomePage() {
   return (
-    <div className="space-y-6 py-4">
-      {/* Shared home card + team logos; links to mobile Ind Stats */}
+    <div className="space-y-8 py-4">
       <HomeLanding
         className="mt-1"
+        rulesHref="/m/rules"
         buildTeamHref={(team) =>
           `/m/indstats?indteam=${encodeURIComponent(team.filterValue)}`
         }
       />
 
-      {/* Current week section below the home card */}
-      <div>
-        <MobileCurrent selectedWeek={selectedWeek} />
+      {/* (Optional) You can delete this extra rules button now if you want */}
+      {/* 
+      <div className="flex justify-center">
+        <a
+          href="/m/rules"
+          className="inline-block rounded-xl border border-neutral-700 bg-neutral-900/70 px-4 py-2 text-sm font-semibold text-neutral-100 hover:bg-neutral-800 transition"
+        >
+          📘 League Rules
+        </a>
       </div>
+      */}
     </div>
   );
 }

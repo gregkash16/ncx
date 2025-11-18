@@ -10,14 +10,17 @@ import {
   Users as UsersIcon,
   List as ListIcon,
   ClipboardEdit,
+  CalendarDays,
 } from "lucide-react";
 import { useRef, useState } from "react";
 
 const TABS = [
   { href: "/m",           label: "Home",     icon: HomeIcon },
+  { href: "/m/current",   label: "Current",  icon: CalendarDays },
   { href: "/m/matchups",  label: "Matchups", icon: ListIcon },
   { href: "/m/standings", label: "Standings",icon: TrophyIcon },
-  { href: "/m/indstats",  label: "Stats",icon: BarChart3 }, // special: tap vs long-press
+  // Special stats tab: tap vs long-press
+  { href: "/m/indstats",  label: "Stats",    icon: BarChart3 },
   { href: "/m/report",    label: "Report",   icon: ClipboardEdit },
 ];
 
@@ -35,7 +38,7 @@ export default function MobileBottomNav() {
     longPressTimer.current = setTimeout(() => {
       longPressTriggered.current = true;
       setShowStatsMenu(true);
-    }, 500);
+    }, 500); // ~0.5s long press
   }
 
   function endPress() {
@@ -44,7 +47,7 @@ export default function MobileBottomNav() {
       longPressTimer.current = null;
     }
     if (!longPressTriggered.current) {
-      // Treat as normal tap: go to Ind Stats
+      // treat as a normal tap: go to Ind Stats
       router.push("/m/indstats");
     }
   }
@@ -70,14 +73,13 @@ export default function MobileBottomNav() {
         {TABS.map((t) => {
           const isStatsTab = t.href === "/m/indstats";
 
-          const active =
-            isStatsTab
-              ? ["/m/indstats", "/m/advstats", "/m/players"].some((p) =>
-                  pathname.startsWith(p)
-                )
-              : t.href === "/m"
-              ? pathname === "/m"
-              : pathname.startsWith(t.href);
+          const active = isStatsTab
+            ? ["/m/indstats", "/m/advstats", "/m/players"].some((p) =>
+                pathname.startsWith(p)
+              )
+            : t.href === "/m"
+            ? pathname === "/m"
+            : pathname.startsWith(t.href);
 
           const Icon = t.icon;
 
@@ -156,7 +158,7 @@ export default function MobileBottomNav() {
             <button
               type="button"
               onClick={() => goStatsRoute("/m/players")}
-              className="rounded-lg bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-100 hover:bg-neutral-800 inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1 rounded-lg bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-100 hover:bg-neutral-800"
             >
               <UsersIcon className="h-3 w-3" />
               Players

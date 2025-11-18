@@ -12,7 +12,7 @@ export default function MobileUnknownPage() {
         </h2>
         <p className="text-sm text-neutral-400">
           That screen doesn&apos;t exist. Use the tabs below or go back to the
-          current week.
+          home screen.
         </p>
       </div>
 
@@ -20,7 +20,7 @@ export default function MobileUnknownPage() {
         href="/m"
         className="rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm font-medium text-neutral-100 hover:bg-neutral-800"
       >
-        Go to Current Week
+        Go to Home
       </Link>
     </div>
   );

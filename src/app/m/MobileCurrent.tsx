@@ -158,9 +158,9 @@ export default async function MobileCurrent({
         {/* Week selector strip (Current + all past weeks) */}
         {activeNum && activeNum > 1 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {/* Current */}
+            {/* Current (active week) */}
             <a
-              href={`?tab=current`}
+              href="/m/current"
               className={[btnBase, "border-yellow-400/70"].join(" ")}
             >
               <span
@@ -180,8 +180,8 @@ export default async function MobileCurrent({
               const selected = wk.toUpperCase() === showWeek.toUpperCase();
               const isActive = wk.toUpperCase() === activeWeek.toUpperCase();
               const href = isActive
-                ? `?tab=current`
-                : `?tab=current&w=${encodeURIComponent(wk)}`;
+                ? "/m/current"
+                : `/m/current?w=${encodeURIComponent(wk)}`;
               return (
                 <a
                   key={wk}
@@ -243,7 +243,9 @@ export default async function MobileCurrent({
 
               // Clicking a series -> Matchups tab with the same week + a team query
               const q = `${m.awayTeam} ${m.homeTeam}`.trim();
-              const href = `/m/matchups?w=${encodeURIComponent(showWeek)}&q=${encodeURIComponent(q)}`;
+              const href = `/m/matchups?w=${encodeURIComponent(
+                showWeek
+              )}&q=${encodeURIComponent(q)}`;
 
               return (
                 <li key={i} className="list-none">

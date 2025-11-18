@@ -24,6 +24,12 @@ type HomeLandingProps = {
    * "/?tab=indstats&indteam=TEAM_NAME"
    */
   buildTeamHref?: (team: TeamLogo) => string;
+  /**
+   * Optional override for the "League Rules" tile link.
+   * Desktop: default "/rules"
+   * Mobile: pass "/m/rules"
+   */
+  rulesHref?: string;
 };
 
 const teams: TeamLogo[] = [
@@ -62,7 +68,10 @@ export default function HomeLanding({
   message,
   className,
   buildTeamHref,
+  rulesHref,
 }: HomeLandingProps) {
+  const rulesLink = rulesHref ?? "/rules";
+
   return (
     <div className={`mx-auto max-w-4xl ${className ?? ""}`}>
       <div className="rounded-2xl border border-purple-500/40 bg-zinc-900/70 p-6 md:p-8 shadow-xl">
@@ -117,7 +126,7 @@ export default function HomeLanding({
           </a>
 
           <a
-            href="/rules"
+            href={rulesLink}
             className="flex items-center justify-center rounded-xl border border-cyan-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold hover:bg-cyan-500/20 hover:border-cyan-400 transition"
           >
             League Rules
