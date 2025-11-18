@@ -1,18 +1,23 @@
 // src/app/m/MobileTabs.tsx
 "use client";
 
+import type { ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ClipboardEdit } from "lucide-react"; // 📝 nice icon
 import type { TabKey } from "@/app/components/HomeTabs";
 
-const TABS: { key: TabKey; label: string; icon?: React.ReactNode }[] = [
+const TABS: { key: TabKey; label: string; icon?: ReactNode }[] = [
   { key: "current",  label: "Current" },
   { key: "matchups", label: "Matchups" },
   { key: "standings",label: "Standings" },
   { key: "indstats", label: "Ind Stats" },
   { key: "advstats", label: "Adv" },
   { key: "players",  label: "Players" },
-  { key: "report",   label: "Report", icon: <ClipboardEdit className="h-4 w-4" /> },
+  {
+    key: "report",
+    label: "Report",
+    icon: <ClipboardEdit className="h-4 w-4" />,
+  },
 ];
 
 export default function MobileTabs() {
@@ -20,25 +25,72 @@ export default function MobileTabs() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Determine active tab
+  // 🔑 Determine active tab purely from pathname
   let active: TabKey = "current";
+
   if (pathname.startsWith("/m/matchups")) {
     active = "matchups";
+  } else if (pathname.startsWith("/m/standings")) {
+    active = "standings";
+  } else if (pathname.startsWith("/m/indstats")) {
+    active = "indstats";
+  } else if (pathname.startsWith("/m/advstats")) {
+    active = "advstats";
+  } else if (pathname.startsWith("/m/players")) {
+    active = "players";
   } else if (pathname.startsWith("/m/report")) {
     active = "report";
+  } else if (pathname.startsWith("/m/current")) {
+    active = "current";
   } else {
-    active = (searchParams.get("tab") as TabKey) || "current";
+    // `/m` (home landing) and anything else default to Current
+    active = "current";
   }
 
   function go(tab: TabKey) {
     if (tab === "matchups") {
+      // Preserve w + q when jumping into Matchups
       const w = searchParams.get("w");
       const q = searchParams.get("q");
       const qs = new URLSearchParams();
       if (w) qs.set("w", w);
       if (q) qs.set("q", q);
-      const href = qs.toString() ? `/m/matchups?${qs}` : `/m/matchups`;
+      const href = qs.toString()
+        ? `/m/matchups?${qs.toString()}`
+        : `/m/matchups`;
       router.replace(href, { scroll: false });
+      return;
+    }
+
+    if (tab === "current") {
+      // Preserve w when jumping to Current Week
+      const w = searchParams.get("w");
+      const qs = new URLSearchParams();
+      if (w) qs.set("w", w);
+      const href = qs.toString()
+        ? `/m/current?${qs.toString()}`
+        : `/m/current`;
+      router.replace(href, { scroll: false });
+      return;
+    }
+
+    if (tab === "standings") {
+      router.replace("/m/standings", { scroll: false });
+      return;
+    }
+
+    if (tab === "indstats") {
+      router.replace("/m/indstats", { scroll: false });
+      return;
+    }
+
+    if (tab === "advstats") {
+      router.replace("/m/advstats", { scroll: false });
+      return;
+    }
+
+    if (tab === "players") {
+      router.replace("/m/players", { scroll: false });
       return;
     }
 
@@ -46,21 +98,6 @@ export default function MobileTabs() {
       router.replace("/m/report", { scroll: false });
       return;
     }
-
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
-    params.delete("q");
-
-    if (tab === "current") {
-      params.delete("tab");
-      const next = params.toString();
-      router.replace(next ? `/m?${next}` : `/m`, { scroll: false });
-      return;
-    }
-
-    params.set("tab", tab);
-    params.delete("w");
-    const next = params.toString();
-    router.replace(next ? `/m?${next}` : `/m`, { scroll: false });
   }
 
   return (

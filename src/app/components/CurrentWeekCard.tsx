@@ -1,4 +1,6 @@
+// src/app/components/CurrentWeekCard.tsx
 // Server Component: no 'use client'
+import type React from "react";
 import Link from "next/link";
 import { getSheets } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
@@ -20,8 +22,7 @@ function WinBoxes({ wins, direction = "right" }: { wins: number; direction?: "le
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: 4 }).map((_, i) => {
-        const filled =
-          direction === "left" ? i < count : i >= 4 - count;
+        const filled = direction === "left" ? i < count : i >= 4 - count;
         return (
           <span
             key={i}
@@ -193,7 +194,12 @@ export default async function CurrentWeekCard({
           {pastWeeks.map((wk) => {
             const selected = wk.toUpperCase() === targetTab.toUpperCase();
             const isActive = wk.toUpperCase() === normalizeWeekTab(activeWeek).toUpperCase();
-            const href = wk === activeWeek ? "?" : `?w=${encodeURIComponent(wk)}`;
+
+            // 🔗 Always stay on Current Week tab when switching weeks
+            const href =
+              wk === activeWeek
+                ? "/?tab=current"
+                : `/?tab=current&w=${encodeURIComponent(wk)}`;
 
             return (
               <Link
@@ -244,7 +250,9 @@ export default async function CurrentWeekCard({
               : {};
 
             const q = `${m.awayTeam} ${m.homeTeam}`;
-            const href = `/?tab=matchups&w=${encodeURIComponent(showWeek)}&q=${encodeURIComponent(q)}`;
+            const href = `/?tab=matchups&w=${encodeURIComponent(
+              showWeek
+            )}&q=${encodeURIComponent(q)}`;
 
             return (
               <li key={i} className="list-none">

@@ -2,11 +2,9 @@
 "use client";
 
 import React, {
-  useState,
   isValidElement,
   cloneElement,
   ReactElement,
-  useEffect,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -61,16 +59,10 @@ export default function HomeTabs({
 
   const hasTeam = !!teamPanel;
 
+  // 🔑 Single source of truth: URL `tab` param
   const urlTabRaw = (searchParams.get("tab") as TabKey) || "home";
-  const urlTab: TabKey =
+  const active: TabKey =
     urlTabRaw === "team" && !hasTeam ? "home" : urlTabRaw;
-
-  const [active, setActive] = useState<TabKey>(urlTab);
-
-  useEffect(() => {
-    if (urlTab !== active) setActive(urlTab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab]);
 
   const btnBase =
     "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
@@ -80,27 +72,6 @@ export default function HomeTabs({
 
   const isActive = (key: TabKey) => active === key;
 
-  // Sync URL <-> state
-  useEffect(() => {
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
-
-    if (active === "home") params.delete("tab");
-    else params.set("tab", active);
-
-    if (!isMatchups(active)) params.delete("q");
-
-    if (!hasTeam && params.get("tab") === "team") {
-      params.delete("tab");
-    }
-
-    const next = params.toString();
-    const href = next ? `${pathname}?${next}` : pathname;
-    const curr = searchParams.toString();
-
-    if (curr !== next) router.replace(href, { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, hasTeam]);
-
   function goToTab(key: TabKey) {
     const params = new URLSearchParams(Array.from(searchParams.entries()));
 
@@ -108,7 +79,6 @@ export default function HomeTabs({
       params.set("tab", MATCHUPS);
       const href = params.toString() ? `${pathname}?${params}` : pathname;
       router.replace(href, { scroll: false });
-      setActive(key);
       return;
     }
 
@@ -117,7 +87,6 @@ export default function HomeTabs({
         params.set("tab", "team");
         const href = params.toString() ? `${pathname}?${params}` : pathname;
         router.replace(href, { scroll: false });
-        setActive(key);
       }
       return;
     }
@@ -127,10 +96,13 @@ export default function HomeTabs({
     } else {
       params.set("tab", key);
     }
-    if (!isMatchups(key)) params.delete("q");
+
+    if (!isMatchups(key)) {
+      params.delete("q");
+    }
+
     const href = params.toString() ? `${pathname}?${params}` : pathname;
     router.replace(href, { scroll: false });
-    setActive(key);
   }
 
   const reportWithProp =

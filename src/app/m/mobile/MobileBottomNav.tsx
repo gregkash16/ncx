@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Home as HomeIcon,
   Trophy as TrophyIcon,
@@ -15,18 +15,19 @@ import {
 import { useRef, useState } from "react";
 
 const TABS = [
-  { href: "/m",           label: "Home",     icon: HomeIcon },
-  { href: "/m/current",   label: "Current",  icon: CalendarDays },
-  { href: "/m/matchups",  label: "Matchups", icon: ListIcon },
-  { href: "/m/standings", label: "Standings",icon: TrophyIcon },
+  { href: "/m",           label: "Home",      icon: HomeIcon },
+  { href: "/m/current",   label: "Current",   icon: CalendarDays },
+  { href: "/m/matchups",  label: "Matchups",  icon: ListIcon },
+  { href: "/m/standings", label: "Standings", icon: TrophyIcon },
   // Special stats tab: tap vs long-press
-  { href: "/m/indstats",  label: "Stats",    icon: BarChart3 },
-  { href: "/m/report",    label: "Report",   icon: ClipboardEdit },
+  { href: "/m/indstats",  label: "Stats",     icon: BarChart3 },
+  { href: "/m/report",    label: "Report",    icon: ClipboardEdit },
 ];
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [showStatsMenu, setShowStatsMenu] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,10 +113,36 @@ export default function MobileBottomNav() {
             );
           }
 
+          // Build hrefs that preserve useful query params
+          let href = t.href;
+
+          if (t.href === "/m/current") {
+            // Preserve ?w when going to Current
+            const w = searchParams.get("w");
+            const qs = new URLSearchParams();
+            if (w) qs.set("w", w);
+            href = qs.toString() ? `/m/current?${qs.toString()}` : "/m/current";
+          } else if (t.href === "/m/matchups") {
+            // Preserve ?w and ?q for Matchups
+            const w = searchParams.get("w");
+            const q = searchParams.get("q");
+            const qs = new URLSearchParams();
+            if (w) qs.set("w", w);
+            if (q) qs.set("q", q);
+            href = qs.toString() ? `/m/matchups?${qs.toString()}` : "/m/matchups";
+          } else if (t.href === "/m") {
+            // Home: just go to /m (drop filters)
+            href = "/m";
+          } else if (t.href === "/m/standings") {
+            href = "/m/standings";
+          } else if (t.href === "/m/report") {
+            href = "/m/report";
+          }
+
           return (
             <li key={t.href} className="flex-1 text-center">
               <Link
-                href={t.href}
+                href={href}
                 className={`flex flex-col items-center justify-center py-3 text-[11px] transition-colors ${
                   active
                     ? "font-semibold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400"

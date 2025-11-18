@@ -255,8 +255,8 @@ async function TeamTable({
           {enriched.map((r, i) => {
             const weekLabel = normalizeWeekLabel(r.week);
 
-            // On mobile, jump to /m (Current tab) with ?w=<week>
-            const weekHref = `/m?w=${encodeURIComponent(weekLabel)}`;
+            // 🔧 FIX: go straight to /m/current, not /m
+            const weekHref = `/m/current?w=${encodeURIComponent(weekLabel)}`;
 
             let rowTone = "";
             if (r.status === "FINAL") {

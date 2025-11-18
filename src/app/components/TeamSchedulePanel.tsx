@@ -32,6 +32,8 @@ type EnrichedRow = TeamScheduleRow & {
   seriesOver: boolean;
 };
 
+type PanelMode = "desktop" | "mobile";
+
 /**
  * Read the week grid (A1:Q120) and derive wins like CurrentWeekCard:
  * - Away Team = col D (index 3)
@@ -66,7 +68,6 @@ async function deriveSeriesFromWeek(weekTab: string, away: string, home: string)
     const awayWins = toInt(row[4]);
     const homeWins = toInt(row[12]);
 
-    // If matched reversed order, flip wins to align with SCHEDULE perspective
     if (matchesFlipped) {
       return { awayWins: homeWins, homeWins: awayWins, found: true };
     }
@@ -157,7 +158,17 @@ function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
 }
 
 /* ----------------------------- PANEL ----------------------------- */
-export default async function TeamSchedulePanel({ team }: { team: string }) {
+
+type TeamSchedulePanelProps = {
+  team: string;
+  /** desktop = "/?tab=current&w=...", mobile = "/m/current?w=..." */
+  mode?: PanelMode;
+};
+
+export default async function TeamSchedulePanel({
+  team,
+  mode = "desktop",
+}: TeamSchedulePanelProps) {
   const { teamName, rows } = await fetchScheduleForTeam(team);
 
   return (
@@ -186,7 +197,7 @@ export default async function TeamSchedulePanel({ team }: { team: string }) {
             </h2>
           </header>
 
-          <TeamTable rows={rows} teamName={teamName} />
+          <TeamTable rows={rows} teamName={teamName} mode={mode} />
         </>
       )}
     </div>
@@ -196,9 +207,11 @@ export default async function TeamSchedulePanel({ team }: { team: string }) {
 async function TeamTable({
   rows,
   teamName,
+  mode,
 }: {
   rows: TeamScheduleRow[];
   teamName: string;
+  mode: PanelMode;
 }) {
   const enriched = await Promise.all(rows.map(enrichRowWithScore));
 
@@ -216,13 +229,13 @@ async function TeamTable({
         <tbody className="text-sm">
           {enriched.map((r, i) => {
             const weekLabel = normalizeWeekLabel(r.week);
-            const q = `${r.away} ${r.home}`;
 
-            // Jump to the Current Week panel, showing the clicked week
-            const weekHref = `/?tab=current&w=${encodeURIComponent(weekLabel)}`;
+            // 🔒 Use explicit string URLs so they can't get rewritten to `?w=...` on `/m`.
+            const weekHref =
+              mode === "mobile"
+                ? `/m/current?w=${encodeURIComponent(weekLabel)}`
+                : `/?tab=current&w=${encodeURIComponent(weekLabel)}`;
 
-
-            // Row tone from viewing team's perspective
             let rowTone = "";
             if (r.status === "FINAL") {
               const viewingIsAway = r.away === teamName;
@@ -242,7 +255,7 @@ async function TeamTable({
 
             return (
               <tr key={`${weekLabel}-${i}`} className={`border-t border-zinc-800 ${rowTone}`}>
-                {/* Week → link to Current Week with w & q */}
+                {/* Week → link to Current Week (desktop) or Mobile Current (mobile) */}
                 <td className="py-2 px-2">
                   <Link
                     href={weekHref}
@@ -294,8 +307,11 @@ async function TeamTable({
       </table>
 
       <div className="mt-6 text-sm text-zinc-400">
-        Click any <span className="text-cyan-300">Week</span> to jump to the home page with that
-        week and matchup pre-selected.
+        Click any <span className="text-cyan-300">Week</span> to jump to the{" "}
+        <span className="text-cyan-300">
+          {mode === "mobile" ? "Mobile Current Week" : "Current Week"}
+        </span>{" "}
+        view with that week selected.
       </div>
     </div>
   );
