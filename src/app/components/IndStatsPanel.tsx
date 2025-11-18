@@ -1,9 +1,9 @@
-'use client';
+// src/app/components/IndStatsPanel.tsx
+"use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { IndRow } from "@/lib/googleSheets";
-
-type Props = { data: IndRow[] };
 
 // Small helper for sortable headers
 function Th({
@@ -33,8 +33,17 @@ function Th({
   );
 }
 
+type Props = { data: IndRow[] };
+
 export default function IndStatsPanel({ data }: Props) {
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+
+  // Pre-fill from URL: ?indteam=TEAM_NAME (used by Home logos)
+  const [query, setQuery] = useState(() => {
+    const fromUrl = searchParams.get("indteam");
+    return fromUrl ? fromUrl : "";
+  });
+
   const [sortKey, setSortKey] = useState<keyof IndRow>("rank");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -58,11 +67,16 @@ export default function IndStatsPanel({ data }: Props) {
     copy.sort((a, b) => {
       const av = (a[sortKey] ?? "").toString();
       const bv = (b[sortKey] ?? "").toString();
-      const an = Number(av), bn = Number(bv);
+      const an = Number(av),
+        bn = Number(bv);
       const bothNums = !Number.isNaN(an) && !Number.isNaN(bn);
       let cmp = 0;
       if (bothNums) cmp = an - bn;
-      else cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+      else
+        cmp = av.localeCompare(bv, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
       return sortDir === "asc" ? cmp : -cmp;
     });
     return copy;
@@ -103,25 +117,25 @@ export default function IndStatsPanel({ data }: Props) {
             {/* Explicit widths so headers & cells align */}
             <colgroup>
               {[
-                { w: 60 },   // Rank
-                { w: 100 },  // NCXID
-                { w: 140 },  // First
-                { w: 140 },  // Last
-                { w: 80 },   // Pick
-                { w: 140 },  // Team
-                { w: 120 },  // Faction
-                { w: 72 },   // Wins
-                { w: 72 },   // Losses
-                { w: 84 },   // Points
-                { w: 84 },   // PL/MS
-                { w: 84 },   // Games
-                { w: 96 },   // Win%
-                { w: 84 },   // PPG
-                { w: 110 },  // Efficiency
-                { w: 84 },   // WAR
-                { w: 84 },   // H2H
-                { w: 84 },   // Potato
-                { w: 84 },   // SOS
+                { w: 60 }, // Rank
+                { w: 100 }, // NCXID
+                { w: 140 }, // First
+                { w: 140 }, // Last
+                { w: 80 }, // Pick
+                { w: 140 }, // Team
+                { w: 120 }, // Faction
+                { w: 72 }, // Wins
+                { w: 72 }, // Losses
+                { w: 84 }, // Points
+                { w: 84 }, // PL/MS
+                { w: 84 }, // Games
+                { w: 96 }, // Win%
+                { w: 84 }, // PPG
+                { w: 110 }, // Efficiency
+                { w: 84 }, // WAR
+                { w: 84 }, // H2H
+                { w: 84 }, // Potato
+                { w: 84 }, // SOS
               ].map((c, i) => (
                 <col key={i} style={{ width: c.w }} />
               ))}
@@ -129,29 +143,141 @@ export default function IndStatsPanel({ data }: Props) {
 
             <thead className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur-sm border-b border-zinc-800">
               <tr>
-                <Th onClick={() => onSort("rank")} active={sortKey==="rank"} dir={sortDir} className="text-zinc-300">
+                <Th
+                  onClick={() => onSort("rank")}
+                  active={sortKey === "rank"}
+                  dir={sortDir}
+                  className="text-zinc-300"
+                >
                   Rk
                 </Th>
-                <Th onClick={() => onSort("ncxid")} active={sortKey==="ncxid"} dir={sortDir} className="text-zinc-300">
+                <Th
+                  onClick={() => onSort("ncxid")}
+                  active={sortKey === "ncxid"}
+                  dir={sortDir}
+                  className="text-zinc-300"
+                >
                   NCXID
                 </Th>
-                <Th onClick={() => onSort("first")} active={sortKey==="first"} dir={sortDir}>First</Th>
-                <Th onClick={() => onSort("last")} active={sortKey==="last"} dir={sortDir}>Last</Th>
-                <Th onClick={() => onSort("pick")} active={sortKey==="pick"} dir={sortDir}>Pick</Th>
-                <Th onClick={() => onSort("team")} active={sortKey==="team"} dir={sortDir}>Team</Th>
-                <Th onClick={() => onSort("faction")} active={sortKey==="faction"} dir={sortDir}>Faction</Th>
-                <Th onClick={() => onSort("wins")} active={sortKey==="wins"} dir={sortDir}>W</Th>
-                <Th onClick={() => onSort("losses")} active={sortKey==="losses"} dir={sortDir}>L</Th>
-                <Th onClick={() => onSort("points")} active={sortKey==="points"} dir={sortDir}>Pts</Th>
-                <Th onClick={() => onSort("plms")} active={sortKey==="plms"} dir={sortDir}>PL/MS</Th>
-                <Th onClick={() => onSort("games")} active={sortKey==="games"} dir={sortDir}>GP</Th>
-                <Th onClick={() => onSort("winPct")} active={sortKey==="winPct"} dir={sortDir}>Win%</Th>
-                <Th onClick={() => onSort("ppg")} active={sortKey==="ppg"} dir={sortDir}>PPG</Th>
-                <Th onClick={() => onSort("efficiency")} active={sortKey==="efficiency"} dir={sortDir}>Eff</Th>
-                <Th onClick={() => onSort("war")} active={sortKey==="war"} dir={sortDir}>WAR</Th>
-                <Th onClick={() => onSort("h2h")} active={sortKey==="h2h"} dir={sortDir}>H2H</Th>
-                <Th onClick={() => onSort("potato")} active={sortKey==="potato"} dir={sortDir}>Potato</Th>
-                <Th onClick={() => onSort("sos")} active={sortKey==="sos"} dir={sortDir}>SOS</Th>
+                <Th
+                  onClick={() => onSort("first")}
+                  active={sortKey === "first"}
+                  dir={sortDir}
+                >
+                  First
+                </Th>
+                <Th
+                  onClick={() => onSort("last")}
+                  active={sortKey === "last"}
+                  dir={sortDir}
+                >
+                  Last
+                </Th>
+                <Th
+                  onClick={() => onSort("pick")}
+                  active={sortKey === "pick"}
+                  dir={sortDir}
+                >
+                  Pick
+                </Th>
+                <Th
+                  onClick={() => onSort("team")}
+                  active={sortKey === "team"}
+                  dir={sortDir}
+                >
+                  Team
+                </Th>
+                <Th
+                  onClick={() => onSort("faction")}
+                  active={sortKey === "faction"}
+                  dir={sortDir}
+                >
+                  Faction
+                </Th>
+                <Th
+                  onClick={() => onSort("wins")}
+                  active={sortKey === "wins"}
+                  dir={sortDir}
+                >
+                  W
+                </Th>
+                <Th
+                  onClick={() => onSort("losses")}
+                  active={sortKey === "losses"}
+                  dir={sortDir}
+                >
+                  L
+                </Th>
+                <Th
+                  onClick={() => onSort("points")}
+                  active={sortKey === "points"}
+                  dir={sortDir}
+                >
+                  Pts
+                </Th>
+                <Th
+                  onClick={() => onSort("plms")}
+                  active={sortKey === "plms"}
+                  dir={sortDir}
+                >
+                  PL/MS
+                </Th>
+                <Th
+                  onClick={() => onSort("games")}
+                  active={sortKey === "games"}
+                  dir={sortDir}
+                >
+                  GP
+                </Th>
+                <Th
+                  onClick={() => onSort("winPct")}
+                  active={sortKey === "winPct"}
+                  dir={sortDir}
+                >
+                  Win%
+                </Th>
+                <Th
+                  onClick={() => onSort("ppg")}
+                  active={sortKey === "ppg"}
+                  dir={sortDir}
+                >
+                  PPG
+                </Th>
+                <Th
+                  onClick={() => onSort("efficiency")}
+                  active={sortKey === "efficiency"}
+                  dir={sortDir}
+                >
+                  Eff
+                </Th>
+                <Th
+                  onClick={() => onSort("war")}
+                  active={sortKey === "war"}
+                  dir={sortDir}
+                >
+                  WAR
+                </Th>
+                <Th
+                  onClick={() => onSort("h2h")}
+                  active={sortKey === "h2h"}
+                  dir={sortDir}
+                >
+                  H2H
+                </Th>
+                <Th
+                  onClick={() => onSort("potato")}
+                  active={sortKey === "potato"}
+                  dir={sortDir}
+                >
+                  Potato
+                </Th>
+                <Th
+                  onClick={() => onSort("sos")}
+                  active={sortKey === "sos"}
+                  dir={sortDir}
+                >
+                  SOS
+                </Th>
               </tr>
             </thead>
 
@@ -159,15 +285,22 @@ export default function IndStatsPanel({ data }: Props) {
               {sorted.map((r) => (
                 <tr key={r.ncxid} className={rowCls}>
                   <td className={num}>{r.rank}</td>
-                  <td className={`${cell} font-semibold text-cyan-300`} title={r.ncxid}>
+                  <td
+                    className={`${cell} font-semibold text-cyan-300`}
+                    title={r.ncxid}
+                  >
                     {r.ncxid}
                   </td>
                   <td className={cell}>{r.first}</td>
                   <td className={cell}>{r.last}</td>
                   <td className={num}>{r.pick}</td>
 
-                  <td className={`${cell} truncate`} title={r.team}>{r.team}</td>
-                  <td className={`${cell} truncate`} title={r.faction}>{r.faction}</td>
+                  <td className={`${cell} truncate`} title={r.team}>
+                    {r.team}
+                  </td>
+                  <td className={`${cell} truncate`} title={r.faction}>
+                    {r.faction}
+                  </td>
 
                   <td className={num}>{r.wins}</td>
                   <td className={num}>{r.losses}</td>

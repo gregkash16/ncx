@@ -15,6 +15,7 @@ import AdvStatsPanelServer from "../components/AdvStatsPanelServer";
 import TeamSchedulePanel from "../components/TeamSchedulePanel";
 import HomeTabs from "../components/HomeTabs";
 import DesktopNavTabs from "../components/DesktopNavTabs";
+import HomeLanding from "../components/HomeLanding";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -139,13 +140,14 @@ export default async function HomePage({
       {/* TABS + PANELS */}
       <section className="w-full px-4 pb-24">
         <div className="w-full max-w-[110rem] mx-auto">
-          {/* Wrap DesktopNavTabs (client hook user) in Suspense */}
+          {/* Desktop tab buttons (header bar) */}
           <Suspense fallback={null}>
             <DesktopNavTabs />
           </Suspense>
 
           <HomeTabs
             hideButtons
+            homePanel={<HomeLanding message={message} />}
             currentWeekPanel={
               <CurrentWeekCard
                 key="current-week"

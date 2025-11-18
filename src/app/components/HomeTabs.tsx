@@ -1,4 +1,5 @@
-'use client';
+// src/app/components/HomeTabs.tsx
+"use client";
 
 import React, {
   useState,
@@ -10,6 +11,7 @@ import React, {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type TabKey =
+  | "home"
   | "current"
   | "matchups"
   | "standings"
@@ -29,6 +31,7 @@ type ReportPanelLikeProps = {
 };
 
 type HomeTabsProps = {
+  homePanel?: React.ReactNode;
   currentWeekPanel: React.ReactNode;
   matchupsPanel?: React.ReactNode;
   standingsPanel?: React.ReactNode;
@@ -41,6 +44,7 @@ type HomeTabsProps = {
 };
 
 export default function HomeTabs({
+  homePanel,
   currentWeekPanel,
   matchupsPanel,
   standingsPanel,
@@ -57,9 +61,9 @@ export default function HomeTabs({
 
   const hasTeam = !!teamPanel;
 
-  const urlTabRaw = (searchParams.get("tab") as TabKey) || "current";
+  const urlTabRaw = (searchParams.get("tab") as TabKey) || "home";
   const urlTab: TabKey =
-    urlTabRaw === "team" && !hasTeam ? "current" : urlTabRaw;
+    urlTabRaw === "team" && !hasTeam ? "home" : urlTabRaw;
 
   const [active, setActive] = useState<TabKey>(urlTab);
 
@@ -80,7 +84,7 @@ export default function HomeTabs({
   useEffect(() => {
     const params = new URLSearchParams(Array.from(searchParams.entries()));
 
-    if (active === "current") params.delete("tab");
+    if (active === "home") params.delete("tab");
     else params.set("tab", active);
 
     if (!isMatchups(active)) params.delete("q");
@@ -118,7 +122,11 @@ export default function HomeTabs({
       return;
     }
 
-    params.set("tab", key);
+    if (key === "home") {
+      params.delete("tab");
+    } else {
+      params.set("tab", key);
+    }
     if (!isMatchups(key)) params.delete("q");
     const href = params.toString() ? `${pathname}?${params}` : pathname;
     router.replace(href, { scroll: false });
@@ -130,8 +138,9 @@ export default function HomeTabs({
       ? cloneElement(reportPanel, { goToTab })
       : reportPanel;
 
-  // 🔥 Notice we do NOT include the Team tab in the button list anymore
+  // No Team button, but still supports tab=team via URL
   const buttons: Array<{ key: TabKey; label: string }> = [
+    { key: "home", label: "Home" },
     { key: "current", label: "Current Week" },
     { key: MATCHUPS, label: "Matchups" },
     { key: "standings", label: "Standings" },
@@ -172,6 +181,7 @@ export default function HomeTabs({
             : "max-w-6xl"
         }`}
       >
+        {active === "home" && homePanel}
         {active === "current" && currentWeekPanel}
         {isMatchups(active) && matchupsPanel}
         {active === "standings" && standingsPanel}

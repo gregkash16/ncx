@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { teamSlug } from "@/lib/slug";
 
 type Player = {
@@ -28,7 +29,10 @@ type Player = {
 };
 
 export default function IndStatsSearch() {
-  const [q, setQ] = useState("");
+  const searchParams = useSearchParams();
+  const initialQFromUrl = searchParams.get("indteam") ?? "";
+
+  const [q, setQ] = useState(initialQFromUrl);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<Player[]>([]);
   const [touched, setTouched] = useState(false);
@@ -60,6 +64,15 @@ export default function IndStatsSearch() {
     inputRef.current?.focus();
   }, []);
 
+  // Auto-run when arriving with ?indteam=TEAM
+  useEffect(() => {
+    if (initialQFromUrl) {
+      setTouched(true);
+      runSearch(initialQFromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQFromUrl]);
+
   const showEmptyState = touched && !loading && items.length === 0;
 
   return (
@@ -72,7 +85,10 @@ export default function IndStatsSearch() {
           Search by name, NCXID, team, or faction.
         </p>
 
-        <form onSubmit={onSubmit} className="mx-auto mt-3 flex max-w-md items-center gap-2">
+        <form
+          onSubmit={onSubmit}
+          className="mx-auto mt-3 flex max-w-md items-center gap-2"
+        >
           <input
             ref={inputRef}
             value={q}
@@ -94,7 +110,9 @@ export default function IndStatsSearch() {
           </div>
         )}
         {loading && (
-          <div className="mt-4 text-center text-sm text-neutral-300">Searching…</div>
+          <div className="mt-4 text-center text-sm text-neutral-300">
+            Searching…
+          </div>
         )}
         {showEmptyState && (
           <div className="mt-4 text-center text-sm text-neutral-400">
@@ -111,7 +129,10 @@ export default function IndStatsSearch() {
               const logoSrc = slug ? `/logos/${slug}.png` : `/logos/default.png`;
 
               return (
-                <li key={p.ncxid} className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3">
+                <li
+                  key={p.ncxid}
+                  className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3"
+                >
                   {/* Top row: Rank badge • Name • Team/Faction */}
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
@@ -122,7 +143,7 @@ export default function IndStatsSearch() {
                         {p.rank || "—"}
                       </span>
 
-                      {/* Team logo (transparent, no border/bg) */}
+                      {/* Team logo */}
                       <Image
                         src={logoSrc}
                         alt={p.team || "Team"}
@@ -145,14 +166,16 @@ export default function IndStatsSearch() {
                     </div>
 
                     <div className="text-right">
-                      <div className="text-xs text-neutral-300">GP: {p.games}</div>
+                      <div className="text-xs text-neutral-300">
+                        GP: {p.games}
+                      </div>
                       <div className="text-xs font-semibold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400">
                         {wl}
                       </div>
                     </div>
                   </div>
 
-                  {/* Stat grid (never horizontal scroll) */}
+                  {/* Stat grid */}
                   <div className="mt-3 grid grid-cols-4 gap-2 text-center text-xs">
                     <Stat label="Win%" value={fmtPct(p.winPct)} />
                     <Stat label="PPG" value={fmtNum(p.ppg)} />
@@ -176,8 +199,12 @@ export default function IndStatsSearch() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-neutral-900/60 px-2 py-1">
-      <div className="uppercase text-[10px] tracking-wide text-neutral-400">{label}</div>
-      <div className="font-semibold tabular-nums text-neutral-200">{value}</div>
+      <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+        {label}
+      </div>
+      <div className="font-semibold tabular-nums text-neutral-200">
+        {value}
+      </div>
     </div>
   );
 }

@@ -1,9 +1,11 @@
+// src/app/components/DesktopNavTabs.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
 const tabs = [
+  { key: "home", label: "Home", href: "/" },
   { key: "current", label: "Current Week", href: "/?tab=current" },
   { key: "matchups", label: "Matchups", href: "/?tab=matchups" },
   { key: "standings", label: "Standings", href: "/?tab=standings" },
@@ -14,6 +16,7 @@ const tabs = [
 ];
 
 export type TabKey =
+  | "home"
   | "current"
   | "matchups"
   | "standings"
@@ -25,7 +28,7 @@ export type TabKey =
 export default function DesktopNavTabs() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const paramTab = (searchParams.get("tab") as TabKey | null) ?? "current";
+  const paramTab = (searchParams.get("tab") as TabKey | null) ?? "home";
 
   const active =
     pathname === "/" ? paramTab : (null as TabKey | null); // only highlight on home
