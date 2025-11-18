@@ -341,34 +341,33 @@ export default function MobileReportPage() {
         </span>
       </div>
 
-      {/* Game selector for captains/admins who manage multiple games */}
+      {/* Game selector (dropdown, like desktop) */}
       {data.games.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {data.games.map((g, idx) => {
-            const isSelected = idx === selectedIndex;
-            return (
-              <button
-                key={`${g.rowIndex}-${g.game}`}
-                type="button"
-                onClick={() => handleSelectGame(idx)}
-                className={`px-3 py-1 rounded-full border text-[11px] transition-colors ${
-                  isSelected
-                    ? "border-pink-400 bg-pink-500/20 text-pink-100"
-                    : "border-neutral-700 bg-neutral-900/70 text-neutral-300 hover:border-pink-400/70"
-                }`}
-              >
-                <span className="font-semibold">G{g.game}</span>{" "}
-                <span className="opacity-80">
-                  {g.away.team || "—"} vs {g.home.team || "—"}
-                </span>
-                {g.isMyGame && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-semibold text-emerald-200">
-                    MY GAME
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-neutral-300">
+            Select a game to edit
+          </label>
+          <select
+            value={String(selectedIndex)}
+            onChange={(e) => handleSelectGame(Number(e.target.value))}
+            className="w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-pink-400/60"
+          >
+            {data.games.map((g, idx) => {
+              const baseLabel = `G${g.game}: ${g.away.team || "—"} vs ${
+                g.home.team || "—"
+              }`;
+              const label = g.isMyGame ? `${baseLabel} • MY GAME` : baseLabel;
+              return (
+                <option key={`${g.rowIndex}-${g.game}`} value={idx}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
+          <p className="text-[11px] text-neutral-500">
+            Admins and captains can switch between any games they&apos;re allowed
+            to manage.
+          </p>
         </div>
       )}
 

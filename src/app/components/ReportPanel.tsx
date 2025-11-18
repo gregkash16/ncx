@@ -1,5 +1,5 @@
-// src/app/(home)/ReportPanel.tsx
-'use client';
+// src/app/components/ReportPanel.tsx
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
@@ -116,8 +116,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           setConfirmOverwrite(false);
         }
       } catch {
-        if (isMounted)
-          setData({ ok: false, reason: "SERVER_ERROR" });
+        if (isMounted) setData({ ok: false, reason: "SERVER_ERROR" });
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -130,7 +129,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
   const selectedGame: GameRow | null = useMemo(() => {
     if (!data || !data.ok) return null;
     if (!data.games || data.games.length === 0) return null;
-    if (selectedIndex < 0 || selectedIndex >= data.games.length) return data.games[0];
+    if (selectedIndex < 0 || selectedIndex >= data.games.length)
+      return data.games[0];
     return data.games[selectedIndex];
   }, [data, selectedIndex]);
 
@@ -281,7 +281,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
 
   if (!data.ok) {
     let msg = "Something went wrong.";
-    if (data.reason === "NOT_AUTH") msg = "Please log in with your Discord to report a game.";
+    if (data.reason === "NOT_AUTH")
+      msg = "Please log in with your Discord to report a game.";
     if (data.reason === "NO_DISCORD_ID")
       msg = "No Discord ID found. Try logging out/in.";
     if (data.reason === "NO_NCXID")
@@ -304,7 +305,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
   }
 
   const { weekTab, role } = data;
-  const { game, away, home, alreadyFilled, canEditAwayId, canEditHomeId } = selectedGame;
+  const { game, away, home, alreadyFilled, canEditAwayId, canEditHomeId } =
+    selectedGame;
 
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300 space-y-6">
@@ -331,34 +333,38 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
         </span>
       </div>
 
-      {/* Game selector for captains/admins with multiple games */}
+      {/* Game selector (dropdown instead of a pile of buttons) */}
       {data.games.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {data.games.map((g, idx) => {
-            const isSelected = idx === selectedIndex;
-            return (
-              <button
-                key={`${g.rowIndex}-${g.game}`}
-                type="button"
-                onClick={() => handleSelectGame(idx)}
-                className={`px-3 py-1 rounded-full border text-xs md:text-sm transition-colors ${
-                  isSelected
-                    ? "border-pink-400 bg-pink-500/20 text-pink-100"
-                    : "border-zinc-700 bg-zinc-900/70 text-zinc-300 hover:border-pink-400/70"
-                }`}
-              >
-                <span className="font-semibold">G{g.game}</span>{" "}
-                <span className="opacity-80">
-                  {g.away.team || "—"} vs {g.home.team || "—"}
-                </span>
-                {g.isMyGame && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-200">
-                    MY GAME
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="space-y-2">
+          <label className="block text-sm text-zinc-300">
+            Select a game to edit
+          </label>
+          <select
+            value={selectedIndex}
+            onChange={(e) => handleSelectGame(Number(e.target.value))}
+            className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-pink-400/60"
+          >
+            {data.games.map((g, idx) => {
+              const labelParts = [
+                `G${g.game}:`,
+                g.away.team || "—",
+                "vs",
+                g.home.team || "—",
+              ];
+              const label =
+                labelParts.join(" ") +
+                (g.isMyGame ? " • MY GAME" : "");
+              return (
+                <option key={`${g.rowIndex}-${g.game}`} value={idx}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
+          <p className="text-xs text-zinc-500">
+            Admins and captains can switch between all games they&apos;re
+            allowed to manage.
+          </p>
         </div>
       )}
 
@@ -372,7 +378,9 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           </div>
           <div className="mt-1 text-sm text-zinc-400 flex flex-col gap-1">
             <div>
-              <span className="font-medium text-white">{away.name || "—"}</span>
+              <span className="font-medium text-white">
+                {away.name || "—"}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-zinc-400">NCX ID:</span>
@@ -396,7 +404,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
             <span className="text-zinc-200">
               {away.wins || 0}-{away.losses || 0}
             </span>{" "}
-            • PL/MS: <span className="text-zinc-200">{away.plms || "-"}</span>
+            • PL/MS:{" "}
+            <span className="text-zinc-200">{away.plms || "-"}</span>
           </div>
         </div>
 
@@ -409,7 +418,9 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           </div>
           <div className="mt-1 text-sm text-zinc-400 flex flex-col gap-1">
             <div>
-              <span className="font-medium text-white">{home.name || "—"}</span>
+              <span className="font-medium text-white">
+                {home.name || "—"}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-zinc-400">NCX ID:</span>
@@ -433,7 +444,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
             <span className="text-zinc-200">
               {home.wins || 0}-{home.losses || 0}
             </span>{" "}
-            • PL/MS: <span className="text-zinc-200">{home.plms || "-"}</span>
+            • PL/MS:{" "}
+            <span className="text-zinc-200">{home.plms || "-"}</span>
           </div>
         </div>
       </div>
