@@ -131,12 +131,17 @@ export default function HomeLanding({
           >
             League Rules
           </a>
-        </div>
 
-        <p className="mt-4 text-xs text-zinc-400 text-center">
-          Tip: Use the tabs to view the current week, matchups, standings,
-          player stats, and to report your league games.
-        </p>
+          {/* NEW — Streamer Kit */}
+          <a
+            href="https://drive.google.com/drive/folders/1cJHX4xa8I-QtRqle-IvWWdOFbnlNGIfp?usp=drive_link"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center rounded-xl border border-yellow-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold hover:bg-yellow-500/20 hover:border-yellow-400 transition"
+          >
+            Streamer Kit
+          </a>
+        </div>
 
         {/* Team logos grid */}
         {sortedTeams.length > 0 && (
