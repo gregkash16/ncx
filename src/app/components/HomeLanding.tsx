@@ -1,5 +1,6 @@
 // src/app/components/HomeLanding.tsx
 import React from "react";
+import { teamSlug } from "@/lib/slug";
 
 type TeamLogo = {
   /** Display name, used for alt text + tooltip */
@@ -7,8 +8,8 @@ type TeamLogo = {
   /** Path to the logo in /public/logos, e.g. "/logos/jagged-axe.png" */
   logoSrc: string;
   /**
-   * Value used to pre-filter Ind. Stats by team.
-   * This should match the team string in your IndRow.team field.
+   * Value used to pre-filter Ind. Stats by team
+   * and to build a team slug for the team profile page.
    */
   filterValue: string;
 };
@@ -20,8 +21,8 @@ type HomeLandingProps = {
   className?: string;
   /**
    * Optional function to customize where team logos link.
-   * If omitted, defaults to the desktop behavior:
-   * "/?tab=indstats&indteam=TEAM_NAME"
+   * If omitted, defaults to the team profile behavior:
+   * "/?tab=team&team=<teamSlug>"
    */
   buildTeamHref?: (team: TeamLogo) => string;
   /**
@@ -72,6 +73,10 @@ export default function HomeLanding({
 }: HomeLandingProps) {
   const rulesLink = rulesHref ?? "/rules";
 
+  // Default behavior: click logo → team profile page
+  const defaultBuildTeamHref = (team: TeamLogo) =>
+    `/?tab=team&team=${encodeURIComponent(teamSlug(team.filterValue))}`;
+
   return (
     <div className={`mx-auto max-w-4xl ${className ?? ""}`}>
       <div className="rounded-2xl border border-purple-500/40 bg-zinc-900/70 p-6 md:p-8 shadow-xl">
@@ -90,8 +95,8 @@ export default function HomeLanding({
               <p className="text-sm md:text-base text-zinc-300">{message}</p>
             )}
             <p className="text-xs md:text-sm text-zinc-400">
-              Use the links below to watch games, join the community, and check
-              the rules.
+              Use the links below to watch games, join the community, check the rules,
+              or jump straight to a team page.
             </p>
           </div>
         </div>
@@ -147,16 +152,14 @@ export default function HomeLanding({
         {sortedTeams.length > 0 && (
           <div className="mt-8">
             <h3 className="text-center text-sm font-semibold text-zinc-300 mb-4">
-              Jump to team&apos;s Individual Stats
+              Jump to a Team Page
             </h3>
 
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-3 place-items-center">
               {sortedTeams.map((team) => {
                 const href = buildTeamHref
                   ? buildTeamHref(team)
-                  : `/?tab=indstats&indteam=${encodeURIComponent(
-                      team.filterValue
-                    )}`;
+                  : defaultBuildTeamHref(team);
 
                 return (
                   <a

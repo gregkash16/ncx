@@ -12,7 +12,10 @@ import IndStatsPanel from "../components/IndStatsPanel";
 import ReportPanel from "../components/ReportPanel";
 import PlayersPanelServer from "../components/PlayersPanelServer";
 import AdvStatsPanelServer from "../components/AdvStatsPanelServer";
-import TeamSchedulePanel from "../components/TeamSchedulePanel";
+import TeamSchedulePanel, {
+  TeamRosterPlayer,
+  TeamAdvStats,
+} from "../components/TeamSchedulePanel";
 import HomeTabs from "../components/HomeTabs";
 import DesktopNavTabs from "../components/DesktopNavTabs";
 import HomeLanding from "../components/HomeLanding";
@@ -25,8 +28,11 @@ import {
   fetchIndStatsDataCached,
   fetchStreamScheduleCached,
   fetchFactionMapCached,
+  fetchAdvStatsCached,
   type MatchRow,
+  type IndRow,
 } from "@/lib/googleSheets";
+import { teamSlug } from "@/lib/slug";
 
 function parseWeekNum(label: string | undefined | null): number | null {
   if (!label) return null;
@@ -38,6 +44,108 @@ function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
 }
 
+/**
+ * Given ?team=<slug> and the IndStats rows, try to recover the
+ * canonical team display name (e.g. "KDB", "NERF HERDERS").
+ */
+function resolveTeamNameFromParam(
+  teamParam: string | undefined,
+  indStats: IndRow[] | null | undefined
+): string | undefined {
+  if (!teamParam || !indStats || indStats.length === 0) return undefined;
+
+  const target = teamParam.toLowerCase();
+  const teams = Array.from(
+    new Set(indStats.map((r) => String(r.team ?? "").trim()).filter(Boolean))
+  );
+
+  for (const name of teams) {
+    if (teamSlug(name).toLowerCase() === target) {
+      return name;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Build a roster array for a given team name using IndStats,
+ * factionMap, and ncx → discord mappings.
+ */
+function buildTeamRoster(
+  teamName: string | undefined,
+  indStats: IndRow[] | null | undefined,
+  factionMap: Record<string, string> | null | undefined,
+  ncxToDiscord: Record<string, string>
+): TeamRosterPlayer[] | undefined {
+  if (!teamName || !indStats || indStats.length === 0) return undefined;
+
+  const rowsForTeam = indStats.filter(
+    (r) => String(r.team ?? "").trim() === teamName
+  );
+  if (rowsForTeam.length === 0) return undefined;
+
+  const roster: TeamRosterPlayer[] = rowsForTeam.map((row) => {
+    const ncxid = String(row.ncxid ?? "").trim();
+    const first = String(row.first ?? "").trim();
+    const last = String(row.last ?? "").trim();
+    const nameFromStats = `${first} ${last}`.trim();
+
+    const pickedName =
+      nameFromStats || (ncxid ? `NCX ${ncxid}` : "Unknown Pilot");
+
+    const discordId = ncxid ? ncxToDiscord[ncxid] ?? null : null;
+    const faction = String(row.faction ?? "").trim() || null;
+
+    const player: TeamRosterPlayer = {
+      ncxid,
+      name: pickedName,
+      faction,
+      discordId,
+      discordTag: null,
+
+      // Individual stats (all as strings for display)
+      wins: row.wins != null ? String(row.wins) : undefined,
+      losses: row.losses != null ? String(row.losses) : undefined,
+      points: row.points != null ? String(row.points) : undefined,
+      plms: row.plms != null ? String(row.plms) : undefined,
+      games: row.games != null ? String(row.games) : undefined,
+      winPct: row.winPct != null ? String(row.winPct) : undefined,
+      ppg: row.ppg != null ? String(row.ppg) : undefined,
+      efficiency: row.efficiency != null ? String(row.efficiency) : undefined,
+      war: row.war != null ? String(row.war) : undefined,
+      h2h: row.h2h != null ? String(row.h2h) : undefined,
+      potato: row.potato != null ? String(row.potato) : undefined,
+      sos: row.sos != null ? String(row.sos) : undefined,
+    };
+
+    return player;
+  });
+
+  return roster;
+}
+
+/** Map a raw AdvStats Table1 row (array) into a TeamAdvStats object. */
+function mapAdvTable1Row(raw: any[]): TeamAdvStats {
+  const s = (v: unknown) => (v ?? "").toString().trim();
+  return {
+    team: s(raw[0]),
+    totalGames: s(raw[1]),
+    avgWins: s(raw[2]),
+    avgLoss: s(raw[3]),
+    avgPoints: s(raw[4]),
+    avgPlms: s(raw[5]),
+    avgGames: s(raw[6]),
+    avgWinPct: s(raw[7]),
+    avgPpg: s(raw[8]),
+    avgEfficiency: s(raw[9]),
+    avgWar: s(raw[10]),
+    avgH2h: s(raw[11]),
+    avgPotato: s(raw[12]),
+    avgSos: s(raw[13]),
+  };
+}
+
 // NOTE: searchParams is a Promise in Next 15 server components
 export default async function HomePage({
   searchParams,
@@ -46,7 +154,7 @@ export default async function HomePage({
 }) {
   const sp = await searchParams;
 
-  // Read team param for the Team tab
+  // Read team param for the Team tab (slug like "kdb")
   const teamParam = (sp?.team as string | undefined) || undefined;
 
   // --- Welcome banner (Discord -> NCXID lookup, cached) ---
@@ -61,9 +169,9 @@ export default async function HomePage({
 
       if (sessionId) {
         const discordMap = await getDiscordMapCached();
-        const match = discordMap[sessionId];
+        const match = (discordMap as any)[sessionId];
         if (match) {
-          const { ncxid, first, last } = match;
+          const { ncxid, first, last } = match as any;
           message = `Welcome ${first} ${last}! – ${ncxid}`;
         } else {
           message = `Welcome ${session.user.name ?? "Pilot"}! – No NCXID Found.`;
@@ -77,17 +185,19 @@ export default async function HomePage({
     }
   }
 
-  // 1) Get the true active week + default matches
+  // 1) Get the true active week + default matches + stats
   const [
     { weekTab: activeWeek, matches: activeMatches },
     indStats,
     streamSched,
     factionMap,
+    advStatsRaw,
   ] = await Promise.all([
     fetchMatchupsDataCached(), // active week (cached 60s)
     fetchIndStatsDataCached(), // cached 5m
     fetchStreamScheduleCached(), // cached 5m
     fetchFactionMapCached(), // tiny in-memory cache + live read
+    fetchAdvStatsCached(), // advanced stats (same source as AdvStatsPanelServer)
   ]);
 
   // 2) Read ?w=WEEK N and enforce "only up to active"
@@ -105,7 +215,7 @@ export default async function HomePage({
     ? await fetchMatchupsDataCached(selectedWeek)
     : { matches: activeMatches, weekTab: activeWeek };
 
-  // Attach Discord IDs by NCXID
+  // Attach Discord IDs by NCXID (for Matchups + roster DM links)
   const discordMap = await getDiscordMapCached();
   const ncxToDiscord: Record<string, string> = {};
   for (const [discordId, payload] of Object.entries(discordMap ?? {})) {
@@ -114,11 +224,36 @@ export default async function HomePage({
       ncxToDiscord[ncxid] = discordId;
     }
   }
+
   const dataWithDiscord = matchesToUse.map((m) => ({
     ...m,
     awayDiscordId: m.awayId ? ncxToDiscord[m.awayId] ?? null : null,
     homeDiscordId: m.homeId ? ncxToDiscord[m.homeId] ?? null : null,
   })) as unknown as MatchRow[];
+
+  // --- Build roster for the Team tab (if teamParam is present) ---
+  const teamNameFromStats = resolveTeamNameFromParam(
+    teamParam,
+    indStats ?? []
+  );
+  const teamRoster = buildTeamRoster(
+    teamNameFromStats,
+    indStats ?? [],
+    factionMap,
+    ncxToDiscord
+  );
+
+  // --- Pull this team's advanced stats row from AdvStats Table1 ---
+  let teamAdvStats: TeamAdvStats | undefined;
+  if (teamNameFromStats && advStatsRaw?.t1) {
+    const t1 = advStatsRaw.t1 as any[];
+    const rawRow = t1.find(
+      (r) => (r?.[0] ?? "").toString().trim() === teamNameFromStats
+    );
+    if (rawRow) {
+      teamAdvStats = mapAdvTable1Row(rawRow as any[]);
+    }
+  }
 
   return (
     <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
@@ -175,7 +310,13 @@ export default async function HomePage({
             /* Provide the Team tab when ?team= is present */
             teamPanel={
               teamParam ? (
-                <TeamSchedulePanel key={`team-${teamParam}`} team={teamParam} />
+                <TeamSchedulePanel
+                  key={`team-${teamParam}`}
+                  team={teamParam}
+                  mode="desktop"
+                  roster={teamRoster}
+                  teamAdvStats={teamAdvStats}
+                />
               ) : undefined
             }
           />

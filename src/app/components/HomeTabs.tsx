@@ -1,11 +1,7 @@
 // src/app/components/HomeTabs.tsx
 "use client";
 
-import React, {
-  isValidElement,
-  cloneElement,
-  ReactElement,
-} from "react";
+import React, { isValidElement, cloneElement, ReactElement } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type TabKey =
@@ -61,8 +57,7 @@ export default function HomeTabs({
 
   // 🔑 Single source of truth: URL `tab` param
   const urlTabRaw = (searchParams.get("tab") as TabKey) || "home";
-  const active: TabKey =
-    urlTabRaw === "team" && !hasTeam ? "home" : urlTabRaw;
+  const active: TabKey = urlTabRaw === "team" && !hasTeam ? "home" : urlTabRaw;
 
   const btnBase =
     "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
@@ -122,6 +117,9 @@ export default function HomeTabs({
     { key: "report", label: "Report a Game" },
   ];
 
+  const wideLayout =
+    active === "indstats" || active === "advstats" || active === "team";
+
   return (
     <div className="w-full">
       {!hideButtons && (
@@ -148,9 +146,7 @@ export default function HomeTabs({
 
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
-          active === "indstats" || active === "advstats"
-            ? "w-full max-w-[115rem]"
-            : "max-w-6xl"
+          wideLayout ? "w-full max-w-[115rem]" : "max-w-6xl"
         }`}
       >
         {active === "home" && homePanel}
