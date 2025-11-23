@@ -440,17 +440,14 @@ function TeamRosterCard({
             >
               {/* Faction icon with glow */}
               {icon && (
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900/90 shadow-[0_0_20px_rgba(34,211,238,0.55)]">
-                  <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-tr from-cyan-500/40 via-transparent to-purple-500/40 mix-blend-screen" />
-                  <Image
-                    src={icon}
-                    alt={`${p.faction ?? "Faction"} icon`}
-                    width={32}
-                    height={32}
-                    className="relative object-contain"
-                    unoptimized
-                  />
-                </div>
+                <Image
+                  src={icon}
+                  alt={`${p.faction ?? "Faction"} icon`}
+                  width={32}
+                  height={32}
+                  /* className="object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.65)]" */
+                  unoptimized
+                />
               )}
 
               <div className="min-w-0 flex-1">

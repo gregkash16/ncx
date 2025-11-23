@@ -537,17 +537,14 @@ export default async function MobileTeamSchedulePage({
                 >
                   {/* Faction icon with subtle glow */}
                   {icon && (
-                    <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-neutral-900 shadow-[0_0_12px_rgba(56,189,248,0.6)]">
-                      <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-tr from-cyan-500/40 via-transparent to-purple-500/40 mix-blend-screen" />
-                      <Image
-                        src={icon}
-                        alt={`${p.faction ?? "Faction"} icon`}
-                        width={24}
-                        height={24}
-                        className="relative object-contain"
-                        unoptimized
-                      />
-                    </div>
+                    <Image
+                      src={icon}
+                      alt={`${p.faction ?? "Faction"} icon`}
+                      width={32}
+                      height={32}
+                      /* className="object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.65)]" */
+                      unoptimized
+                    />
                   )}
 
                   <div className="min-w-0 flex-1">
