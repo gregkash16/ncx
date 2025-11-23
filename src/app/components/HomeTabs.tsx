@@ -13,7 +13,8 @@ export type TabKey =
   | "advstats"
   | "players"
   | "report"
-  | "team";
+  | "team"
+  | "playoffs"; // 🔴 new hidden tab
 
 const MATCHUPS: TabKey = "matchups";
 function isMatchups(k: TabKey): k is "matchups" {
@@ -34,6 +35,7 @@ type HomeTabsProps = {
   playersPanel?: React.ReactNode;
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
   teamPanel?: React.ReactNode; // still supported, just hidden
+  playoffsPanel?: React.ReactNode; // 🔴 new hidden playoffs tab
   hideButtons?: boolean;
 };
 
@@ -47,6 +49,7 @@ export default function HomeTabs({
   playersPanel,
   reportPanel,
   teamPanel,
+  playoffsPanel,
   hideButtons = false,
 }: HomeTabsProps) {
   const searchParams = useSearchParams();
@@ -54,10 +57,15 @@ export default function HomeTabs({
   const router = useRouter();
 
   const hasTeam = !!teamPanel;
+  const hasPlayoffs = !!playoffsPanel;
 
   // 🔑 Single source of truth: URL `tab` param
   const urlTabRaw = (searchParams.get("tab") as TabKey) || "home";
-  const active: TabKey = urlTabRaw === "team" && !hasTeam ? "home" : urlTabRaw;
+  let active: TabKey = urlTabRaw;
+
+  // If tab=team or tab=playoffs but the panel isn't provided, fall back to home
+  if (active === "team" && !hasTeam) active = "home";
+  if (active === "playoffs" && !hasPlayoffs) active = "home";
 
   const btnBase =
     "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
@@ -105,7 +113,7 @@ export default function HomeTabs({
       ? cloneElement(reportPanel, { goToTab })
       : reportPanel;
 
-  // No Team button, but still supports tab=team via URL
+  // No Team or Playoffs button, but still supports tab=team / tab=playoffs via URL
   const buttons: Array<{ key: TabKey; label: string }> = [
     { key: "home", label: "Home" },
     { key: "current", label: "Current Week" },
@@ -116,9 +124,6 @@ export default function HomeTabs({
     { key: "players", label: "Players" },
     { key: "report", label: "Report a Game" },
   ];
-
-  const wideLayout =
-    active === "indstats" || active === "advstats" || active === "team";
 
   return (
     <div className="w-full">
@@ -146,7 +151,9 @@ export default function HomeTabs({
 
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
-          wideLayout ? "w-full max-w-[115rem]" : "max-w-6xl"
+          active === "indstats" || active === "advstats"
+            ? "w-full max-w-[115rem]"
+            : "max-w-6xl"
         }`}
       >
         {active === "home" && homePanel}
@@ -159,6 +166,8 @@ export default function HomeTabs({
         {active === "report" && reportWithProp}
         {/* ✅ still render Team panel when tab=team, even without a button */}
         {active === "team" && hasTeam && teamPanel}
+        {/* ✅ secret Playoffs tab, only if panel provided */}
+        {active === "playoffs" && hasPlayoffs && playoffsPanel}
       </div>
     </div>
   );

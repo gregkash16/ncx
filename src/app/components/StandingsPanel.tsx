@@ -96,6 +96,16 @@ export default async function StandingsPanel() {
           </table>
         </div>
       )}
+
+      {/* Link to Playoff Bracket */}
+      <div className="mt-4 flex justify-center">
+        <a
+          href="/?tab=playoffs"
+          className="inline-block rounded-xl border border-cyan-500/40 bg-zinc-950/70 px-4 py-2 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400 transition"
+        >
+          🏆 View Playoff Bracket
+        </a>
+      </div>
     </div>
   );
 }

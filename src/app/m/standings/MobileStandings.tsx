@@ -137,11 +137,7 @@ export default async function MobileStandings() {
                 className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-2.5"
               >
                 {href ? (
-                  <Link
-                    href={href}
-                    className="block"
-                    prefetch={false}
-                  >
+                  <Link href={href} className="block" prefetch={false}>
                     {content}
                   </Link>
                 ) : (
@@ -151,6 +147,17 @@ export default async function MobileStandings() {
             );
           })}
         </ul>
+
+        {/* Link to Playoff Bracket */}
+        <div className="mt-4 flex justify-center">
+          <Link
+            href="/m/playoffs"
+            prefetch={false}
+            className="inline-block rounded-xl border border-cyan-500/40 bg-neutral-950/80 px-4 py-2 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400 transition"
+          >
+            🏆 View Playoff Bracket
+          </Link>
+        </div>
       </div>
     </section>
   );
