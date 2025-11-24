@@ -5,16 +5,12 @@ import {
   fetchScheduleForTeam,
   TeamScheduleRow,
   getSheets,
-  fetchIndStatsDataCached,
-  fetchFactionMapCached,
-  getDiscordMapCached,
-  type IndRow,
-  type FactionMap,
 } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
 import PlayerDMLink from "@/app/components/PlayerDMLink";
 
 /* ----------------------------- helpers ----------------------------- */
+
 function normalizeWeekLabel(label: string): string {
   const s = String(label ?? "").trim();
   if (!s) return "WEEK 1";
@@ -53,7 +49,8 @@ type PanelMode = "desktop" | "mobile";
  * We scan each 10-row block starting at visual row 10 (idx 9): 9, 19, 29, ... 119
  */
 async function deriveSeriesFromWeek(weekTab: string, away: string, home: string) {
-  const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID || process.env.SHEETS_SPREADSHEET_ID;
+  const spreadsheetId =
+    process.env.NCX_LEAGUE_SHEET_ID || process.env.SHEETS_SPREADSHEET_ID;
   if (!spreadsheetId) return { awayWins: 0, homeWins: 0, found: false };
 
   const sheets = getSheets();
@@ -90,7 +87,11 @@ async function deriveSeriesFromWeek(weekTab: string, away: string, home: string)
 async function enrichRowWithScore(row: TeamScheduleRow): Promise<EnrichedRow> {
   const weekTab = normalizeWeekLabel(row.week);
   try {
-    const { awayWins, homeWins, found } = await deriveSeriesFromWeek(weekTab, row.away, row.home);
+    const { awayWins, homeWins, found } = await deriveSeriesFromWeek(
+      weekTab,
+      row.away,
+      row.home
+    );
     if (!found) {
       return {
         ...row,
@@ -103,7 +104,11 @@ async function enrichRowWithScore(row: TeamScheduleRow): Promise<EnrichedRow> {
     }
     const seriesOver = awayWins >= 4 || homeWins >= 4;
     const status: Status =
-      awayWins > 0 || homeWins > 0 ? (seriesOver ? "FINAL" : "IN PROGRESS") : "SCHEDULED";
+      awayWins > 0 || homeWins > 0
+        ? seriesOver
+          ? "FINAL"
+          : "IN PROGRESS"
+        : "SCHEDULED";
     return { ...row, week: weekTab, status, awayWins, homeWins, seriesOver };
   } catch {
     return {
@@ -167,32 +172,51 @@ function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
   return <span className="text-zinc-400">Final</span>;
 }
 
-/* ----------------------------- ROSTER HELPERS ----------------------------- */
+/* ----------------------------- ROSTER TYPES (EXPORTS) ----------------------------- */
 
-type TeamRosterPlayer = {
+/**
+ * These must match how /src/app/(desktop)/page.tsx builds the roster.
+ */
+export type TeamRosterPlayer = {
   ncxid: string;
   name: string;
   faction: string | null;
   discordId: string | null;
-  wins: number;
-  losses: number;
-  points: number;
-  plms: number;
-  efficiency: number;
-  potato: number;
-  isCaptain: boolean;
+  discordTag: string | null;
+
+  // All of these are strings in page.tsx’s buildTeamRoster
+  wins?: string;
+  losses?: string;
+  points?: string;
+  plms?: string;
+  games?: string;
+  winPct?: string;
+  ppg?: string;
+  efficiency?: string;
+  war?: string;
+  h2h?: string;
+  potato?: string;
+  sos?: string;
 };
 
-function buildNcxToDiscord(discordMap: Record<string, any> | null | undefined) {
-  const ncxToDiscord: Record<string, string> = {};
-  Object.entries(discordMap ?? {}).forEach(([discordId, payload]) => {
-    const ncxid = String((payload as any)?.ncxid ?? "").trim();
-    if (ncxid) {
-      ncxToDiscord[ncxid] = discordId;
-    }
-  });
-  return ncxToDiscord;
-}
+export type TeamAdvStats = {
+  team: string;
+  totalGames: string;
+  avgWins: string;
+  avgLoss: string;
+  avgPoints: string;
+  avgPlms: string;
+  avgGames: string;
+  avgWinPct: string;
+  avgPpg: string;
+  avgEfficiency: string;
+  avgWar: string;
+  avgH2h: string;
+  avgPotato: string;
+  avgSos: string;
+};
+
+/* ----------------------------- FACTION ICONS ----------------------------- */
 
 const FACTION_FILE: Record<string, string> = {
   REBELS: "Rebels.png",
@@ -210,86 +234,24 @@ function factionIconSrc(faction?: string | null) {
   return file ? `/factions/${file}` : "";
 }
 
-function buildRosterForTeam(
-  teamName: string,
-  indStats: IndRow[] | null | undefined,
-  factionMap: FactionMap | undefined,
-  discordMap: Record<string, any> | undefined
-): TeamRosterPlayer[] {
-  if (!indStats || !teamName) return [];
-
-  const ncxToDiscord = buildNcxToDiscord(discordMap);
-
-  const players: TeamRosterPlayer[] = (indStats ?? [])
-    .filter((r) => String(r.team ?? "").trim() === teamName)
-    .map((r) => {
-      const ncxid = String(r.ncxid ?? "").trim();
-      const name = `${r.first ?? ""} ${r.last ?? ""}`.trim() || ncxid || "Unknown Pilot";
-
-      const pickNum = Number(r.pick ?? 0);
-      const isCaptain = pickNum === 0;
-
-      const faction =
-        (String(r.faction ?? "").trim() ||
-          (ncxid && factionMap ? factionMap[ncxid] ?? "" : "")) || null;
-
-      const wins = Number(r.wins ?? 0);
-      const losses = Number(r.losses ?? 0);
-      const points = Number(r.points ?? 0);
-      const plms = Number(r.plms ?? 0);
-      const efficiency = Number(r.efficiency ?? 0);
-      const potato = Number(r.potato ?? 0);
-
-      const discordId = ncxid ? ncxToDiscord[ncxid] ?? null : null;
-
-      return {
-        ncxid,
-        name,
-        faction,
-        discordId,
-        wins,
-        losses,
-        points,
-        plms,
-        efficiency,
-        potato,
-        isCaptain,
-      };
-    });
-
-  // Captains first, then by pick (so the drafted order still kinda shows), then name
-  players.sort((a, b) => {
-    if (a.isCaptain !== b.isCaptain) return a.isCaptain ? -1 : 1;
-    // we don't have pick stored; tie-break on name + ncxid
-    const an = a.name.toLowerCase();
-    const bn = b.name.toLowerCase();
-    if (an !== bn) return an.localeCompare(bn);
-    return a.ncxid.localeCompare(b.ncxid);
-  });
-
-  return players;
-}
-
 /* ----------------------------- PANEL ----------------------------- */
 
-type TeamSchedulePanelProps = {
+export type TeamSchedulePanelProps = {
   team: string;
-  /** desktop = "/?tab=current&w=...", mobile = "/m/current?w=..." */
-  mode?: PanelMode;
+  mode: "desktop" | "mobile";
+
+  // Optional: provided by (desktop)/page.tsx
+  roster?: TeamRosterPlayer[];
+  teamAdvStats?: TeamAdvStats;
 };
 
 export default async function TeamSchedulePanel({
   team,
   mode = "desktop",
+  roster,
+  teamAdvStats,
 }: TeamSchedulePanelProps) {
-  const [{ teamName, rows }, indStats, factionMap, discordMap] = await Promise.all([
-    fetchScheduleForTeam(team),
-    fetchIndStatsDataCached(),
-    fetchFactionMapCached(),
-    getDiscordMapCached(),
-  ]);
-
-  const roster = buildRosterForTeam(teamName, indStats ?? [], factionMap, discordMap);
+  const [{ teamName, rows }] = await Promise.all([fetchScheduleForTeam(team)]);
 
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-6">
@@ -300,6 +262,7 @@ export default async function TeamSchedulePanel({
         </>
       ) : (
         <>
+          {/* Header */}
           <header className="flex items-center gap-3">
             <span className="shrink-0 rounded-md overflow-hidden bg-zinc-800 border border-zinc-700 w-[40px] h-[40px] flex items-center justify-center">
               <Image
@@ -322,8 +285,62 @@ export default async function TeamSchedulePanel({
             </div>
           </header>
 
-          {/* ROSTER CARD */}
-          {roster.length > 0 && (
+          {/* Optional: team advanced stats summary */}
+          {teamAdvStats && (
+            <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 grid gap-3 md:grid-cols-2 text-xs text-zinc-300">
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-100 mb-2">
+                  Team Performance Snapshot
+                </h3>
+                <div className="space-y-1">
+                  <div>
+                    Games Played:{" "}
+                    <span className="text-zinc-100">{teamAdvStats.totalGames}</span>
+                  </div>
+                  <div>
+                    Avg Wins / Loss:{" "}
+                    <span className="text-zinc-100">
+                      {teamAdvStats.avgWins} / {teamAdvStats.avgLoss}
+                    </span>
+                  </div>
+                  <div>
+                    Avg Points:{" "}
+                    <span className="text-zinc-100">{teamAdvStats.avgPoints}</span> • PL/MS:{" "}
+                    <span className="text-zinc-100">{teamAdvStats.avgPlms}</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-100 mb-2">
+                  Efficiency & Difficulty
+                </h3>
+                <div className="space-y-1">
+                  <div>
+                    Win% / PPG:{" "}
+                    <span className="text-zinc-100">
+                      {teamAdvStats.avgWinPct} / {teamAdvStats.avgPpg}
+                    </span>
+                  </div>
+                  <div>
+                    Eff / WAR:{" "}
+                    <span className="text-zinc-100">
+                      {teamAdvStats.avgEfficiency} / {teamAdvStats.avgWar}
+                    </span>
+                  </div>
+                  <div>
+                    H2H / Potato / SoS:{" "}
+                    <span className="text-zinc-100">
+                      {teamAdvStats.avgH2h} / {teamAdvStats.avgPotato} /{" "}
+                      {teamAdvStats.avgSos}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ROSTER CARD (if provided) */}
+          {roster && roster.length > 0 && (
             <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 space-y-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <h3 className="text-lg font-semibold text-zinc-100">
@@ -333,26 +350,21 @@ export default async function TeamSchedulePanel({
                   </span>
                 </h3>
                 <p className="text-xs text-zinc-500">
-                  Captains are marked with a{" "}
-                  <span className="text-yellow-300 font-semibold">CAPTAIN</span> badge.
+                  Click a name to open Discord DMs (if linked).
                 </p>
               </div>
 
               <div className="space-y-2">
                 {roster.map((p) => {
-                  const factionIcon = factionIconSrc(p.faction ?? undefined);
-                  const tooltip = p.isCaptain ? "Team Captain" : "Open DM";
-
-                  const rowTone = p.isCaptain
-                    ? "border-yellow-500/60 bg-yellow-500/5"
-                    : "border-zinc-800 bg-zinc-950/60";
+                  const factionIcon = factionIconSrc(p.faction);
+                  const tooltip = p.discordTag || "Open DM";
 
                   return (
                     <div
                       key={p.ncxid}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2 ${rowTone}`}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2 border border-zinc-800 bg-zinc-950/60"
                     >
-                      {/* Faction icon with subtle glow */}
+                      {/* Faction icon */}
                       {factionIcon ? (
                         <div className="relative h-10 w-10 shrink-0 flex items-center justify-center">
                           <span className="absolute inset-0 rounded-full bg-white/10 blur-sm" />
@@ -379,40 +391,47 @@ export default async function TeamSchedulePanel({
                             titleSuffix={tooltip}
                             className="font-semibold text-cyan-200 hover:text-cyan-100"
                           />
-                          {p.isCaptain && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/70 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-100">
-                              ★ Captain
-                            </span>
-                          )}
                         </div>
 
                         <div className="mt-1 text-xs text-zinc-400 flex flex-wrap gap-x-3 gap-y-1">
                           {p.faction && (
-                            <span className="mr-1">
-                              Faction: <span className="text-zinc-200">{p.faction}</span>
+                            <span>
+                              Faction:{" "}
+                              <span className="text-zinc-200">{p.faction}</span>
                             </span>
                           )}
-                          <span>
-                            Record:{" "}
-                            <span className="text-zinc-200">
-                              {p.wins}-{p.losses}
+                          {p.wins && p.losses && (
+                            <span>
+                              Record:{" "}
+                              <span className="text-zinc-200">
+                                {p.wins}-{p.losses}
+                              </span>
                             </span>
-                          </span>
-                          <span>
-                            Pts: <span className="text-zinc-200">{p.points}</span>
-                          </span>
-                          <span>
-                            PL/MS: <span className="text-zinc-200">{p.plms}</span>
-                          </span>
-                          <span>
-                            Eff:{" "}
-                            <span className="text-zinc-200">
-                              {p.efficiency ? p.efficiency.toFixed(2) : "—"}
+                          )}
+                          {p.points && (
+                            <span>
+                              Pts: <span className="text-zinc-200">{p.points}</span>
                             </span>
-                          </span>
-                          <span>
-                            Potato: <span className="text-zinc-200">{p.potato || "—"}</span>
-                          </span>
+                          )}
+                          {p.plms && (
+                            <span>
+                              PL/MS: <span className="text-zinc-200">{p.plms}</span>
+                            </span>
+                          )}
+                          {p.efficiency && (
+                            <span>
+                              Eff:{" "}
+                              <span className="text-zinc-200">
+                                {p.efficiency}
+                              </span>
+                            </span>
+                          )}
+                          {p.potato && (
+                            <span>
+                              Potato:{" "}
+                              <span className="text-zinc-200">{p.potato}</span>
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -435,6 +454,8 @@ export default async function TeamSchedulePanel({
     </div>
   );
 }
+
+/* ----------------------------- SCHEDULE TABLE ----------------------------- */
 
 async function TeamTable({
   rows,
@@ -485,7 +506,10 @@ async function TeamTable({
             }
 
             return (
-              <tr key={`${weekLabel}-${i}`} className={`border-t border-zinc-800 ${rowTone}`}>
+              <tr
+                key={`${weekLabel}-${i}`}
+                className={`border-t border-zinc-800 ${rowTone}`}
+              >
                 {/* Week → link to Current Week (desktop) or Mobile Current (mobile) */}
                 <td className="py-2 px-2">
                   <Link

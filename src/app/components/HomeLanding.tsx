@@ -1,6 +1,7 @@
 // src/app/components/HomeLanding.tsx
 import React from "react";
 import { teamSlug } from "@/lib/slug";
+import MyMatchupWidget from "@/app/components/MyMatchupWidget";
 
 type TeamLogo = {
   /** Display name, used for alt text + tooltip */
@@ -31,6 +32,11 @@ type HomeLandingProps = {
    * Mobile: pass "/m/rules"
    */
   rulesHref?: string;
+  /**
+   * NCXID -> faction label map (e.g. "REBELS", "EMPIRE").
+   * Same thing you already pass into MatchupsPanel as factionMap.
+   */
+  factionMap?: Record<string, string>;
 };
 
 const teams: TeamLogo[] = [
@@ -70,6 +76,7 @@ export default function HomeLanding({
   className,
   buildTeamHref,
   rulesHref,
+  factionMap,
 }: HomeLandingProps) {
   const rulesLink = rulesHref ?? "/rules";
 
@@ -147,6 +154,9 @@ export default function HomeLanding({
             Streamer Kit
           </a>
         </div>
+
+        {/* NEW: Inline "Your Matchup" widget (only shows if logged in & has game) */}
+        <MyMatchupWidget factionMap={factionMap} />
 
         {/* Team logos grid */}
         {sortedTeams.length > 0 && (

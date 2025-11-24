@@ -281,47 +281,52 @@ export default async function HomePage({
             <DesktopNavTabs />
           </Suspense>
 
-          <HomeTabs
-            hideButtons
-            homePanel={<HomeLanding message={message} />}
-            currentWeekPanel={
-              <CurrentWeekCard
-                key="current-week"
-                activeWeek={activeWeek}
-                selectedWeek={selectedWeek}
-              />
-            }
-            matchupsPanel={
-              <MatchupsPanel
-                key="matchups"
-                data={dataWithDiscord}
-                weekLabel={weekLabelForPanel}
-                activeWeek={activeWeek}
-                scheduleWeek={streamSched.scheduleWeek}
-                scheduleMap={streamSched.scheduleMap}
-                indStats={indStats ?? []}
-                factionMap={factionMap}
-              />
-            }
-            standingsPanel={<StandingsPanel key="standings" />}
-            indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
-            advStatsPanel={<AdvStatsPanelServer key="advstats" />}
-            playersPanel={<PlayersPanelServer key="players" />}
-            reportPanel={<ReportPanel key="report" />}
-            /* Provide the Team tab when ?team= is present */
-            teamPanel={
-              teamParam ? (
-                <TeamSchedulePanel
-                  key={`team-${teamParam}`}
-                  team={teamParam}
-                  mode="desktop"
-                  roster={teamRoster}
-                  teamAdvStats={teamAdvStats}
-                />
-              ) : undefined
-            }
-            playoffsPanel={<PlayoffsPanel key="playoffs" />} 
+                <HomeTabs
+        hideButtons
+        homePanel={
+          <HomeLanding
+            message={message}
+            factionMap={factionMap ?? undefined}   // 👈 add this
           />
+        }
+        currentWeekPanel={
+          <CurrentWeekCard
+            key="current-week"
+            activeWeek={activeWeek}
+            selectedWeek={selectedWeek}
+          />
+        }
+        matchupsPanel={
+          <MatchupsPanel
+            key="matchups"
+            data={dataWithDiscord}
+            weekLabel={weekLabelForPanel}
+            activeWeek={activeWeek}
+            scheduleWeek={streamSched.scheduleWeek}
+            scheduleMap={streamSched.scheduleMap}
+            indStats={indStats ?? []}
+            factionMap={factionMap}
+          />
+        }
+        standingsPanel={<StandingsPanel key="standings" />}
+        indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
+        advStatsPanel={<AdvStatsPanelServer key="advstats" />}
+        playersPanel={<PlayersPanelServer key="players" />}
+        reportPanel={<ReportPanel key="report" />}
+        teamPanel={
+          teamParam ? (
+            <TeamSchedulePanel
+              key={`team-${teamParam}`}
+              team={teamParam}
+              mode="desktop"
+              roster={teamRoster}
+              teamAdvStats={teamAdvStats}
+            />
+          ) : undefined
+        }
+        playoffsPanel={<PlayoffsPanel key="playoffs" />}
+      />
+
         </div>
       </section>
     </main>
