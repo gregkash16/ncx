@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
+import NextImage from "next/image";
 import type { IndRow, FactionMap, MatchRow } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
 import PlayerDMLink from "@/app/components/PlayerDMLink";
@@ -17,7 +17,7 @@ interface MatchRowWithDiscord extends MatchRow {
 }
 
 type Props = {
-  data: MatchRow[];              // we accept MatchRow[]; extra fields are read via the extended interface above
+  data: MatchRow[]; // we accept MatchRow[]; extra fields are read via the extended interface above
   weekLabel?: string;
   activeWeek?: string;
   scheduleWeek?: string;
@@ -102,6 +102,245 @@ function formatWeekLabel(n: number) {
   return `WEEK ${n}`;
 }
 
+// --- Thumbnail generation helpers ----
+const THUMB_WIDTH = 1920;
+const THUMB_HEIGHT = 1080;
+
+type ThumbnailContext = {
+  row: MatchRowWithDiscord;
+  awaySeason?: IndRow;
+  homeSeason?: IndRow;
+  awayFactionIcon?: string;
+  homeFactionIcon?: string;
+  weekLabel?: string;
+};
+
+function loadImageSafe(src?: string | null): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    if (typeof window === "undefined") return resolve(null);
+
+    const img = new window.Image(); // explicitly use the DOM Image
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality = 0.9): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
+  });
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function generateMatchThumbnail(ctxData: ThumbnailContext) {
+  if (typeof window === "undefined") return;
+
+  const { row, awayFactionIcon, homeFactionIcon, weekLabel } = ctxData;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = THUMB_WIDTH;
+  canvas.height = THUMB_HEIGHT;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  // === BOLDER BACKGROUND ===
+  const baseGrad = ctx.createLinearGradient(0, 0, THUMB_WIDTH, THUMB_HEIGHT);
+  baseGrad.addColorStop(0, "#020617"); // slate-950
+  baseGrad.addColorStop(0.5, "#020617");
+  baseGrad.addColorStop(1, "#020617");
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(0, 0, THUMB_WIDTH, THUMB_HEIGHT);
+
+  // Left pink overlay (stronger)
+  const leftGrad = ctx.createLinearGradient(0, 0, THUMB_WIDTH / 2, 0);
+  leftGrad.addColorStop(0, "rgba(236,72,153,0.9)");  // pink-500
+  leftGrad.addColorStop(0.7, "rgba(236,72,153,0.2)");
+  leftGrad.addColorStop(1, "rgba(236,72,153,0.0)");
+  ctx.fillStyle = leftGrad;
+  ctx.fillRect(0, 0, THUMB_WIDTH / 2, THUMB_HEIGHT);
+
+  // Right cyan overlay (stronger)
+  const rightGrad = ctx.createLinearGradient(THUMB_WIDTH / 2, 0, THUMB_WIDTH, 0);
+  rightGrad.addColorStop(0, "rgba(34,211,238,0.0)");
+  rightGrad.addColorStop(0.3, "rgba(34,211,238,0.2)");
+  rightGrad.addColorStop(1, "rgba(34,211,238,0.9)"); // cyan-400
+  ctx.fillStyle = rightGrad;
+  ctx.fillRect(THUMB_WIDTH / 2, 0, THUMB_WIDTH / 2, THUMB_HEIGHT);
+
+  // Stronger center glow
+  const centerGrad = ctx.createRadialGradient(
+    THUMB_WIDTH / 2,
+    THUMB_HEIGHT / 2,
+    0,
+    THUMB_WIDTH / 2,
+    THUMB_HEIGHT / 2,
+    THUMB_HEIGHT / 1.2
+  );
+  centerGrad.addColorStop(0, "rgba(129,140,248,0.35)"); // indigo-400
+  centerGrad.addColorStop(1, "rgba(15,23,42,0)");
+  ctx.fillStyle = centerGrad;
+  ctx.fillRect(0, 0, THUMB_WIDTH, THUMB_HEIGHT);
+
+  // Top label: NICKEL CITY X-WING
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#e5e7eb";
+  ctx.font = "1000 100px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText("NICKEL CITY X-WING", THUMB_WIDTH / 2, 90);
+
+  if (weekLabel) {
+    ctx.fillStyle = "#a5b4fc"; // indigo-300
+    ctx.font = "500 36px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    ctx.fillText(weekLabel.toUpperCase(), THUMB_WIDTH / 2, 140);
+  }
+
+  const awayName = row.awayName || "Away Player";
+  const homeName = row.homeName || "Home Player";
+  const awayTeam = row.awayTeam || "Away Team";
+  const homeTeam = row.homeTeam || "Home Team";
+
+  const awayLogoPath = `/logos/${teamSlug(row.awayTeam)}.png`;
+  const homeLogoPath = `/logos/${teamSlug(row.homeTeam)}.png`;
+  const mainLogoPath = "/logo.png";
+
+  const [awayLogoImg, homeLogoImg, awayFactionImg, homeFactionImg, mainLogoImg] =
+    await Promise.all([
+      loadImageSafe(awayLogoPath),
+      loadImageSafe(homeLogoPath),
+      loadImageSafe(awayFactionIcon),
+      loadImageSafe(homeFactionIcon),
+      loadImageSafe(mainLogoPath),
+    ]);
+
+  // Center logo instead of VS
+  if (mainLogoImg) {
+    const logoSize = 460;
+    const cx = THUMB_WIDTH / 2 - logoSize / 2;
+    const cy = THUMB_HEIGHT / 2 - logoSize / 2 + 10;
+    ctx.drawImage(mainLogoImg, cx, cy, logoSize, logoSize);
+  }
+
+  // === LAYOUT CONSTANTS ===
+  const midY = THUMB_HEIGHT / 2;
+
+  const factionSize = 180;   // bigger
+  const teamLogoSize = 320;  // bigger
+
+  const leftCenterX = THUMB_WIDTH * 0.25;
+  const rightCenterX = THUMB_WIDTH * 0.75;
+
+  // Y positions for stack on each side:
+  // Faction center, Name, Team, Team Logo center
+  const factionCenterY = midY - 250;
+  const nameY = midY - 40;
+  const teamY = nameY + 70;
+  const teamLogoCenterY = midY + 220;
+
+  // ===== LEFT SIDE (Away) =====
+  ctx.textAlign = "center";
+
+  // Faction icon ABOVE name (higher than before, larger)
+  if (awayFactionImg) {
+    ctx.drawImage(
+      awayFactionImg,
+      leftCenterX - factionSize / 2,
+      factionCenterY - factionSize / 2,
+      factionSize,
+      factionSize
+    );
+  }
+
+  // Away player name
+  ctx.fillStyle = "#f9a8d4"; // pink-300
+  ctx.font = "800 84px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText(awayName, leftCenterX, nameY);
+
+  // Away team name
+  ctx.fillStyle = "#f9fafb";
+  ctx.font = "600 52px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText(awayTeam, leftCenterX, teamY);
+
+  // Team logo BELOW team name (bigger, centered)
+  if (awayLogoImg) {
+    ctx.drawImage(
+      awayLogoImg,
+      leftCenterX - teamLogoSize / 2,
+      teamLogoCenterY - teamLogoSize / 2,
+      teamLogoSize,
+      teamLogoSize
+    );
+  }
+
+  // ===== RIGHT SIDE (Home) =====
+  // Faction icon
+  if (homeFactionImg) {
+    ctx.drawImage(
+      homeFactionImg,
+      rightCenterX - factionSize / 2,
+      factionCenterY - factionSize / 2,
+      factionSize,
+      factionSize
+    );
+  }
+
+  // Home player name
+  ctx.fillStyle = "#7dd3fc"; // cyan-300
+  ctx.font = "800 84px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText(homeName, rightCenterX, nameY);
+
+  // Home team name
+  ctx.fillStyle = "#f9fafb";
+  ctx.font = "600 52px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText(homeTeam, rightCenterX, teamY);
+
+  // Home team logo
+  if (homeLogoImg) {
+    ctx.drawImage(
+      homeLogoImg,
+      rightCenterX - teamLogoSize / 2,
+      teamLogoCenterY - teamLogoSize / 2,
+      teamLogoSize,
+      teamLogoSize
+    );
+  }
+
+  // Subfooter: GAME X (no score)
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#9ca3af";
+  ctx.font = "500 32px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  const gameLabel = `GAME ${row.game}`;
+  ctx.fillText(gameLabel, THUMB_WIDTH / 2, THUMB_HEIGHT - 70);
+
+  const blob = await canvasToBlob(canvas, 0.9);
+  if (!blob) return;
+
+  const safeSlug = (s: string) =>
+    (s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "team";
+
+  const filename = `Game-${row.game}-${safeSlug(awayTeam)}-vs-${safeSlug(homeTeam)}.jpg`;
+  downloadBlob(blob, filename);
+}
+
+
+// --- Component ----
+
 export default function MatchupsPanel({
   data,
   weekLabel,
@@ -139,6 +378,9 @@ export default function MatchupsPanel({
 
   const [onlyCompleted, setOnlyCompleted] = useState(false);
   const [onlyScheduled, setOnlyScheduled] = useState(false);
+
+  // track which game is generating (for button disabled state)
+  const [generatingGame, setGeneratingGame] = useState<string | null>(null);
 
   // Keep input synced if the URL changes (clicking a different series or week)
   useEffect(() => {
@@ -316,7 +558,6 @@ export default function MatchupsPanel({
                 : "";
 
             // Season summaries (from IndStats)
-            const indById = statsMapFromIndRows(indStats);
             const awaySeason = row.awayId ? indById.get(row.awayId) : undefined;
             const homeSeason = row.homeId ? indById.get(row.homeId) : undefined;
 
@@ -327,6 +568,22 @@ export default function MatchupsPanel({
             // Optional tooltip helpers if you store handles like name#1234
             const awayTooltip = row.awayDiscordTag ? `@${row.awayDiscordTag}` : "Open DM";
             const homeTooltip = row.homeDiscordTag ? `@${row.homeDiscordTag}` : "Open DM";
+
+            const handleClickThumbnail = async () => {
+              try {
+                setGeneratingGame(row.game);
+                await generateMatchThumbnail({
+                  row,
+                  awaySeason,
+                  homeSeason,
+                  awayFactionIcon,
+                  homeFactionIcon,
+                  weekLabel,
+                });
+              } finally {
+                setGeneratingGame((current) => (current === row.game ? null : current));
+              }
+            };
 
             return (
               <div
@@ -349,11 +606,23 @@ export default function MatchupsPanel({
                   </span>
                 </div>
 
+                {/* Create thumbnail button */}
+                <div className="absolute -top-3 -right-3">
+                  <button
+                    type="button"
+                    onClick={handleClickThumbnail}
+                    disabled={generatingGame === row.game}
+                    className="inline-flex items-center rounded-lg bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {generatingGame === row.game ? "Generating…" : "Create thumbnail"}
+                  </button>
+                </div>
+
                 {/* Teams row */}
                 <div className="relative z-10 flex items-center justify-between font-semibold text-lg">
                   {/* Away */}
                   <div className="flex items-center gap-3 w-1/3 min-w-0">
-                    <Image
+                    <NextImage
                       src={awayLogo}
                       alt={row.awayTeam || "Team"}
                       width={32}
@@ -393,7 +662,7 @@ export default function MatchupsPanel({
                     >
                       {row.homeTeam || "TBD"}
                     </span>
-                    <Image
+                    <NextImage
                       src={homeLogo}
                       alt={row.homeTeam || "Team"}
                       width={32}
@@ -410,7 +679,7 @@ export default function MatchupsPanel({
                 <div className="relative z-10 mt-3 text-sm text-zinc-200 grid grid-cols-2 gap-3">
                   <div className="flex items-center gap-3">
                     {awayFactionIcon && (
-                      <Image
+                      <NextImage
                         src={awayFactionIcon}
                         alt={`${row.awayName} faction`}
                         width={48}
@@ -447,7 +716,7 @@ export default function MatchupsPanel({
                       className="text-cyan-400 font-semibold text-right"
                     />
                     {homeFactionIcon && (
-                      <Image
+                      <NextImage
                         src={homeFactionIcon}
                         alt={`${row.homeName} faction`}
                         width={48}
