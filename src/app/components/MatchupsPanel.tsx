@@ -146,6 +146,7 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+// OPTION A: LIGHTSPEED DUEL STYLE — CLEAN + BRIGHT TEXT (TS-SAFE)
 async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   if (typeof window === "undefined") return;
 
@@ -154,58 +155,104 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const canvas = document.createElement("canvas");
   canvas.width = THUMB_WIDTH;
   canvas.height = THUMB_HEIGHT;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
 
-  // === BOLDER BACKGROUND ===
-  const baseGrad = ctx.createLinearGradient(0, 0, THUMB_WIDTH, THUMB_HEIGHT);
-  baseGrad.addColorStop(0, "#020617"); // slate-950
-  baseGrad.addColorStop(0.5, "#020617");
-  baseGrad.addColorStop(1, "#020617");
-  ctx.fillStyle = baseGrad;
-  ctx.fillRect(0, 0, THUMB_WIDTH, THUMB_HEIGHT);
+  const maybeCtx = canvas.getContext("2d");
+  if (!maybeCtx) return;
+  const ctx: CanvasRenderingContext2D = maybeCtx;
 
-  // Left pink overlay (stronger)
-  const leftGrad = ctx.createLinearGradient(0, 0, THUMB_WIDTH / 2, 0);
-  leftGrad.addColorStop(0, "rgba(236,72,153,0.9)");  // pink-500
-  leftGrad.addColorStop(0.7, "rgba(236,72,153,0.2)");
-  leftGrad.addColorStop(1, "rgba(236,72,153,0.0)");
-  ctx.fillStyle = leftGrad;
-  ctx.fillRect(0, 0, THUMB_WIDTH / 2, THUMB_HEIGHT);
+  const W = THUMB_WIDTH;
+  const H = THUMB_HEIGHT;
 
-  // Right cyan overlay (stronger)
-  const rightGrad = ctx.createLinearGradient(THUMB_WIDTH / 2, 0, THUMB_WIDTH, 0);
-  rightGrad.addColorStop(0, "rgba(34,211,238,0.0)");
-  rightGrad.addColorStop(0.3, "rgba(34,211,238,0.2)");
-  rightGrad.addColorStop(1, "rgba(34,211,238,0.9)"); // cyan-400
-  ctx.fillStyle = rightGrad;
-  ctx.fillRect(THUMB_WIDTH / 2, 0, THUMB_WIDTH / 2, THUMB_HEIGHT);
+  // ===== HYPERSPACE BACKGROUND =====
+  const bgGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, H / 1.1);
+  bgGrad.addColorStop(0, "#020617");
+  bgGrad.addColorStop(1, "#000000");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
 
-  // Stronger center glow
-  const centerGrad = ctx.createRadialGradient(
-    THUMB_WIDTH / 2,
-    THUMB_HEIGHT / 2,
+  // Hyperspace streaks
+  function drawStreaks(side: "left" | "right") {
+    const count = 150;
+    ctx.save();
+    ctx.lineCap = "round";
+
+    for (let i = 0; i < count; i++) {
+      const y = Math.random() * H;
+      const len = 80 + Math.random() * 220;
+      const thickness = 1 + Math.random() * 3;
+
+      let xStart: number;
+      let xEnd: number;
+
+      if (side === "left") {
+        xStart = Math.random() * (W * 0.45);
+        xEnd = xStart + len;
+        ctx.strokeStyle = `rgba(236,72,153,${0.2 + Math.random() * 0.55})`; // pink
+      } else {
+        xStart = W * 0.55 + Math.random() * (W * 0.45);
+        xEnd = xStart - len;
+        ctx.strokeStyle = `rgba(56,189,248,${0.2 + Math.random() * 0.55})`; // cyan
+      }
+
+      ctx.lineWidth = thickness;
+      ctx.beginPath();
+      ctx.moveTo(xStart, y);
+      ctx.lineTo(xEnd, y + (side === "left" ? -len * 0.15 : len * 0.15));
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  drawStreaks("left");
+  drawStreaks("right");
+
+  // Light grid overlay
+  ctx.save();
+  ctx.strokeStyle = "rgba(148,163,184,0.1)";
+  const gridSize = 48;
+  for (let x = 0; x < W; x += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  for (let y = 0; y < H; y += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Central glow (kept subtle)
+  const centerGlow = ctx.createRadialGradient(
+    W / 2,
+    H / 2,
     0,
-    THUMB_WIDTH / 2,
-    THUMB_HEIGHT / 2,
-    THUMB_HEIGHT / 1.2
+    W / 2,
+    H / 2,
+    H / 1.3
   );
-  centerGrad.addColorStop(0, "rgba(129,140,248,0.35)"); // indigo-400
-  centerGrad.addColorStop(1, "rgba(15,23,42,0)");
-  ctx.fillStyle = centerGrad;
-  ctx.fillRect(0, 0, THUMB_WIDTH, THUMB_HEIGHT);
+  centerGlow.addColorStop(0, "rgba(129,140,248,0.25)");
+  centerGlow.addColorStop(1, "rgba(15,23,42,0)");
+  ctx.fillStyle = centerGlow;
+  ctx.fillRect(0, 0, W, H);
 
-  // Top label: NICKEL CITY X-WING
-  ctx.textBaseline = "alphabetic";
+  // ===== TOP TEXT: BRIGHTER =====
   ctx.textAlign = "center";
-  ctx.fillStyle = "#e5e7eb";
-  ctx.font = "1000 100px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText("NICKEL CITY X-WING", THUMB_WIDTH / 2, 90);
+  ctx.textBaseline = "alphabetic";
 
+  // Title
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText("NICKEL CITY X-WING", W / 2, 95);
+
+  // WEEK label (brighter)
   if (weekLabel) {
-    ctx.fillStyle = "#a5b4fc"; // indigo-300
-    ctx.font = "500 36px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-    ctx.fillText(weekLabel.toUpperCase(), THUMB_WIDTH / 2, 140);
+    ctx.fillStyle = "#ffffff"; // bright white
+    ctx.font = "700 40px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    ctx.fillText(weekLabel.toUpperCase(), W / 2, 150);
   }
 
   const awayName = row.awayName || "Away Player";
@@ -217,127 +264,151 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const homeLogoPath = `/logos/${teamSlug(row.homeTeam)}.png`;
   const mainLogoPath = "/logo.png";
 
-  const [awayLogoImg, homeLogoImg, awayFactionImg, homeFactionImg, mainLogoImg] =
-    await Promise.all([
-      loadImageSafe(awayLogoPath),
-      loadImageSafe(homeLogoPath),
-      loadImageSafe(awayFactionIcon),
-      loadImageSafe(homeFactionIcon),
-      loadImageSafe(mainLogoPath),
-    ]);
+  const [
+    awayLogoImg,
+    homeLogoImg,
+    awayFactionImg,
+    homeFactionImg,
+    mainLogoImg,
+  ] = await Promise.all([
+    loadImageSafe(awayLogoPath),
+    loadImageSafe(homeLogoPath),
+    loadImageSafe(awayFactionIcon),
+    loadImageSafe(homeFactionIcon),
+    loadImageSafe(mainLogoPath),
+  ]);
 
-  // Center logo instead of VS
+  // ===== CENTER LOGO (NO CIRCLE) =====
   if (mainLogoImg) {
-    const logoSize = 460;
-    const cx = THUMB_WIDTH / 2 - logoSize / 2;
-    const cy = THUMB_HEIGHT / 2 - logoSize / 2 + 10;
-    ctx.drawImage(mainLogoImg, cx, cy, logoSize, logoSize);
+    const size = 380;
+    ctx.globalAlpha = 1;
+    ctx.drawImage(
+      mainLogoImg,
+      W / 2 - size / 2,
+      H / 2 - size / 2 + 10,
+      size,
+      size
+    );
   }
 
-  // === LAYOUT CONSTANTS ===
-  const midY = THUMB_HEIGHT / 2;
+  // ===== HOLO PANELS =====
+  function drawHoloPanel(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    color: string
+  ) {
+    const r = 18;
+    ctx.save();
+    ctx.beginPath();
 
-  const factionSize = 180;   // bigger
-  const teamLogoSize = 320;  // bigger
+    ctx.moveTo(x - w / 2 + r, y - h / 2);
+    ctx.lineTo(x + w / 2 - r, y - h / 2);
+    ctx.quadraticCurveTo(x + w / 2, y - h / 2, x + w / 2, y - h / 2 + r);
+    ctx.lineTo(x + w / 2, y + h / 2 - r);
+    ctx.quadraticCurveTo(x + w / 2, y + h / 2, x + w / 2 - r, y + h / 2);
+    ctx.lineTo(x - w / 2 + r, y + h / 2);
+    ctx.quadraticCurveTo(x - w / 2, y + h / 2, x - w / 2, y + h / 2 - r);
+    ctx.lineTo(x - w / 2, y - h / 2 + r);
+    ctx.quadraticCurveTo(x - w / 2, y - h / 2, x - w / 2 + r, y - h / 2);
 
-  const leftCenterX = THUMB_WIDTH * 0.25;
-  const rightCenterX = THUMB_WIDTH * 0.75;
+    ctx.closePath();
+    ctx.fillStyle = "rgba(15,23,42,0.85)";
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
-  // Y positions for stack on each side:
-  // Faction center, Name, Team, Team Logo center
-  const factionCenterY = midY - 250;
-  const nameY = midY - 40;
-  const teamY = nameY + 70;
-  const teamLogoCenterY = midY + 220;
+    ctx.restore();
+  }
 
-  // ===== LEFT SIDE (Away) =====
-  ctx.textAlign = "center";
+  const midY = H / 2;
+  const leftX = W * 0.25;
+  const rightX = W * 0.75;
 
-  // Faction icon ABOVE name (higher than before, larger)
+  const factionSize = 210;
+  const teamLogoSize = 320;
+
+  // Faction icons (NO GLOW CIRCLES)
   if (awayFactionImg) {
     ctx.drawImage(
       awayFactionImg,
-      leftCenterX - factionSize / 2,
-      factionCenterY - factionSize / 2,
+      leftX - factionSize / 2,
+      midY - 250 - factionSize / 2,
       factionSize,
       factionSize
     );
   }
-
-  // Away player name
-  ctx.fillStyle = "#f9a8d4"; // pink-300
-  ctx.font = "800 84px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText(awayName, leftCenterX, nameY);
-
-  // Away team name
-  ctx.fillStyle = "#f9fafb";
-  ctx.font = "600 52px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText(awayTeam, leftCenterX, teamY);
-
-  // Team logo BELOW team name (bigger, centered)
-  if (awayLogoImg) {
-    ctx.drawImage(
-      awayLogoImg,
-      leftCenterX - teamLogoSize / 2,
-      teamLogoCenterY - teamLogoSize / 2,
-      teamLogoSize,
-      teamLogoSize
-    );
-  }
-
-  // ===== RIGHT SIDE (Home) =====
-  // Faction icon
   if (homeFactionImg) {
     ctx.drawImage(
       homeFactionImg,
-      rightCenterX - factionSize / 2,
-      factionCenterY - factionSize / 2,
+      rightX - factionSize / 2,
+      midY - 250 - factionSize / 2,
       factionSize,
       factionSize
     );
   }
 
-  // Home player name
-  ctx.fillStyle = "#7dd3fc"; // cyan-300
-  ctx.font = "800 84px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText(homeName, rightCenterX, nameY);
+  // Holo name panels
+  drawHoloPanel(leftX, midY + 10, 560, 150, "rgb(236,72,153)");
+  drawHoloPanel(rightX, midY + 10, 560, 150, "rgb(56,189,248)");
 
-  // Home team name
-  ctx.fillStyle = "#f9fafb";
-  ctx.font = "600 52px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText(homeTeam, rightCenterX, teamY);
+  // Names
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff"; // bright white
+  ctx.font = "800 60px system-ui";
+  ctx.fillText(awayName, leftX, midY - 10);
+  ctx.fillText(homeName, rightX, midY - 10);
 
-  // Home team logo
+  // Teams
+  ctx.fillStyle = "#e5e7eb";
+  ctx.font = "600 40px system-ui";
+  ctx.fillText(awayTeam, leftX, midY + 50);
+  ctx.fillText(homeTeam, rightX, midY + 50);
+
+  // Team logos (NO glow ellipse)
+  if (awayLogoImg) {
+    ctx.drawImage(
+      awayLogoImg,
+      leftX - teamLogoSize / 2,
+      midY + 110,
+      teamLogoSize,
+      teamLogoSize
+    );
+  }
   if (homeLogoImg) {
     ctx.drawImage(
       homeLogoImg,
-      rightCenterX - teamLogoSize / 2,
-      teamLogoCenterY - teamLogoSize / 2,
+      rightX - teamLogoSize / 2,
+      midY + 110,
       teamLogoSize,
       teamLogoSize
     );
   }
 
-  // Subfooter: GAME X (no score)
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#9ca3af";
-  ctx.font = "500 32px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  const gameLabel = `GAME ${row.game}`;
-  ctx.fillText(gameLabel, THUMB_WIDTH / 2, THUMB_HEIGHT - 70);
+  // ===== GAME LABEL (BRIGHTER) =====
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 34px system-ui";
+  ctx.fillText(`GAME ${row.game}`, W / 2, H - 70);
 
   const blob = await canvasToBlob(canvas, 0.9);
   if (!blob) return;
 
   const safeSlug = (s: string) =>
-    (s || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "team";
+  (s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .replace(/^-+|-+$/g, "") || "player";
 
-  const filename = `Game-${row.game}-${safeSlug(awayTeam)}-vs-${safeSlug(homeTeam)}.jpg`;
+  const fileAway = safeSlug(awayName);
+  const fileHome = safeSlug(homeName);
+
+  // game15-gregvdan.jpg
+  const filename = `game${row.game} - ${fileAway} v ${fileHome}.jpg`;
   downloadBlob(blob, filename);
-}
 
+}
 
 // --- Component ----
 
