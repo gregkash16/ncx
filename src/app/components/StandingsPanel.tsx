@@ -4,6 +4,7 @@ import {
   fetchOverallStandingsCached,
   fetchMatchupsDataCached,
   getSheets,
+  fetchTeamScheduleAllCached, // ⬅️ NEW
 } from "@/lib/googleSheets";
 
 type SeriesResult = "win" | "loss";
@@ -145,6 +146,167 @@ function StreakPill({
   );
 }
 
+/** -------------------- Playoff math helpers -------------------- **/
+
+type TeamPlayoffWindow = {
+  team: string;
+  wins: number;     // current series wins
+  gameWins: number; // current game wins
+
+  remaining: number; // remaining series (not yet finished)
+  minWins: number;
+  maxWins: number;
+  minGW: number;
+  maxGW: number;
+};
+
+/**
+ * Compute remaining series for each team, using the
+ * SCHEDULE overview and completed series from WEEK tabs.
+ *
+ * - Season is 10 weeks, 1 series per week per team.
+ * - We count total scheduled series (from SCHEDULE),
+ *   then subtract completed series (from weekResults).
+ */
+
+// Treat the season as if it were only this many weeks long
+const MAX_WEEKS_FOR_PLAYOFF_MATH = 10;
+
+async function computeRemainingSeriesPerTeam(
+  weekResults: Map<string, SeriesResult>[] | null,
+  activeWeekNum: number | null
+): Promise<Record<string, number>> {
+  const schedule = await fetchTeamScheduleAllCached(); // [{week, away, home}, ...]
+  const remaining: Record<string, number> = {};
+
+  // Total scheduled series per team, but only up to MAX_WEEKS_FOR_PLAYOFF_MATH
+  for (const row of schedule) {
+    const away = row.away;
+    const home = row.home;
+
+    // row.week looks like "WEEK 1", "WEEK 2", ...
+    const weekNum = parseWeekNum(row.week);
+    if (!weekNum || weekNum > MAX_WEEKS_FOR_PLAYOFF_MATH) {
+      continue; // pretend weeks 9–10 don't exist
+    }
+
+    if (away) remaining[away] = (remaining[away] ?? 0) + 1;
+    if (home) remaining[home] = (remaining[home] ?? 0) + 1;
+  }
+
+  // Subtract completed series from WEEK 1..min(activeWeekNum, MAX_WEEKS_FOR_PLAYOFF_MATH)
+  if (weekResults && activeWeekNum) {
+    const cappedActive = Math.min(activeWeekNum, MAX_WEEKS_FOR_PLAYOFF_MATH);
+
+    for (let n = 1; n <= cappedActive; n++) {
+      const idx = n - 1;
+      const map = weekResults[idx];
+      if (!map) continue;
+
+      for (const teamName of map.keys()) {
+        if (remaining[teamName] != null && remaining[teamName] > 0) {
+          remaining[teamName] -= 1;
+        }
+      }
+    }
+  }
+
+  // Clamp just in case
+  for (const k of Object.keys(remaining)) {
+    if (remaining[k] < 0) remaining[k] = 0;
+  }
+
+  return remaining;
+}
+
+/**
+ * Can "other" possibly finish at or above "team" in the
+ * worst-case for team / best-case for other, using
+ * (wins, gameWins) with gameWins as the only tiebreaker
+ * and points ignored.
+ *
+ * We treat ties in (wins, gameWins) as *dangerous* because
+ * points could break them either way → so we consider a
+ * tie as "could threaten" for clinch logic.
+ */
+function canOtherPossiblyThreatenTeam(
+  other: TeamPlayoffWindow,
+  team: TeamPlayoffWindow
+): boolean {
+  const teamWorstWins = team.minWins;
+  const teamWorstGW = team.minGW;
+
+  const otherBestWins = other.maxWins;
+  const otherBestGW = other.maxGW;
+
+  if (otherBestWins > teamWorstWins) return true;
+  if (otherBestWins === teamWorstWins && otherBestGW >= teamWorstGW) return true; // tie or better on GW
+  return false;
+}
+
+/**
+ * Is this team mathematically clinched for a top-16 spot,
+ * given (wins, gameWins) and ignoring points?
+ *
+ * A team is clinched if, even in their worst case, there
+ * are at most 15 teams that can possibly finish at or
+ * above them in (wins, gameWins).
+ */
+function isTeamClinched(
+  team: TeamPlayoffWindow,
+  all: TeamPlayoffWindow[]
+): boolean {
+  let threats = 0;
+
+  for (const other of all) {
+    if (other.team === team.team) continue;
+    if (canOtherPossiblyThreatenTeam(other, team)) {
+      threats++;
+      if (threats > 15) return false;
+    }
+  }
+
+  return threats <= 15;
+}
+
+/**
+ * Is this team mathematically eliminated from a top-16 spot,
+ * given (wins, gameWins) and ignoring points?
+ *
+ * A team is eliminated if, even in their best case, there
+ * are already 16 teams that are guaranteed to finish strictly
+ * ahead of them in (wins, gameWins).
+ */
+function isTeamEliminated(
+  team: TeamPlayoffWindow,
+  all: TeamPlayoffWindow[]
+): boolean {
+  const bestWins = team.maxWins;
+  const bestGW = team.maxGW;
+
+  let guaranteedAhead = 0;
+
+  for (const other of all) {
+    if (other.team === team.team) continue;
+
+    const otherWorstWins = other.minWins;
+    const otherWorstGW = other.minGW;
+
+    // Other is guaranteed strictly ahead of team:
+    // - more wins no matter what, OR
+    // - same wins but strictly more GW no matter what.
+    if (
+      otherWorstWins > bestWins ||
+      (otherWorstWins === bestWins && otherWorstGW > bestGW)
+    ) {
+      guaranteedAhead++;
+      if (guaranteedAhead >= 16) return true;
+    }
+  }
+
+  return false;
+}
+
 export default async function StandingsPanel() {
   let data: Awaited<ReturnType<typeof fetchOverallStandingsCached>> = [];
   let errorMsg: string | null = null;
@@ -159,6 +321,7 @@ export default async function StandingsPanel() {
 
   // 2) Compute series streaks from WEEK tabs
   let weekResults: Map<string, SeriesResult>[] | null = null;
+  let activeNum: number | null = null;
 
   try {
     const spreadsheetId =
@@ -169,7 +332,7 @@ export default async function StandingsPanel() {
 
       // Use the same helper as the rest of the site to find the active week
       const { weekTab: activeWeek } = await fetchMatchupsDataCached();
-      const activeNum = parseWeekNum(activeWeek);
+      activeNum = parseWeekNum(activeWeek);
 
       if (activeNum && activeNum > 0) {
         const tmp: Map<string, SeriesResult>[] = [];
@@ -194,8 +357,60 @@ export default async function StandingsPanel() {
       }
     }
   } catch {
-    // If anything fails here, we just won't show streaks
+    // If anything fails here, we just won't show streaks or playoff flags
     weekResults = null;
+    activeNum = null;
+  }
+
+  // 3) Playoff windows (min/max wins + game wins) and flags
+  let playoffFlags: Record<
+    string,
+    {
+      clinched: boolean;
+      eliminated: boolean;
+    }
+  > = {};
+
+  try {
+    if (!errorMsg && data.length > 0 && weekResults && activeNum) {
+      const remainingSeriesPerTeam = await computeRemainingSeriesPerTeam(
+        weekResults,
+        activeNum
+      );
+
+      const teams: TeamPlayoffWindow[] = data.map((row) => {
+        const wins = toInt(row.wins);
+        const gameWins = toInt(row.gameWins);
+        const remaining = remainingSeriesPerTeam[row.team] ?? 0;
+
+        const minWins = wins; // lose out
+        const maxWins = wins + remaining; // win out
+
+        const minGW = gameWins; // assume worst, no more game wins
+        const maxGW = gameWins + remaining * 4; // assume best, sweep every remaining series
+
+        return {
+          team: row.team,
+          wins,
+          gameWins,
+          remaining,
+          minWins,
+          maxWins,
+          minGW,
+          maxGW,
+        };
+      });
+
+      playoffFlags = {};
+      for (const t of teams) {
+        const clinched = isTeamClinched(t, teams);
+        const eliminated = !clinched && isTeamEliminated(t, teams);
+        playoffFlags[t.team] = { clinched, eliminated };
+      }
+    }
+  } catch {
+    // If any playoff math fails, just don't show flags
+    playoffFlags = {};
   }
 
   return (
@@ -234,6 +449,12 @@ export default async function StandingsPanel() {
                   weekResults
                 );
 
+                const flags =
+                  playoffFlags[row.team] ?? {
+                    clinched: false,
+                    eliminated: false,
+                  };
+
                 return (
                   <tr
                     key={`${row.rank}-${row.team}`}
@@ -255,7 +476,19 @@ export default async function StandingsPanel() {
                             unoptimized
                           />
                         </span>
-                        <span className="truncate">{row.team}</span>
+                        <span className="truncate">
+                          {row.team}
+                          {flags.clinched && (
+                            <span className="ml-2 text-[11px] font-semibold text-emerald-400/70">
+                              - ✓
+                            </span>
+                          )}
+                          {!flags.clinched && flags.eliminated && (
+                            <span className="ml-2 text-[11px] font-semibold text-red-400/70">
+                              - x
+                            </span>
+                          )}
+                        </span>
                       </a>
                     </td>
                     <td className="py-2 px-2 text-right tabular-nums">
