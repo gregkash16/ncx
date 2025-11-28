@@ -3,7 +3,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { teamSlug } from "@/lib/slug";
-import { getSheets, fetchMatchupsDataCached } from "@/lib/googleSheets";
+import {
+  getSheets,
+  fetchMatchupsDataCached,
+  fetchTeamScheduleAllCached,
+} from "@/lib/googleSheets";
 
 console.log("[SSR] MobileStandings render", new Date().toISOString());
 
@@ -171,11 +175,158 @@ function StreakPill({
   );
 }
 
+/** -------------------- Playoff math helpers (same as desktop) -------------------- **/
+
+// Treat the season as 10 weeks (real length)
+const MAX_WEEKS_FOR_PLAYOFF_MATH = 10;
+
+type TeamPlayoffWindow = {
+  team: string;
+  wins: number;     // current series wins
+  gameWins: number; // current game wins
+
+  remaining: number; // remaining series (not yet finished)
+  minWins: number;
+  maxWins: number;
+  minGW: number;
+  maxGW: number;
+};
+
+/**
+ * Compute remaining series for each team using:
+ * - SCHEDULE overview (total scheduled series)
+ * - weekResults (completed series by week)
+ *
+ * Only weeks 1..MAX_WEEKS_FOR_PLAYOFF_MATH are considered.
+ */
+async function computeRemainingSeriesPerTeam(
+  weekResults: Map<string, SeriesResult>[] | null,
+  activeWeekNum: number | null
+): Promise<Record<string, number>> {
+  const schedule = await fetchTeamScheduleAllCached(); // [{week, away, home}, ...]
+  const remaining: Record<string, number> = {};
+
+  // Total scheduled series per team, capped by MAX_WEEKS_FOR_PLAYOFF_MATH
+  for (const row of schedule) {
+    const away = row.away;
+    const home = row.home;
+
+    const weekNum = parseWeekNum(row.week);
+    if (!weekNum || weekNum > MAX_WEEKS_FOR_PLAYOFF_MATH) continue;
+
+    if (away) remaining[away] = (remaining[away] ?? 0) + 1;
+    if (home) remaining[home] = (remaining[home] ?? 0) + 1;
+  }
+
+  // Subtract completed series from WEEK 1..min(activeWeekNum, MAX_WEEKS_FOR_PLAYOFF_MATH)
+  if (weekResults && activeWeekNum) {
+    const cappedActive = Math.min(activeWeekNum, MAX_WEEKS_FOR_PLAYOFF_MATH);
+
+    for (let n = 1; n <= cappedActive; n++) {
+      const idx = n - 1;
+      const map = weekResults[idx];
+      if (!map) continue;
+
+      for (const teamName of map.keys()) {
+        if (remaining[teamName] != null && remaining[teamName] > 0) {
+          remaining[teamName] -= 1;
+        }
+      }
+    }
+  }
+
+  // Clamp
+  for (const k of Object.keys(remaining)) {
+    if (remaining[k] < 0) remaining[k] = 0;
+  }
+
+  return remaining;
+}
+
+/**
+ * Can "other" possibly finish at or above "team" in the
+ * worst-case for team / best-case for other, using
+ * (wins, gameWins) with gameWins as the only tiebreaker.
+ *
+ * Ties on wins+GW are treated as dangerous (since points,
+ * which we ignore, could go either way).
+ */
+function canOtherPossiblyThreatenTeam(
+  other: TeamPlayoffWindow,
+  team: TeamPlayoffWindow
+): boolean {
+  const teamWorstWins = team.minWins;
+  const teamWorstGW = team.minGW;
+
+  const otherBestWins = other.maxWins;
+  const otherBestGW = other.maxGW;
+
+  if (otherBestWins > teamWorstWins) return true;
+  if (otherBestWins === teamWorstWins && otherBestGW >= teamWorstGW) return true;
+  return false;
+}
+
+/**
+ * A team is clinched if, even in their worst case, there
+ * are at most 15 teams that can possibly finish at or
+ * above them in (wins, gameWins).
+ */
+function isTeamClinched(
+  team: TeamPlayoffWindow,
+  all: TeamPlayoffWindow[]
+): boolean {
+  let threats = 0;
+
+  for (const other of all) {
+    if (other.team === team.team) continue;
+    if (canOtherPossiblyThreatenTeam(other, team)) {
+      threats++;
+      if (threats > 15) return false;
+    }
+  }
+
+  return threats <= 15;
+}
+
+/**
+ * A team is eliminated if, even in their best case, there
+ * are already 16 teams that are guaranteed to finish strictly
+ * ahead of them in (wins, gameWins).
+ */
+function isTeamEliminated(
+  team: TeamPlayoffWindow,
+  all: TeamPlayoffWindow[]
+): boolean {
+  const bestWins = team.maxWins;
+  const bestGW = team.maxGW;
+
+  let guaranteedAhead = 0;
+
+  for (const other of all) {
+    if (other.team === team.team) continue;
+
+    const otherWorstWins = other.minWins;
+    const otherWorstGW = other.minGW;
+
+    if (
+      otherWorstWins > bestWins ||
+      (otherWorstWins === bestWins && otherWorstGW > bestGW)
+    ) {
+      guaranteedAhead++;
+      if (guaranteedAhead >= 16) return true;
+    }
+  }
+
+  return false;
+}
+
+/** --------------------------- Component --------------------------- **/
+
 export default async function MobileStandings() {
   const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-  const sheets = await getSheets();
+  const sheets = getSheets();
 
-  // --- Overall standings (same as before) ---
+  // --- Overall standings ---
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: "OVERALL RECORD!A2:F25",
@@ -197,12 +348,13 @@ export default async function MobileStandings() {
     points: String(r[5] ?? ""),
   }));
 
-  // --- Series streaks from WEEK tabs (same logic as desktop) ---
+  // --- Series streaks & active week ---
   let weekResults: Map<string, SeriesResult>[] | null = null;
+  let activeNum: number | null = null;
 
   try {
     const { weekTab: activeWeek } = await fetchMatchupsDataCached();
-    const activeNum = parseWeekNum(activeWeek);
+    activeNum = parseWeekNum(activeWeek);
 
     if (activeNum && activeNum > 0) {
       const tmp: Map<string, SeriesResult>[] = [];
@@ -221,6 +373,57 @@ export default async function MobileStandings() {
     }
   } catch {
     weekResults = null;
+    activeNum = null;
+  }
+
+  // --- Playoff flags (clinched / eliminated) ---
+  let playoffFlags: Record<
+    string,
+    {
+      clinched: boolean;
+      eliminated: boolean;
+    }
+  > = {};
+
+  try {
+    if (data.length > 0 && weekResults && activeNum) {
+      const remainingSeriesPerTeam = await computeRemainingSeriesPerTeam(
+        weekResults,
+        activeNum
+      );
+
+      const teams: TeamPlayoffWindow[] = data.map((t) => {
+        const wins = toInt(t.wins);
+        const gameWins = toInt(t.gameWins);
+        const remaining = remainingSeriesPerTeam[t.team] ?? 0;
+
+        const minWins = wins;
+        const maxWins = wins + remaining;
+
+        const minGW = gameWins;
+        const maxGW = gameWins + remaining * 4;
+
+        return {
+          team: t.team,
+          wins,
+          gameWins,
+          remaining,
+          minWins,
+          maxWins,
+          minGW,
+          maxGW,
+        };
+      });
+
+      playoffFlags = {};
+      for (const t of teams) {
+        const clinched = isTeamClinched(t, teams);
+        const eliminated = !clinched && isTeamEliminated(t, teams);
+        playoffFlags[t.team] = { clinched, eliminated };
+      }
+    }
+  } catch {
+    playoffFlags = {};
   }
 
   if (!data.length) {
@@ -244,6 +447,12 @@ export default async function MobileStandings() {
             const href = slug ? `/m/team/${encodeURIComponent(slug)}` : undefined;
             const { dir, count } = getStreakForTeam(t.team, weekResults);
 
+            const flags =
+              playoffFlags[t.team] ?? {
+                clinched: false,
+                eliminated: false,
+              };
+
             const content = (
               <>
                 {/* Top row: rank + team + streak pill */}
@@ -255,6 +464,16 @@ export default async function MobileStandings() {
                     <Logo name={t.team} size={24} />
                     <span className="truncate text-sm font-medium text-neutral-200">
                       {t.team}
+                      {flags.clinched && (
+                        <span className="ml-1 text-[10px] font-semibold text-emerald-400/70">
+                          - ✓
+                        </span>
+                      )}
+                      {!flags.clinched && flags.eliminated && (
+                        <span className="ml-1 text-[10px] font-semibold text-red-400/70">
+                          - x
+                        </span>
+                      )}
                     </span>
                   </div>
                   <StreakPill dir={dir} count={count} />
