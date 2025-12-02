@@ -456,6 +456,7 @@ const SHIP_ICON_MAP: Record<string, string> = {
   customizedyt1300lightfreighter: "W",
   droidtrifighter: "+",
   delta7aethersprite: "\\",
+  delta7baethersprite: "\\",
   escapecraft: "X",
   eta2actis: "-",
   ewing: "e",
