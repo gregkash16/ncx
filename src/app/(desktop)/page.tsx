@@ -30,6 +30,7 @@ import {
   fetchStreamScheduleCached,
   fetchFactionMapCached,
   fetchAdvStatsCached,
+  fetchListsForWeekCached, // 👈 NEW
   type MatchRow,
   type IndRow,
 } from "@/lib/googleSheets";
@@ -216,6 +217,9 @@ export default async function HomePage({
     ? await fetchMatchupsDataCached(selectedWeek)
     : { matches: activeMatches, weekTab: activeWeek };
 
+  // 3b) Fetch Lists for that same week (cached)
+  const { listsMap } = await fetchListsForWeekCached(weekLabelForPanel);
+
   // Attach Discord IDs by NCXID (for Matchups + roster DM links)
   const discordMap = await getDiscordMapCached();
   const ncxToDiscord: Record<string, string> = {};
@@ -281,52 +285,52 @@ export default async function HomePage({
             <DesktopNavTabs />
           </Suspense>
 
-                <HomeTabs
-        hideButtons
-        homePanel={
-          <HomeLanding
-            message={message}
-            factionMap={factionMap ?? undefined}   // 👈 add this
+          <HomeTabs
+            hideButtons
+            homePanel={
+              <HomeLanding
+                message={message}
+                factionMap={factionMap ?? undefined}
+              />
+            }
+            currentWeekPanel={
+              <CurrentWeekCard
+                key="current-week"
+                activeWeek={activeWeek}
+                selectedWeek={selectedWeek}
+              />
+            }
+            matchupsPanel={
+              <MatchupsPanel
+                key="matchups"
+                data={dataWithDiscord}
+                weekLabel={weekLabelForPanel}
+                activeWeek={activeWeek}
+                scheduleWeek={streamSched.scheduleWeek}
+                scheduleMap={streamSched.scheduleMap}
+                indStats={indStats ?? []}
+                factionMap={factionMap}
+                listsForWeek={listsMap} // 👈 NEW PROP
+              />
+            }
+            standingsPanel={<StandingsPanel key="standings" />}
+            indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
+            advStatsPanel={<AdvStatsPanelServer key="advstats" />}
+            playersPanel={<PlayersPanelServer key="players" />}
+            reportPanel={<ReportPanel key="report" />}
+            teamPanel={
+              teamParam ? (
+                <TeamSchedulePanel
+                  key={`team-${teamParam}`}
+                  team={teamParam}
+                  mode="desktop"
+                  roster={teamRoster}
+                  teamAdvStats={teamAdvStats}
+                />
+              ) : undefined
+            }
+            playoffsPanel={<PlayoffsPanel key="playoffs" />}
           />
-        }
-        currentWeekPanel={
-          <CurrentWeekCard
-            key="current-week"
-            activeWeek={activeWeek}
-            selectedWeek={selectedWeek}
-          />
-        }
-        matchupsPanel={
-          <MatchupsPanel
-            key="matchups"
-            data={dataWithDiscord}
-            weekLabel={weekLabelForPanel}
-            activeWeek={activeWeek}
-            scheduleWeek={streamSched.scheduleWeek}
-            scheduleMap={streamSched.scheduleMap}
-            indStats={indStats ?? []}
-            factionMap={factionMap}
-          />
-        }
-        standingsPanel={<StandingsPanel key="standings" />}
-        indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
-        advStatsPanel={<AdvStatsPanelServer key="advstats" />}
-        playersPanel={<PlayersPanelServer key="players" />}
-        reportPanel={<ReportPanel key="report" />}
-        teamPanel={
-          teamParam ? (
-            <TeamSchedulePanel
-              key={`team-${teamParam}`}
-              team={teamParam}
-              mode="desktop"
-              roster={teamRoster}
-              teamAdvStats={teamAdvStats}
-            />
-          ) : undefined
-        }
-        playoffsPanel={<PlayoffsPanel key="playoffs" />}
-      />
-
         </div>
       </section>
     </main>

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
@@ -9,12 +9,22 @@ import PlayerDMLink from "@/app/components/PlayerDMLink";
 
 type ScheduleMap = Record<string, { day: string; slot: string }>;
 
+// Extra fields that get attached in page.tsx
 interface MatchRowWithDiscord extends MatchRow {
   awayDiscordId?: string | null;
   homeDiscordId?: string | null;
   awayDiscordTag?: string | null;
   homeDiscordTag?: string | null;
 }
+
+// Lists map for a given week (from Lists!A:D)
+type ListsForWeek = Record<
+  string,
+  {
+    awayList?: string;
+    homeList?: string;
+  }
+>;
 
 type Props = {
   data: MatchRow[]; // we accept MatchRow[]; extra fields are read via the extended interface above
@@ -24,6 +34,7 @@ type Props = {
   scheduleMap?: ScheduleMap;
   indStats?: IndRow[];
   factionMap?: FactionMap;
+  listsForWeek?: ListsForWeek; // ✅ NEW – per-game list URLs
 };
 
 function parseIntSafe(v: string): number {
@@ -44,7 +55,9 @@ function pickTeamFilter(q: string, rows: MatchRow[]): string {
   if (!tokens.length) return "";
 
   const allTeams = Array.from(
-    new Set(rows.flatMap((r) => [r.awayTeam, r.homeTeam]).filter(Boolean) as string[])
+    new Set(
+      rows.flatMap((r) => [r.awayTeam, r.homeTeam]).filter(Boolean) as string[]
+    )
   );
   const teamBySlug = new Map(allTeams.map((t) => [teamSlug(t), t]));
 
@@ -102,7 +115,9 @@ function formatWeekLabel(n: number) {
   return `WEEK ${n}`;
 }
 
-// --- Thumbnail generation helpers ----
+/************************************************************
+ *  Thumbnail generation helpers
+ ************************************************************/
 const THUMB_WIDTH = 1920;
 const THUMB_HEIGHT = 1080;
 
@@ -128,8 +143,10 @@ function loadImageSafe(src?: string | null): Promise<HTMLImageElement | null> {
   });
 }
 
-
-function canvasToBlob(canvas: HTMLCanvasElement, quality = 0.9): Promise<Blob | null> {
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  quality = 0.9
+): Promise<Blob | null> {
   return new Promise((resolve) => {
     canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
   });
@@ -164,7 +181,14 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const H = THUMB_HEIGHT;
 
   // ===== HYPERSPACE BACKGROUND =====
-  const bgGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, H / 1.1);
+  const bgGrad = ctx.createRadialGradient(
+    W / 2,
+    H / 2,
+    0,
+    W / 2,
+    H / 2,
+    H / 1.1
+  );
   bgGrad.addColorStop(0, "#020617");
   bgGrad.addColorStop(1, "#000000");
   ctx.fillStyle = bgGrad;
@@ -187,11 +211,15 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
       if (side === "left") {
         xStart = Math.random() * (W * 0.45);
         xEnd = xStart + len;
-        ctx.strokeStyle = `rgba(236,72,153,${0.2 + Math.random() * 0.55})`; // pink
+        ctx.strokeStyle = `rgba(236,72,153,${
+          0.2 + Math.random() * 0.55
+        })`; // pink
       } else {
         xStart = W * 0.55 + Math.random() * (W * 0.45);
         xEnd = xStart - len;
-        ctx.strokeStyle = `rgba(56,189,248,${0.2 + Math.random() * 0.55})`; // cyan
+        ctx.strokeStyle = `rgba(56,189,248,${
+          0.2 + Math.random() * 0.55
+        })`; // cyan
       }
 
       ctx.lineWidth = thickness;
@@ -245,13 +273,15 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
 
   // Title
   ctx.fillStyle = "#ffffff";
-  ctx.font = "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.font =
+    "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   ctx.fillText("NICKEL CITY X-WING", W / 2, 95);
 
   // WEEK label (brighter)
   if (weekLabel) {
     ctx.fillStyle = "#ffffff"; // bright white
-    ctx.font = "700 40px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    ctx.font =
+      "700 40px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
     ctx.fillText(weekLabel.toUpperCase(), W / 2, 150);
   }
 
@@ -264,19 +294,14 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const homeLogoPath = `/logos/${teamSlug(row.homeTeam)}.png`;
   const mainLogoPath = "/logo.png";
 
-  const [
-    awayLogoImg,
-    homeLogoImg,
-    awayFactionImg,
-    homeFactionImg,
-    mainLogoImg,
-  ] = await Promise.all([
-    loadImageSafe(awayLogoPath),
-    loadImageSafe(homeLogoPath),
-    loadImageSafe(awayFactionIcon),
-    loadImageSafe(homeFactionIcon),
-    loadImageSafe(mainLogoPath),
-  ]);
+  const [awayLogoImg, homeLogoImg, awayFactionImg, homeFactionImg, mainLogoImg] =
+    await Promise.all([
+      loadImageSafe(awayLogoPath),
+      loadImageSafe(homeLogoPath),
+      loadImageSafe(awayFactionIcon),
+      loadImageSafe(homeFactionIcon),
+      loadImageSafe(mainLogoPath),
+    ]);
 
   // ===== CENTER LOGO (NO CIRCLE) =====
   if (mainLogoImg) {
@@ -396,10 +421,10 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   if (!blob) return;
 
   const safeSlug = (s: string) =>
-  (s || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "")
-    .replace(/^-+|-+$/g, "") || "player";
+    (s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "")
+      .replace(/^-+|-+$/g, "") || "player";
 
   const fileAway = safeSlug(awayName);
   const fileHome = safeSlug(homeName);
@@ -407,10 +432,244 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   // game15-gregvdan.jpg
   const filename = `game${row.game} - ${fileAway} v ${fileHome}.jpg`;
   downloadBlob(blob, filename);
-
 }
 
-// --- Component ----
+/************************************************************
+ *  Ship icon map + local proxy helpers (for list icons)
+ ************************************************************/
+const SHIP_ICON_MAP: Record<string, string> = {
+  aggressorassaultfighter: "i",
+  alphaclassstarwing: "&",
+  arc170starfighter: "c",
+  asf01bwing: "b",
+  attackshuttle: "g",
+  auzituckgunship: "@",
+  belbullab22starfighter: "[",
+  btanr2ywing: "{",
+  btla4ywing: "y",
+  btlbywing: ":",
+  btls8kwing: "k",
+  clonez95headhunter: "¡",
+  cr90corvette: "2",
+  croccruiser: "5",
+  customizedyt1300lightfreighter: "W",
+  droidtrifighter: "+",
+  delta7aethersprite: "\\",
+  escapecraft: "X",
+  eta2actis: "-",
+  ewing: "e",
+  fangfighter: "M",
+  fireball: "0",
+  firesprayclasspatrolcraft: "f",
+  g1astarfighter: "n",
+  gauntletfighter: "|",
+  gozanticlasscruiser: "4",
+  gr75mediumtransport: "1",
+  hmpdroidgunship: ".",
+  hwk290lightfreighter: "h",
+  hyenaclassdroidbomber: "=",
+  jumpmaster5000: "p",
+  kihraxzfighter: "r",
+  laatigunship: "/",
+  lambdaclasst4ashuttle: "l",
+  lancerclasspursuitcraft: "L",
+  m12lkimogilafighter: "K",
+  m3ainterceptor: "s",
+  mg100starfortress: "Z",
+  modifiedtielnfighter: "C",
+  modifiedyt1300lightfreighter: "m",
+  nabooroyaln1starfighter: "<",
+  nantexclassstarfighter: ";",
+  nimbusclassvwing: ",",
+  quadrijettransferspacetug: "q",
+  raiderclasscorvette: "3",
+  resistancetransport: ">",
+  resistancetransportpod: "?",
+  rogueclassstarfighter: "~",
+  rz1awing: "a",
+  rz2awing: "E",
+  scavengedyt1300: "Y",
+  scurrgh6bomber: "H",
+  sheathipedeclassshuttle: "%",
+  sithinfiltrator: "]",
+  st70assaultship: "}",
+  starviperclassattackplatform: "v",
+  syliureclasshyperspacering: "*",
+  t65xwing: "x",
+  t70xwing: "w",
+  tieadvancedv1: "R",
+  tieadvancedx1: "A",
+  tieagaggressor: "`",
+  tiebainterceptor: "j",
+  tiecapunisher: "N",
+  tieddefender: "D",
+  tiefofighter: "O",
+  tieinterceptor: "I",
+  tielnfighter: "F",
+  tiephphantom: "P",
+  tierbheavy: "J",
+  tiereaper: "V",
+  tiesabomber: "B",
+  tiesebomber: "!",
+  tiesffighter: "S",
+  tieskstriker: "T",
+  tievnsilencer: "$",
+  tiewiwhispermodifiedinterceptor: "#",
+  tridentclassassaultship: "6",
+  upsilonclasscommandshuttle: "U",
+  ut60duwing: "u",
+  v19torrentstarfighter: "^",
+  vcx100lightfreighter: "G",
+  vt49decimator: "d",
+  vultureclassdroidfighter: "_",
+  xiclasslightshuttle: "Q",
+  yt2400lightfreighter: "o",
+  yv666lightfreighter: "t",
+  z95af4headhunter: "z",
+};
+
+type XwsPilot = {
+  ship: string;
+};
+
+type XwsResponse = {
+  pilots: XwsPilot[];
+};
+
+// Build URL to *your* proxy route (avoids CORS)
+function buildLocalProxyUrl(yasbUrl: string): string | null {
+  if (!yasbUrl.startsWith("https://yasb.app")) return null;
+  return `/api/yasb-xws?yasb=${encodeURIComponent(yasbUrl)}`;
+}
+
+function shipsToGlyphs(pilots: XwsPilot[]): string {
+  return pilots.map((p) => SHIP_ICON_MAP[p.ship] ?? "·").join("");
+}
+
+type ListIconsProps = {
+  label: string; // "Away list" or "Home list"
+  yasbUrl?: string;
+  side: "away" | "home"; // 👈 NEW: controls layout
+};
+
+const ListIcons: React.FC<ListIconsProps> = ({ label, yasbUrl, side }) => {
+  const [glyphs, setGlyphs] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!yasbUrl || !yasbUrl.startsWith("https://yasb.app")) {
+      setGlyphs(null);
+      setError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const apiUrl = buildLocalProxyUrl(yasbUrl);
+        if (!apiUrl) return;
+
+        const res = await fetch(apiUrl).catch((err) => {
+          console.warn("YASB proxy fetch failed:", err);
+          return null;
+        });
+
+        if (!res || !res.ok) {
+          if (!cancelled) {
+            setGlyphs(null);
+            setError("!");
+          }
+          return;
+        }
+
+        const data = (await res.json()) as XwsResponse;
+        const iconString = shipsToGlyphs(data.pilots ?? []);
+
+        if (!cancelled) {
+          setGlyphs(iconString);
+          setError(null);
+        }
+      } catch (e) {
+        console.error("Error fetching YASB/XWS via proxy:", e);
+        if (!cancelled) {
+          setGlyphs(null);
+          setError("!");
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [yasbUrl]);
+
+  if (!yasbUrl) return null;
+
+  // Common bits
+  const iconBlock = glyphs ? (
+  <div
+    className="
+      ship-icons
+      text-[48px]       /* ≈ 48px font size to match 48x48 icons */
+      leading-none
+      h-12              /* 48px tall box */
+      flex items-center justify-center
+    "
+  >
+    {glyphs}
+  </div>
+  ) : !glyphs && !error ? (
+    <div className="h-12 flex items-center text-zinc-500 text-xs">…</div>
+  ) : (
+    <div className="h-12 flex items-center font-mono text-xs text-red-400">
+      !
+    </div>
+  );
+
+
+  const linkBlock = (
+    <a
+      href={yasbUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 rounded-full bg-zinc-900/80 border border-zinc-700 px-2.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-200 hover:border-pink-500/60 hover:bg-zinc-800/80 transition"
+      title={yasbUrl}
+    >
+      <span className="underline decoration-dotted underline-offset-2">
+        {label}
+      </span>
+    </a>
+  );
+
+  // For AWAY (left column): icons [inside] link
+  // For HOME (right column): link [inside] icons
+  const content =
+    side === "away" ? (
+      <>
+        {iconBlock}
+        {linkBlock}
+      </>
+    ) : (
+      <>
+        {linkBlock}
+        {iconBlock}
+      </>
+    );
+
+  return (
+    <div className="inline-flex items-center gap-2 min-w-[120px]">
+      {content}
+    </div>
+  );
+};
+
+
+/************************************************************
+ *  Component
+ ************************************************************/
 
 export default function MatchupsPanel({
   data,
@@ -420,14 +679,21 @@ export default function MatchupsPanel({
   scheduleMap,
   indStats,
   factionMap,
+  listsForWeek,
 }: Props) {
   const searchParams = useSearchParams();
   const urlQRaw = (searchParams.get("q") ?? "").trim();
   const selectedWeekRaw = (searchParams.get("w") ?? "").trim(); // e.g. "WEEK 3"
 
   // Parse week numbers so we can render the week-strip
-  const activeNum = useMemo(() => parseWeekNum(activeWeek ?? null), [activeWeek]);
-  const selectedNum = useMemo(() => parseWeekNum(selectedWeekRaw || null), [selectedWeekRaw]);
+  const activeNum = useMemo(
+    () => parseWeekNum(activeWeek ?? null),
+    [activeWeek]
+  );
+  const selectedNum = useMemo(
+    () => parseWeekNum(selectedWeekRaw || null),
+    [selectedWeekRaw]
+  );
 
   // Past weeks to render as pills = 1..active
   const weeksPills = useMemo(() => {
@@ -458,7 +724,10 @@ export default function MatchupsPanel({
     setQuery(urlSelectedTeam);
   }, [urlSelectedTeam]);
 
-  const selectedTeam = useMemo(() => pickTeamFilter(query, cleaned), [query, cleaned]);
+  const selectedTeam = useMemo(
+    () => pickTeamFilter(query, cleaned),
+    [query, cleaned]
+  );
 
   // Precompute lookups
   const indById = useMemo(() => statsMapFromIndRows(indStats), [indStats]);
@@ -491,9 +760,15 @@ export default function MatchupsPanel({
 
     rows.sort((a, b) => {
       const aInSel =
-        selectedTeam && (a.awayTeam === selectedTeam || a.homeTeam === selectedTeam) ? 1 : 0;
+        selectedTeam &&
+        (a.awayTeam === selectedTeam || a.homeTeam === selectedTeam)
+          ? 1
+          : 0;
       const bInSel =
-        selectedTeam && (b.awayTeam === selectedTeam || b.homeTeam === selectedTeam) ? 1 : 0;
+        selectedTeam &&
+        (b.awayTeam === selectedTeam || b.homeTeam === selectedTeam)
+          ? 1
+          : 0;
 
       if (aInSel !== bInSel) return bInSel - aInSel; // selected team first
       return gameNum(a.game) - gameNum(b.game);
@@ -503,7 +778,8 @@ export default function MatchupsPanel({
   }, [cleaned, query, onlyCompleted, onlyScheduled, selectedTeam]);
 
   const scheduleEnabled =
-    Boolean(weekLabel && scheduleWeek) && weekLabel!.trim() === scheduleWeek!.trim();
+    Boolean(weekLabel && scheduleWeek) &&
+    weekLabel!.trim() === scheduleWeek!.trim();
 
   // Styles for the week-strip buttons (match HomeTabs vibe)
   const btnBase =
@@ -521,19 +797,24 @@ export default function MatchupsPanel({
       <h2 className="text-2xl font-bold text-center mb-4">
         <span className="text-pink-400">WEEKLY</span>{" "}
         <span className="text-cyan-400">MATCHUPS</span>
-        {weekLabel ? <span className="ml-2 text-zinc-400 text-base">• {weekLabel}</span> : null}
+        {weekLabel ? (
+          <span className="ml-2 text-zinc-400 text-base">• {weekLabel}</span>
+        ) : null}
       </h2>
 
       {/* Week selector strip (Current = active, gold; others are past weeks) */}
       {activeNum && activeNum > 0 && (
         <div className="flex flex-wrap justify-center gap-2 mb-5">
           {weeksPills.map((wk) => {
-            const isActive = wk.toUpperCase() === (activeWeek || "").toUpperCase();
+            const isActive =
+              wk.toUpperCase() === (activeWeek || "").toUpperCase();
             const selected =
               (!selectedWeekRaw && isActive) ||
               wk.toUpperCase() === (selectedWeekRaw || "").toUpperCase();
 
-            const href = isActive ? "?tab=matchups" : `?tab=matchups&w=${encodeURIComponent(wk)}`;
+            const href = isActive
+              ? "?tab=matchups"
+              : `?tab=matchups&w=${encodeURIComponent(wk)}`;
 
             return (
               <a
@@ -607,13 +888,19 @@ export default function MatchupsPanel({
             const homeScore = parseIntSafe(row.homePts);
             const isDone = Boolean((row.scenario || "").trim());
             const winner =
-              awayScore > homeScore ? "away" : homeScore > awayScore ? "home" : "tie";
+              awayScore > homeScore
+                ? "away"
+                : homeScore > awayScore
+                ? "home"
+                : "tie";
 
             const awayLogo = `/logos/${teamSlug(row.awayTeam)}.png`;
             const homeLogo = `/logos/${teamSlug(row.homeTeam)}.png`;
 
-            const leftColor = winner === "away" ? GREEN : winner === "home" ? RED : TIE;
-            const rightColor = winner === "home" ? GREEN : winner === "away" ? RED : TIE;
+            const leftColor =
+              winner === "away" ? GREEN : winner === "home" ? RED : TIE;
+            const rightColor =
+              winner === "home" ? GREEN : winner === "away" ? RED : TIE;
 
             const gradientStyle: React.CSSProperties = {
               backgroundImage: `
@@ -625,20 +912,30 @@ export default function MatchupsPanel({
             // Optional stream-schedule badge
             const sched =
               scheduleEnabled && scheduleMap?.[row.game]
-                ? ` — ${scheduleMap[row.game].day.toUpperCase()}, ${scheduleMap[row.game].slot.toUpperCase()}`
+                ? ` — ${scheduleMap[row.game].day.toUpperCase()}, ${scheduleMap[
+                    row.game
+                  ].slot.toUpperCase()}`
                 : "";
 
             // Season summaries (from IndStats)
-            const awaySeason = row.awayId ? indById.get(row.awayId) : undefined;
-            const homeSeason = row.homeId ? indById.get(row.homeId) : undefined;
+            const awaySeason = row.awayId
+              ? indById.get(row.awayId)
+              : undefined;
+            const homeSeason = row.homeId
+              ? indById.get(row.homeId)
+              : undefined;
 
             // Faction icons (from factionMap + /public/factions)
             const awayFactionIcon = factionIconSrc(factionMap?.[row.awayId]);
             const homeFactionIcon = factionIconSrc(factionMap?.[row.homeId]);
 
             // Optional tooltip helpers if you store handles like name#1234
-            const awayTooltip = row.awayDiscordTag ? `@${row.awayDiscordTag}` : "Open DM";
-            const homeTooltip = row.homeDiscordTag ? `@${row.homeDiscordTag}` : "Open DM";
+            const awayTooltip = row.awayDiscordTag
+              ? `@${row.awayDiscordTag}`
+              : "Open DM";
+            const homeTooltip = row.homeDiscordTag
+              ? `@${row.homeDiscordTag}`
+              : "Open DM";
 
             const handleClickThumbnail = async () => {
               try {
@@ -652,9 +949,15 @@ export default function MatchupsPanel({
                   weekLabel,
                 });
               } finally {
-                setGeneratingGame((current) => (current === row.game ? null : current));
+                setGeneratingGame((current) =>
+                  current === row.game ? null : current
+                );
               }
             };
+
+            // ✅ Look up YASB list URLs for this game (if any)
+            const awayListUrl = listsForWeek?.[row.game]?.awayList;
+            const homeListUrl = listsForWeek?.[row.game]?.homeList;
 
             return (
               <div
@@ -685,7 +988,9 @@ export default function MatchupsPanel({
                     disabled={generatingGame === row.game}
                     className="inline-flex items-center rounded-lg bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {generatingGame === row.game ? "Generating…" : "Create thumbnail"}
+                    {generatingGame === row.game
+                      ? "Generating…"
+                      : "Create thumbnail"}
                   </button>
                 </div>
 
@@ -705,7 +1010,9 @@ export default function MatchupsPanel({
                     />
                     <span
                       className={`truncate ${
-                        awayScore > homeScore ? "text-pink-400 font-bold" : "text-zinc-300"
+                        awayScore > homeScore
+                          ? "text-pink-400 font-bold"
+                          : "text-zinc-300"
                       }`}
                     >
                       {row.awayTeam || "TBD"}
@@ -728,7 +1035,9 @@ export default function MatchupsPanel({
                   <div className="flex items-center gap-3 justify-end w-1/3 min-w-0">
                     <span
                       className={`truncate text-right ${
-                        homeScore > awayScore ? "text-cyan-400 font-bold" : "text-zinc-300"
+                        homeScore > awayScore
+                          ? "text-cyan-400 font-bold"
+                          : "text-zinc-300"
                       }`}
                     >
                       {row.homeTeam || "TBD"}
@@ -801,20 +1110,54 @@ export default function MatchupsPanel({
                   </div>
                 </div>
 
+                {/* ✅ Lists (YASB links + BIG ship icons) ABOVE the stats rail */}
+                {(awayListUrl || homeListUrl) && (
+                  <div className="relative z-10 mt-4 flex items-center justify-between gap-6">
+                    <div className="flex-1 flex justify-start">
+                      {awayListUrl && (
+                        <ListIcons
+                          label="Away list"
+                          yasbUrl={awayListUrl}
+                          side="away"          // 👈 new
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1 flex justify-end">
+                      {homeListUrl && (
+                        <ListIcons
+                          label="Home list"
+                          yasbUrl={homeListUrl}
+                          side="home"          // 👈 new
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Season summary rail */}
                 <div className="relative z-10 mt-4 grid grid-cols-2 gap-3 text-xs text-zinc-300">
                   <div className="bg-zinc-800/60 rounded-lg px-3 py-2">
                     <div>
                       Record:{" "}
                       <span className="text-zinc-100">
-                        {awaySeason ? `${awaySeason.wins}-${awaySeason.losses}` : "—"}
+                        {awaySeason
+                          ? `${awaySeason.wins}-${awaySeason.losses}`
+                          : "—"}
                       </span>
                     </div>
                     <div>
-                      Win%: <span className="text-zinc-100">{awaySeason?.winPct ?? "—"}</span>
-                      {" • "}SoS: <span className="text-zinc-100">{awaySeason?.sos ?? "—"}</span>
+                      Win%:{" "}
+                      <span className="text-zinc-100">
+                        {awaySeason?.winPct ?? "—"}
+                      </span>
+                      {" • "}SoS:{" "}
+                      <span className="text-zinc-100">
+                        {awaySeason?.sos ?? "—"}
+                      </span>
                       {" • "}Potato:{" "}
-                      <span className="text-zinc-100">{awaySeason?.potato ?? "—"}</span>
+                      <span className="text-zinc-100">
+                        {awaySeason?.potato ?? "—"}
+                      </span>
                     </div>
                   </div>
 
@@ -822,14 +1165,24 @@ export default function MatchupsPanel({
                     <div>
                       Record:{" "}
                       <span className="text-zinc-100">
-                        {homeSeason ? `${homeSeason.wins}-${homeSeason.losses}` : "—"}
+                        {homeSeason
+                          ? `${homeSeason.wins}-${homeSeason.losses}`
+                          : "—"}
                       </span>
                     </div>
                     <div>
-                      Win%: <span className="text-zinc-100">{homeSeason?.winPct ?? "—"}</span>
-                      {" • "}SoS: <span className="text-zinc-100">{homeSeason?.sos ?? "—"}</span>
+                      Win%:{" "}
+                      <span className="text-zinc-100">
+                        {homeSeason?.winPct ?? "—"}
+                      </span>
+                      {" • "}SoS:{" "}
+                      <span className="text-zinc-100">
+                        {homeSeason?.sos ?? "—"}
+                      </span>
                       {" • "}Potato:{" "}
-                      <span className="text-zinc-100">{homeSeason?.potato ?? "—"}</span>
+                      <span className="text-zinc-100">
+                        {homeSeason?.potato ?? "—"}
+                      </span>
                     </div>
                   </div>
                 </div>

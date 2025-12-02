@@ -632,3 +632,75 @@ export const fetchOverallStandingsCached = unstable_cache(
   { revalidate: 120 } // cache for 2 minutes to smooth out spikes
 );
 
+export type ListRow = {
+  week: string;      // A = WEEK (e.g. "WEEK 1")
+  game: string;      // B = GAME (string, matches MatchRow.game)
+  awayList: string;  // C = AWAY LIST (YASB link or something else)
+  homeList: string;  // D = HOME LIST
+};
+
+export type ListsMapForWeek = Record<
+  string, // game number, e.g. "15"
+  {
+    awayList?: string;
+    homeList?: string;
+  }
+>;
+
+async function fetchListsForWeek(weekOverride?: string): Promise<{
+  weekTab: string;
+  listsMap: ListsMapForWeek;
+}> {
+  const sheets = getSheets();
+  const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
+  if (!spreadsheetId) throw new Error("Missing NCX_LEAGUE_SHEET_ID");
+
+  // Get the active week (SCHEDULE!U2) unless a weekOverride was passed in
+  const u2 = await withBackoff(() =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "SCHEDULE!U2",
+      valueRenderOption: "FORMATTED_VALUE",
+    })
+  );
+
+  const activeWeek = norm(u2.data.values?.[0]?.[0]) || "WEEK 1";
+  const targetWeek = (weekOverride && weekOverride.trim()) || activeWeek;
+  const normalizedTarget = normalizeWeekLabel(targetWeek);
+
+  // Read the Lists grid
+  const res = await withBackoff(() =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "Lists!A2:D", // WEEK, GAME, AWAY LIST, HOME LIST
+      valueRenderOption: "FORMATTED_VALUE",
+    })
+  );
+
+  const rows = (res.data.values ?? []) as string[][];
+  const listsMap: ListsMapForWeek = {};
+
+  for (const r of rows) {
+    const week = normalizeWeekLabel(norm(r?.[0])); // A
+    const game = norm(r?.[1]);                      // B
+    const awayList = norm(r?.[2]);                  // C
+    const homeList = norm(r?.[3]);                  // D
+
+    if (!week || !game) continue;
+    if (week !== normalizedTarget) continue;
+
+    listsMap[game] = {
+      awayList: awayList || undefined,
+      homeList: homeList || undefined,
+    };
+  }
+
+  return { weekTab: normalizedTarget, listsMap };
+}
+
+/** Cached Lists map (5 min) */
+export const fetchListsForWeekCached = unstable_cache(
+  async (weekOverride?: string) => fetchListsForWeek(weekOverride),
+  ["lists-by-week"],
+  { revalidate: 300 }
+);

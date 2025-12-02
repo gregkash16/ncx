@@ -120,3 +120,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+@font-face {
+  font-family: "XWingShips";
+  src: url("/fonts/xwing-miniatures-ships.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.ship-icons {
+  font-family: "XWingShips", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-variant-ligatures: none;
+}
