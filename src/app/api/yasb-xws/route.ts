@@ -9,19 +9,37 @@ function buildPatternAnalyzerUrl(yasbUrl: string): string | null {
   return `https://www.pattern-analyzer.app/api/yasb/xws${dataLink}`;
 }
 
+function buildLaunchBayUrl(lbxValue: string): string | null {
+  if (!lbxValue) return null;
+  // lbxValue is the raw piece after lbx= from the original URL
+  return `https://launchbaynext.app/api/xws?lbx=${lbxValue}`;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const yasb = searchParams.get("yasb");
+  const lbx = searchParams.get("lbx");
 
-  if (!yasb || !yasb.startsWith("https://yasb.app")) {
+  let upstreamUrl: string | null = null;
+
+  if (yasb) {
+    if (!yasb.startsWith("https://yasb.app")) {
+      return NextResponse.json(
+        { error: "Invalid yasb URL" },
+        { status: 400 }
+      );
+    }
+    upstreamUrl = buildPatternAnalyzerUrl(yasb);
+  } else if (lbx) {
+    upstreamUrl = buildLaunchBayUrl(lbx);
+  } else {
     return NextResponse.json(
-      { error: "Missing or invalid yasb URL" },
+      { error: "Missing yasb or lbx parameter" },
       { status: 400 }
     );
   }
 
-  const apiUrl = buildPatternAnalyzerUrl(yasb);
-  if (!apiUrl) {
+  if (!upstreamUrl) {
     return NextResponse.json(
       { error: "Could not build upstream URL" },
       { status: 400 }
@@ -29,8 +47,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(apiUrl, {
-      // Don't cache lists aggressively; you can tweak this
+    const res = await fetch(upstreamUrl, {
       cache: "no-store",
     });
 
@@ -44,7 +61,7 @@ export async function GET(req: NextRequest) {
     const data = await res.json();
     return NextResponse.json(data);
   } catch (err) {
-    console.error("YASB proxy error:", err);
+    console.error("XWS proxy error:", err);
     return NextResponse.json(
       { error: "Failed to reach upstream" },
       { status: 502 }

@@ -34,11 +34,11 @@ type Props = {
   scheduleMap?: ScheduleMap;
   indStats?: IndRow[];
   factionMap?: FactionMap;
-  listsForWeek?: ListsForWeek; // ✅ NEW – per-game list URLs
+  listsForWeek?: ListsForWeek; // per-game list URLs (YASB or LBN)
 };
 
-function parseIntSafe(v: string): number {
-  const n = Number((v || "").trim());
+function parseIntSafe(v: string | number | undefined | null): number {
+  const n = Number(String(v ?? "").trim());
   return Number.isFinite(n) ? n : 0;
 }
 function gameNum(g: string): number {
@@ -435,7 +435,7 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
 }
 
 /************************************************************
- *  Ship icon map + local proxy helpers (for list icons)
+ *  Ship icon map + local proxy helpers (YASB + LaunchBayNext)
  ************************************************************/
 const SHIP_ICON_MAP: Record<string, string> = {
   aggressorassaultfighter: "i",
@@ -536,10 +536,32 @@ type XwsResponse = {
   pilots: XwsPilot[];
 };
 
-// Build URL to *your* proxy route (avoids CORS)
-function buildLocalProxyUrl(yasbUrl: string): string | null {
-  if (!yasbUrl.startsWith("https://yasb.app")) return null;
-  return `/api/yasb-xws?yasb=${encodeURIComponent(yasbUrl)}`;
+/**
+ * Build URL to your proxy route (/api/yasb-xws) for:
+ * - YASB: passes full URL as ?yasb=...
+ * - LaunchBayNext: pulls the "lbx=" segment and passes it as ?lbx=...
+ */
+function buildLocalProxyUrl(listUrl: string): string | null {
+  // YASB
+  if (listUrl.startsWith("https://yasb.app")) {
+    return `/api/yasb-xws?yasb=${encodeURIComponent(listUrl)}`;
+  }
+
+  // LaunchBayNext
+  if (listUrl.startsWith("https://launchbaynext.app")) {
+    const idx = listUrl.indexOf("lbx=");
+    if (idx === -1) return null;
+
+    let value = listUrl.slice(idx + "lbx=".length);
+    const ampIdx = value.indexOf("&");
+    if (ampIdx !== -1) {
+      value = value.slice(0, ampIdx);
+    }
+
+    return `/api/yasb-xws?lbx=${encodeURIComponent(value)}`;
+  }
+
+  return null;
 }
 
 function shipsToGlyphs(pilots: XwsPilot[]): string {
@@ -548,16 +570,23 @@ function shipsToGlyphs(pilots: XwsPilot[]): string {
 
 type ListIconsProps = {
   label: string; // "Away list" or "Home list"
-  yasbUrl?: string;
-  side: "away" | "home"; // 👈 NEW: controls layout
+  listUrl?: string | null; // YASB or LBN URL
+  side: "away" | "home"; // controls alignment layout
 };
 
-const ListIcons: React.FC<ListIconsProps> = ({ label, yasbUrl, side }) => {
+const ListIcons: React.FC<ListIconsProps> = ({ label, listUrl, side }) => {
   const [glyphs, setGlyphs] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!yasbUrl || !yasbUrl.startsWith("https://yasb.app")) {
+    if (!listUrl) {
+      setGlyphs(null);
+      setError(null);
+      return;
+    }
+
+    const apiUrl = buildLocalProxyUrl(listUrl);
+    if (!apiUrl) {
       setGlyphs(null);
       setError(null);
       return;
@@ -567,11 +596,8 @@ const ListIcons: React.FC<ListIconsProps> = ({ label, yasbUrl, side }) => {
 
     const run = async () => {
       try {
-        const apiUrl = buildLocalProxyUrl(yasbUrl);
-        if (!apiUrl) return;
-
-        const res = await fetch(apiUrl).catch((err) => {
-          console.warn("YASB proxy fetch failed:", err);
+        const res = await fetch(apiUrl, { cache: "no-store" }).catch((err) => {
+          console.warn("XWS proxy fetch failed:", err);
           return null;
         });
 
@@ -591,7 +617,7 @@ const ListIcons: React.FC<ListIconsProps> = ({ label, yasbUrl, side }) => {
           setError(null);
         }
       } catch (e) {
-        console.error("Error fetching YASB/XWS via proxy:", e);
+        console.error("Error fetching XWS via proxy:", e);
         if (!cancelled) {
           setGlyphs(null);
           setError("!");
@@ -604,23 +630,23 @@ const ListIcons: React.FC<ListIconsProps> = ({ label, yasbUrl, side }) => {
     return () => {
       cancelled = true;
     };
-  }, [yasbUrl]);
+  }, [listUrl]);
 
-  if (!yasbUrl) return null;
+  if (!listUrl) return null;
 
-  // Common bits
+  // Icon block (big glyphs, same height as 48x48 faction icon)
   const iconBlock = glyphs ? (
-  <div
-    className="
-      ship-icons
-      text-[48px]       /* ≈ 48px font size to match 48x48 icons */
-      leading-none
-      h-12              /* 48px tall box */
-      flex items-center justify-center
-    "
-  >
-    {glyphs}
-  </div>
+    <div
+      className="
+        ship-icons
+        text-[48px]
+        leading-none
+        h-12
+        flex items-center justify-center
+      "
+    >
+      {glyphs}
+    </div>
   ) : !glyphs && !error ? (
     <div className="h-12 flex items-center text-zinc-500 text-xs">…</div>
   ) : (
@@ -629,14 +655,13 @@ const ListIcons: React.FC<ListIconsProps> = ({ label, yasbUrl, side }) => {
     </div>
   );
 
-
   const linkBlock = (
     <a
-      href={yasbUrl}
+      href={listUrl}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex items-center gap-1 rounded-full bg-zinc-900/80 border border-zinc-700 px-2.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-200 hover:border-pink-500/60 hover:bg-zinc-800/80 transition"
-      title={yasbUrl}
+      title={listUrl}
     >
       <span className="underline decoration-dotted underline-offset-2">
         {label}
@@ -644,28 +669,27 @@ const ListIcons: React.FC<ListIconsProps> = ({ label, yasbUrl, side }) => {
     </a>
   );
 
-  // For AWAY (left column): icons [inside] link
-  // For HOME (right column): link [inside] icons
+  // For AWAY (left column): list link towards center, icons towards outer side
+  // For HOME (right column): list link towards center, icons towards outer side
   const content =
     side === "away" ? (
       <>
-        {iconBlock}
         {linkBlock}
+        {iconBlock}
       </>
     ) : (
       <>
-        {linkBlock}
         {iconBlock}
+        {linkBlock}
       </>
     );
 
   return (
-    <div className="inline-flex items-center gap-2 min-w-[120px]">
+    <div className="inline-flex items-center gap-2 min-w-[140px]">
       {content}
     </div>
   );
 };
-
 
 /************************************************************
  *  Component
@@ -748,7 +772,7 @@ export default function MatchupsPanel({
             m.scenario,
           ]
             .filter(Boolean)
-            .some((v) => v.toLowerCase().includes(q))
+            .some((v) => String(v).toLowerCase().includes(q))
         );
 
     rows = rows.filter((m) => {
@@ -955,9 +979,9 @@ export default function MatchupsPanel({
               }
             };
 
-            // ✅ Look up YASB list URLs for this game (if any)
-            const awayListUrl = listsForWeek?.[row.game]?.awayList;
-            const homeListUrl = listsForWeek?.[row.game]?.homeList;
+            // List URLs (YASB or LBN) for this game
+            const awayListUrl = listsForWeek?.[row.game]?.awayList || null;
+            const homeListUrl = listsForWeek?.[row.game]?.homeList || null;
 
             return (
               <div
@@ -1110,15 +1134,15 @@ export default function MatchupsPanel({
                   </div>
                 </div>
 
-                {/* ✅ Lists (YASB links + BIG ship icons) ABOVE the stats rail */}
+                {/* Lists (YASB or LBN) + big ship icons ABOVE the stats rail */}
                 {(awayListUrl || homeListUrl) && (
                   <div className="relative z-10 mt-4 flex items-center justify-between gap-6">
                     <div className="flex-1 flex justify-start">
                       {awayListUrl && (
                         <ListIcons
                           label="Away list"
-                          yasbUrl={awayListUrl}
-                          side="away"          // 👈 new
+                          listUrl={awayListUrl}
+                          side="away"
                         />
                       )}
                     </div>
@@ -1126,8 +1150,8 @@ export default function MatchupsPanel({
                       {homeListUrl && (
                         <ListIcons
                           label="Home list"
-                          yasbUrl={homeListUrl}
-                          side="home"          // 👈 new
+                          listUrl={homeListUrl}
+                          side="home"
                         />
                       )}
                     </div>
