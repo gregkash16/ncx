@@ -36,6 +36,9 @@ type GameRow = {
   isMyGame: boolean;
   canEditAwayId: boolean;
   canEditHomeId: boolean;
+  /** New: stored from Lists sheet */
+  awayList?: string;
+  homeList?: string;
 };
 
 type FoundPayload = {
@@ -63,6 +66,16 @@ type ReportPanelProps = {
   goToTab?: (key: TabKey) => void;
 };
 
+function isValidListLink(url: string): boolean {
+  const s = String(url ?? "").trim().toLowerCase();
+  if (!s) return true; // empty is allowed
+  const isUrlLike = /^https?:\/\//.test(s);
+  if (!isUrlLike) return false;
+  const isYasb = s.includes("yasb.app") || s.includes("raithos.github.io");
+  const isLbn = s.includes("launchbaynext.app");
+  return isYasb || isLbn;
+}
+
 export default function ReportPanel({ goToTab }: ReportPanelProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FoundPayload | NotOk | null>(null);
@@ -76,6 +89,10 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
   const [scenario, setScenario] = useState<string>("");
   const [awayId, setAwayId] = useState<string>("");
   const [homeId, setHomeId] = useState<string>("");
+
+  // New: list URLs
+  const [awayList, setAwayList] = useState<string>("");
+  const [homeList, setHomeList] = useState<string>("");
 
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -113,6 +130,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           setScenario(g.scenario || "");
           setAwayId(g.away.id || "");
           setHomeId(g.home.id || "");
+          setAwayList(g.awayList || "");
+          setHomeList(g.homeList || "");
           setConfirmOverwrite(false);
         }
       } catch {
@@ -151,11 +170,32 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
     );
   }, [selectedGame, awayId, homeId]);
 
+  const editingLists = useMemo(() => {
+    if (!selectedGame) return false;
+    return (
+      awayList !== (selectedGame.awayList || "") ||
+      homeList !== (selectedGame.homeList || "")
+    );
+  }, [selectedGame, awayList, homeList]);
+
+  const listError = useMemo(() => {
+    if (awayList && !isValidListLink(awayList)) {
+      return "Should be a YASB or LBN Link";
+    }
+    if (homeList && !isValidListLink(homeList)) {
+      return "Should be a YASB or LBN Link";
+    }
+    return "";
+  }, [awayList, homeList]);
+
   const canSubmit = useMemo(() => {
     if (!data || !data.ok || !selectedGame) return false;
 
     // Nothing changed? No submit.
-    if (!editingScores && !editingIds) return false;
+    if (!editingScores && !editingIds && !editingLists) return false;
+
+    // List fields invalid? Block submit.
+    if (listError) return false;
 
     // If we’re editing scores, require both scores + scenario,
     // and confirm overwrite if scores already exist.
@@ -164,17 +204,19 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
       if (selectedGame.alreadyFilled && !confirmOverwrite) return false;
     }
 
-    // If we’re only editing IDs, that’s fine – backend enforces perms.
+    // If we’re only editing IDs or lists, that’s fine – backend enforces perms.
     return true;
   }, [
     data,
     selectedGame,
     editingScores,
     editingIds,
+    editingLists,
     awayPts,
     homePts,
     scenario,
     confirmOverwrite,
+    listError,
   ]);
 
   async function submit() {
@@ -188,6 +230,9 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
         // Always send these; server decides whether you're allowed to change them
         newAwayId: awayId,
         newHomeId: homeId,
+        // New: list URLs (optional)
+        awayList,
+        homeList,
       };
 
       // Only include scores + scenario if they actually changed.
@@ -210,6 +255,10 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           setNotice(
             "This game already has results. Check ‘Confirm overwrite’ to proceed."
           );
+          return;
+        }
+        if (json?.reason === "BAD_LIST_LINK" && json?.message) {
+          setNotice(json.message);
           return;
         }
         setNotice("Submission failed. " + (json?.reason ?? ""));
@@ -237,6 +286,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
     setScenario(g.scenario || "");
     setAwayId(g.away.id || "");
     setHomeId(g.home.id || "");
+    setAwayList(g.awayList || "");
+    setHomeList(g.homeList || "");
     setConfirmOverwrite(false);
     setNotice("");
   }
@@ -490,6 +541,41 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
               </option>
             ))}
           </select>
+        </label>
+      </div>
+
+      {/* New: List URLs */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <label className="block">
+          <span className="text-sm text-zinc-400">Away List (optional)</span>
+          <input
+            type="url"
+            value={awayList}
+            onChange={(e) => setAwayList(e.target.value)}
+            placeholder="Paste YASB or LBN link"
+            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:border-pink-400/60"
+          />
+          {awayList && !isValidListLink(awayList) && (
+            <p className="mt-1 text-xs text-red-400">
+              Should be a YASB or LBN Link
+            </p>
+          )}
+        </label>
+
+        <label className="block">
+          <span className="text-sm text-zinc-400">Home List (optional)</span>
+          <input
+            type="url"
+            value={homeList}
+            onChange={(e) => setHomeList(e.target.value)}
+            placeholder="Paste YASB or LBN link"
+            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:border-pink-400/60"
+          />
+          {homeList && !isValidListLink(homeList) && (
+            <p className="mt-1 text-xs text-red-400">
+              Should be a YASB or LBN Link
+            </p>
+          )}
         </label>
       </div>
 

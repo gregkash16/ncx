@@ -13,6 +13,16 @@ function norm(v: unknown) {
   return String(v ?? "").trim();
 }
 
+function isValidListLink(url: string): boolean {
+  const s = String(url ?? "").trim().toLowerCase();
+  if (!s) return true; // empty is allowed
+  const isUrlLike = /^https?:\/\//.test(s);
+  if (!isUrlLike) return false;
+  const isYasb = s.includes("yasb.app") || s.includes("raithos.github.io");
+  const isLbn = s.includes("launchbaynext.app");
+  return isYasb || isLbn;
+}
+
 const ADMIN_DISCORD_ID = "349349801076195329" as const;
 
 type Role = "player" | "captain" | "admin";
@@ -43,6 +53,9 @@ type GameRow = {
   isMyGame: boolean;
   canEditAwayId: boolean;
   canEditHomeId: boolean;
+  /** New: list URLs from Lists sheet */
+  awayList?: string;
+  homeList?: string;
 };
 
 type LookupResult =
@@ -254,6 +267,30 @@ export async function GET() {
     });
     const rows = dataRes.data.values ?? [];
 
+    // 3) Lists sheet: WEEK, GAME, AWAY LIST, HOME LIST (fail-soft)
+    const listMap = new Map<
+      string,
+      { awayList: string; homeList: string }
+    >();
+    try {
+      const listsRes = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: "Lists!A2:D",
+        valueRenderOption: "FORMATTED_VALUE",
+      });
+      const listRows = listsRes.data.values ?? [];
+      for (const r of listRows) {
+        const wk = norm(r?.[0]); // WEEK
+        const gm = norm(r?.[1]); // GAME
+        const awayList = norm(r?.[2]); // AWAY LIST
+        const homeList = norm(r?.[3]); // HOME LIST
+        if (!wk || !gm) continue;
+        listMap.set(`${wk}#${gm}`, { awayList, homeList });
+      }
+    } catch (e) {
+      console.warn("Lists sheet missing or unreadable; continuing without lists:", e);
+    }
+
     const games: GameRow[] = [];
 
     for (let i = 0; i < rows.length; i++) {
@@ -322,6 +359,9 @@ export async function GET() {
 
       if (!canManage) continue;
 
+      const listKey = `${weekTab}#${game}`;
+      const lists = listMap.get(listKey);
+
       games.push({
         rowIndex,
         game,
@@ -348,6 +388,8 @@ export async function GET() {
         isMyGame,
         canEditAwayId,
         canEditHomeId,
+        awayList: lists?.awayList,
+        homeList: lists?.homeList,
       });
     }
 
@@ -402,6 +444,9 @@ export async function POST(req: Request) {
       force,
       newAwayId,
       newHomeId,
+      // New: list URLs
+      awayList,
+      homeList,
     } = body ?? {};
 
     const cleanScenario = String(scenario ?? "").toUpperCase();
@@ -430,6 +475,26 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+    }
+
+    const awayListStr =
+      typeof awayList === "string" ? awayList.trim() : "";
+    const homeListStr =
+      typeof homeList === "string" ? homeList.trim() : "";
+
+    // Validate list URLs if provided
+    if (
+      (awayListStr && !isValidListLink(awayListStr)) ||
+      (homeListStr && !isValidListLink(homeListStr))
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          reason: "BAD_LIST_LINK",
+          message: "Should be a YASB or LBN Link",
+        },
+        { status: 400 }
+      );
     }
 
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
@@ -527,7 +592,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Build batch updates
+    // Build batch updates for main week tab
     const batchData: { range: string; values: any[][] }[] = [];
 
     // Scores + scenario (if provided)
@@ -566,75 +631,148 @@ export async function POST(req: Request) {
       });
     }
 
-    // If nothing actually changed, just say OK
-    if (batchData.length === 0) {
-      return NextResponse.json({ ok: true, pushed: 0 });
+    let didMainUpdate = false;
+
+    // Write main week-tab changes if any
+    if (batchData.length > 0) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          valueInputOption: "RAW",
+          data: batchData,
+        },
+      });
+      didMainUpdate = true;
+
+      // Optional: enforce number formatting for scores (if we touched them)
+      if (hasScoreInputs) {
+        try {
+          const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+          const weekSheet = spreadsheet.data.sheets?.find(
+            (s) => s.properties?.title === weekTab
+          );
+          const sheetId = weekSheet?.properties?.sheetId;
+
+          if (sheetId != null) {
+            await sheets.spreadsheets.batchUpdate({
+              spreadsheetId,
+              requestBody: {
+                requests: [
+                  {
+                    repeatCell: {
+                      range: {
+                        sheetId,
+                        startRowIndex: rowNum - 1,
+                        endRowIndex: rowNum,
+                        startColumnIndex: 6,
+                        endColumnIndex: 7,
+                      },
+                      cell: {
+                        userEnteredFormat: {
+                          numberFormat: { type: "NUMBER", pattern: "0" },
+                        },
+                      },
+                      fields: "userEnteredFormat.numberFormat",
+                    },
+                  },
+                  {
+                    repeatCell: {
+                      range: {
+                        sheetId,
+                        startRowIndex: rowNum - 1,
+                        endRowIndex: rowNum,
+                        startColumnIndex: 14,
+                        endColumnIndex: 15,
+                      },
+                      cell: {
+                        userEnteredFormat: {
+                          numberFormat: { type: "NUMBER", pattern: "0" },
+                        },
+                      },
+                      fields: "userEnteredFormat.numberFormat",
+                    },
+                  },
+                ],
+              },
+            });
+          }
+        } catch (fmtErr) {
+          console.warn("⚠️ Formatting skipped/failed:", fmtErr);
+        }
+      }
     }
 
-    // Write all changes
-    await sheets.spreadsheets.values.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        valueInputOption: "RAW",
-        data: batchData,
-      },
-    });
-
-    // Optional: enforce number formatting for scores (if we touched them)
-    if (hasScoreInputs) {
+    // ---- Lists sheet upsert (optional, can be updated later) ----
+    let didListsUpdate = false;
+    if (awayListStr || homeListStr) {
       try {
-        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-        const weekSheet = spreadsheet.data.sheets?.find(
-          (s) => s.properties?.title === weekTab
-        );
-        const sheetId = weekSheet?.properties?.sheetId;
+        const listsRange = "Lists!A2:D";
+        const listsRes = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: listsRange,
+          valueRenderOption: "FORMATTED_VALUE",
+        });
+        const listsRows = listsRes.data.values ?? [];
 
-        if (sheetId != null) {
-          await sheets.spreadsheets.batchUpdate({
+        let matchIndex = -1;
+        for (let i = 0; i < listsRows.length; i++) {
+          const wk = norm(listsRows[i]?.[0]);
+          const gm = norm(listsRows[i]?.[1]);
+          if (wk === weekTab && gm === gameNo) {
+            matchIndex = i;
+            break;
+          }
+        }
+
+        const listsTitle = "Lists";
+
+        if (matchIndex >= 0) {
+          // Update existing row
+          const listRowNum = matchIndex + 2;
+          await sheets.spreadsheets.values.update({
             spreadsheetId,
+            range: `${listsTitle}!A${listRowNum}:D${listRowNum}`,
+            valueInputOption: "RAW",
             requestBody: {
-              requests: [
-                {
-                  repeatCell: {
-                    range: {
-                      sheetId,
-                      startRowIndex: rowNum - 1,
-                      endRowIndex: rowNum,
-                      startColumnIndex: 6,
-                      endColumnIndex: 7,
-                    },
-                    cell: {
-                      userEnteredFormat: {
-                        numberFormat: { type: "NUMBER", pattern: "0" },
-                      },
-                    },
-                    fields: "userEnteredFormat.numberFormat",
-                  },
-                },
-                {
-                  repeatCell: {
-                    range: {
-                      sheetId,
-                      startRowIndex: rowNum - 1,
-                      endRowIndex: rowNum,
-                      startColumnIndex: 14,
-                      endColumnIndex: 15,
-                    },
-                    cell: {
-                      userEnteredFormat: {
-                        numberFormat: { type: "NUMBER", pattern: "0" },
-                      },
-                    },
-                    fields: "userEnteredFormat.numberFormat",
-                  },
-                },
+              values: [
+                [
+                  weekTab,
+                  gameNo,
+                  awayListStr || "",
+                  homeListStr || "",
+                ],
+              ],
+            },
+          });
+        } else {
+          // Append new row
+          await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range: `${listsTitle}!A2:D2`,
+            valueInputOption: "RAW",
+            insertDataOption: "INSERT_ROWS",
+            requestBody: {
+              values: [
+                [
+                  weekTab,
+                  gameNo,
+                  awayListStr || "",
+                  homeListStr || "",
+                ],
               ],
             },
           });
         }
-      } catch (fmtErr) {
-        console.warn("⚠️ Formatting skipped/failed:", fmtErr);
+
+        didListsUpdate = true;
+      } catch (e) {
+        console.warn("⚠️ Lists sheet update/append failed:", e);
       }
+    }
+
+    // If literally nothing changed anywhere, just say OK
+    if (!didMainUpdate && !didListsUpdate) {
+      return NextResponse.json({ ok: true, pushed: 0 });
     }
 
     // ---- Streamer.bot overlay + Discord + push only if scores were updated ----
