@@ -446,6 +446,7 @@ const SHIP_ICON_MAP: Record<string, string> = {
   auzituckgunship: "@",
   belbullab22starfighter: "[",
   btanr2ywing: "{",
+  btanr2wywing: "{",
   btla4ywing: "y",
   btlbywing: ":",
   btls8kwing: "k",
