@@ -128,7 +128,37 @@ type ThumbnailContext = {
   awayFactionIcon?: string;
   homeFactionIcon?: string;
   weekLabel?: string;
+  // NEW: list URLs so we can add ship icons to the thumbnail
+  awayListUrl?: string | null;
+  homeListUrl?: string | null;
 };
+
+const SHIP_FONT_FAMILY = "XWingShips";
+
+let shipFontLoaded: Promise<void> | null = null;
+
+function ensureShipFontLoaded(): Promise<void> {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return Promise.resolve();
+  }
+
+  if (shipFontLoaded) return shipFontLoaded;
+
+  shipFontLoaded = (async () => {
+    try {
+      const font = new FontFace(
+        SHIP_FONT_FAMILY,
+        'url(/fonts/x-wing-miniatures-ships.ttf)'
+      );
+      const loaded = await font.load();
+      (document as any).fonts.add(loaded);
+    } catch (err) {
+      console.warn("Failed to load X-Wing ship font:", err);
+    }
+  })();
+
+  return shipFontLoaded;
+}
 
 function loadImageSafe(src?: string | null): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -163,11 +193,42 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+async function fetchShipGlyphs(
+  listUrl?: string | null
+): Promise<string | null> {
+  if (!listUrl) return null;
+  if (typeof window === "undefined") return null;
+
+  const apiUrl = buildLocalProxyUrl(listUrl);
+  if (!apiUrl) return null;
+
+  try {
+    const res = await fetch(apiUrl, { cache: "no-store" });
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as XwsResponse;
+    const iconString = shipsToGlyphs(data.pilots ?? []);
+    return iconString || null;
+  } catch (err) {
+    console.warn("fetchShipGlyphs error:", err);
+    return null;
+  }
+}
+
 // OPTION A: LIGHTSPEED DUEL STYLE — CLEAN + BRIGHT TEXT (TS-SAFE)
 async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   if (typeof window === "undefined") return;
 
-  const { row, awayFactionIcon, homeFactionIcon, weekLabel } = ctxData;
+  await ensureShipFontLoaded(); // <- make sure ship font is ready
+
+  const {
+    row,
+    awayFactionIcon,
+    homeFactionIcon,
+    weekLabel,
+    awayListUrl,
+    homeListUrl,
+  } = ctxData;
 
   const canvas = document.createElement("canvas");
   canvas.width = THUMB_WIDTH;
@@ -294,27 +355,48 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const homeLogoPath = `/logos/${teamSlug(row.homeTeam)}.png`;
   const mainLogoPath = "/logo.png";
 
-  const [awayLogoImg, homeLogoImg, awayFactionImg, homeFactionImg, mainLogoImg] =
-    await Promise.all([
-      loadImageSafe(awayLogoPath),
-      loadImageSafe(homeLogoPath),
-      loadImageSafe(awayFactionIcon),
-      loadImageSafe(homeFactionIcon),
-      loadImageSafe(mainLogoPath),
-    ]);
+  const [
+  awayLogoImg,
+  homeLogoImg,
+  awayFactionImg,
+  homeFactionImg,
+  mainLogoImg,
+  awayShipGlyphs,
+  homeShipGlyphs,
+] = await Promise.all([
+  loadImageSafe(awayLogoPath),
+  loadImageSafe(homeLogoPath),
+  loadImageSafe(awayFactionIcon),
+  loadImageSafe(homeFactionIcon),
+  loadImageSafe(mainLogoPath),
+  fetchShipGlyphs(awayListUrl),
+  fetchShipGlyphs(homeListUrl),
+]);
 
-  // ===== CENTER LOGO (NO CIRCLE) =====
+const hasShips = Boolean(awayShipGlyphs || homeShipGlyphs);
+
+  // ===== CENTER LOGO (PRESERVE ASPECT RATIO) =====
   if (mainLogoImg) {
-    const size = 380;
+    const maxW = 380;
+    const maxH = 380;
+
+    let drawW = mainLogoImg.width;
+    let drawH = mainLogoImg.height;
+
+    const scale = Math.min(maxW / drawW, maxH / drawH);
+    drawW *= scale;
+    drawH *= scale;
+
     ctx.globalAlpha = 1;
     ctx.drawImage(
       mainLogoImg,
-      W / 2 - size / 2,
-      H / 2 - size / 2 + 10,
-      size,
-      size
+      W / 2 - drawW / 2,
+      H / 2 - drawH / 2 + 10,
+      drawW,
+      drawH
     );
   }
+
 
   // ===== HOLO PANELS =====
   function drawHoloPanel(
@@ -375,42 +457,76 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
     );
   }
 
-  // Holo name panels
-  drawHoloPanel(leftX, midY + 10, 560, 150, "rgb(236,72,153)");
-  drawHoloPanel(rightX, midY + 10, 560, 150, "rgb(56,189,248)");
+  // Slightly larger panels to fit name + ships + team comfortably
+  // drawHoloPanel(leftX, midY + 10, 640, 190, "rgb(236,72,153)");
+  // drawHoloPanel(rightX, midY + 10, 640, 190, "rgb(56,189,248)");
+
+  // ===== TEXT LAYOUT: NAME / SHIPS / TEAM =====
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
 
   // Names
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#ffffff"; // bright white
-  ctx.font = "800 60px system-ui";
-  ctx.fillText(awayName, leftX, midY - 10);
-  ctx.fillText(homeName, rightX, midY - 10);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText(awayName, leftX, hasShips ? midY - 40 : midY - 20);
+  ctx.fillText(homeName, rightX, hasShips ? midY - 40 : midY - 20);
 
-  // Teams
+  // BIG ship icons row (if we have lists)
+  if (hasShips) {
+    ctx.save();
+    ctx.fillStyle = "#e5e7eb";
+
+    // BIG font size for ship iconographs
+    ctx.font = `700 86px "${SHIP_FONT_FAMILY}", system-ui, -apple-system, sans-serif`;
+
+    // Add a soft shadow so they pop off the background
+    ctx.shadowColor = "rgba(0,0,0,0.7)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 4;
+
+    if (awayShipGlyphs) {
+      ctx.fillText(awayShipGlyphs, leftX, midY + 35);
+    }
+    if (homeShipGlyphs) {
+      ctx.fillText(homeShipGlyphs, rightX, midY + 35);
+    }
+
+    ctx.restore();
+  }
+
+  // Team names (below ships)
   ctx.fillStyle = "#e5e7eb";
-  ctx.font = "600 40px system-ui";
-  ctx.fillText(awayTeam, leftX, midY + 50);
-  ctx.fillText(homeTeam, rightX, midY + 50);
+  ctx.font = "600 42px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText(awayTeam, leftX, hasShips ? midY + 95 : midY + 50);
+  ctx.fillText(homeTeam, rightX, hasShips ? midY + 95 : midY + 50);
 
-  // Team logos (NO glow ellipse)
+  // Team logos (PRESERVE ASPECT RATIO)
   if (awayLogoImg) {
-    ctx.drawImage(
-      awayLogoImg,
-      leftX - teamLogoSize / 2,
-      midY + 110,
-      teamLogoSize,
-      teamLogoSize
-    );
+    const maxW = 320;
+    const maxH = 260;
+    let w = awayLogoImg.width;
+    let h = awayLogoImg.height;
+    const scale = Math.min(maxW / w, maxH / h);
+    w *= scale;
+    h *= scale;
+
+    // top aligned below panel
+    ctx.drawImage(awayLogoImg, leftX - w / 2, midY + 110, w, h);
   }
+
   if (homeLogoImg) {
-    ctx.drawImage(
-      homeLogoImg,
-      rightX - teamLogoSize / 2,
-      midY + 110,
-      teamLogoSize,
-      teamLogoSize
-    );
+    const maxW = 320;
+    const maxH = 260;
+    let w = homeLogoImg.width;
+    let h = homeLogoImg.height;
+    const scale = Math.min(maxW / w, maxH / h);
+    w *= scale;
+    h *= scale;
+
+    ctx.drawImage(homeLogoImg, rightX - w / 2, midY + 110, w, h);
   }
+
 
   // ===== GAME LABEL (BRIGHTER) =====
   ctx.fillStyle = "#ffffff";
@@ -973,6 +1089,8 @@ export default function MatchupsPanel({
                   awayFactionIcon,
                   homeFactionIcon,
                   weekLabel,
+                  awayListUrl,  // <- important
+                  homeListUrl,  // <- important
                 });
               } finally {
                 setGeneratingGame((current) =>
@@ -980,6 +1098,7 @@ export default function MatchupsPanel({
                 );
               }
             };
+
 
             // List URLs (YASB or LBN) for this game
             const awayListUrl = listsForWeek?.[row.game]?.awayList || null;
