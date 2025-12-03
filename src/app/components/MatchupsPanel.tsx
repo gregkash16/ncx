@@ -96,6 +96,96 @@ function factionIconSrc(faction?: string) {
   return file ? `/factions/${file}` : "";
 }
 
+// --- Team color mapping for thumbnails ---------------------------------
+
+// --- Team color mapping for thumbnails ---------------------------------
+
+// Map CANONICAL TEAM NAME (uppercased, trimmed) -> base hex color
+const TEAM_COLOR_MAP: Record<string, string> = {
+  "BERSERKERS": "#8b5a2b",           // Brown
+  "DEGENERATES": "#16a34a",          // Green
+  "FIREBIRDS": "#ea580c",            // Orange
+  "FOXES": "#a855f7",                // Purple
+  "GALACTIC WARDENS": "#16a34a",     // Green
+  "HAVOC": "#eab308",                // Yellow
+  "HEADHUNTERS": "#020617",          // Black-ish
+  "HOTSHOTS": "#facc99",             // Tan
+  "JAGGED AXE": "#f97316",           // Orange
+  "KDB": "#14b8a6",                  // Teal
+  "MAWLERS": "#14b8a6",              // Teal
+  "MEATBAGS": "#dc2626",             // Red
+  "MEGA MILK UNION": "#38bdf8",      // Light Blue
+  "MISFITS": "#ea580c",              // Orange
+  "MON CALA SC": "#5eead4",          // Seafoam Green
+  "NERF HERDERS": "#16a34a",         // Green
+  "ORDER 66": "#2563eb",             // Blue
+  "OUTER RIM HEROES": "#2563eb",     // Blue
+  "PUDDLEJUMPERS": "#22c55e",        // Green
+  "PUDDLE JUMPERS": "#22c55e",       // (safety alias)
+  "PUNISHERS": "#ef4444",            // Red
+  "RAVE CRAB CHAMPIONS": "#fb923c",  // Neon Orange-ish
+  "STARKILLERS": "#d97706",          // Burnt Yellow
+  "VOODOO KREWE": "#1d4ed8",         // Blue
+  "WOLFPACK": "#ec4899",             // Pink
+};
+
+function getTeamColorHex(teamName?: string | null): string {
+  if (!teamName) return "#0f172a"; // fallback navy
+  const key = teamName.trim().toUpperCase();
+  return TEAM_COLOR_MAP[key] ?? "#0f172a";
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  let h = hex.replace("#", "");
+  if (h.length === 3) {
+    h = h
+      .split("")
+      .map((ch) => ch + ch)
+      .join("");
+  }
+  const int = parseInt(h, 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  fillStyle?: string,
+  strokeStyle?: string,
+  strokeWidth = 1
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+
+  if (fillStyle) {
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+  }
+  if (strokeStyle) {
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = strokeWidth;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // Build a quick lookup from IndStats by NCXID
 function statsMapFromIndRows(rows?: IndRow[]) {
   const map = new Map<string, IndRow>();
@@ -215,11 +305,12 @@ async function fetchShipGlyphs(
   }
 }
 
-// OPTION A: LIGHTSPEED DUEL STYLE — CLEAN + BRIGHT TEXT (TS-SAFE)
+// OPTION A: TEAM-COLOR GRADIENT STYLE
+// OPTION A: TEAM-COLOR GRADIENT STYLE
 async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   if (typeof window === "undefined") return;
 
-  await ensureShipFontLoaded(); // <- make sure ship font is ready
+  await ensureShipFontLoaded();
 
   const {
     row,
@@ -241,111 +332,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const W = THUMB_WIDTH;
   const H = THUMB_HEIGHT;
 
-  // ===== HYPERSPACE BACKGROUND =====
-  const bgGrad = ctx.createRadialGradient(
-    W / 2,
-    H / 2,
-    0,
-    W / 2,
-    H / 2,
-    H / 1.1
-  );
-  bgGrad.addColorStop(0, "#020617");
-  bgGrad.addColorStop(1, "#000000");
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, W, H);
-
-  // Hyperspace streaks
-  function drawStreaks(side: "left" | "right") {
-    const count = 150;
-    ctx.save();
-    ctx.lineCap = "round";
-
-    for (let i = 0; i < count; i++) {
-      const y = Math.random() * H;
-      const len = 80 + Math.random() * 220;
-      const thickness = 1 + Math.random() * 3;
-
-      let xStart: number;
-      let xEnd: number;
-
-      if (side === "left") {
-        xStart = Math.random() * (W * 0.45);
-        xEnd = xStart + len;
-        ctx.strokeStyle = `rgba(236,72,153,${
-          0.2 + Math.random() * 0.55
-        })`; // pink
-      } else {
-        xStart = W * 0.55 + Math.random() * (W * 0.45);
-        xEnd = xStart - len;
-        ctx.strokeStyle = `rgba(56,189,248,${
-          0.2 + Math.random() * 0.55
-        })`; // cyan
-      }
-
-      ctx.lineWidth = thickness;
-      ctx.beginPath();
-      ctx.moveTo(xStart, y);
-      ctx.lineTo(xEnd, y + (side === "left" ? -len * 0.15 : len * 0.15));
-      ctx.stroke();
-    }
-
-    ctx.restore();
-  }
-
-  drawStreaks("left");
-  drawStreaks("right");
-
-  // Light grid overlay
-  ctx.save();
-  ctx.strokeStyle = "rgba(148,163,184,0.1)";
-  const gridSize = 48;
-  for (let x = 0; x < W; x += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, H);
-    ctx.stroke();
-  }
-  for (let y = 0; y < H; y += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Central glow (kept subtle)
-  const centerGlow = ctx.createRadialGradient(
-    W / 2,
-    H / 2,
-    0,
-    W / 2,
-    H / 2,
-    H / 1.3
-  );
-  centerGlow.addColorStop(0, "rgba(129,140,248,0.25)");
-  centerGlow.addColorStop(1, "rgba(15,23,42,0)");
-  ctx.fillStyle = centerGlow;
-  ctx.fillRect(0, 0, W, H);
-
-  // ===== TOP TEXT: BRIGHTER =====
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-
-  // Title
-  ctx.fillStyle = "#ffffff";
-  ctx.font =
-    "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText("NICKEL CITY X-WING", W / 2, 95);
-
-  // WEEK label (brighter)
-  if (weekLabel) {
-    ctx.fillStyle = "#ffffff"; // bright white
-    ctx.font =
-      "700 40px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-    ctx.fillText(weekLabel.toUpperCase(), W / 2, 150);
-  }
-
   const awayName = row.awayName || "Away Player";
   const homeName = row.homeName || "Home Player";
   const awayTeam = row.awayTeam || "Away Team";
@@ -355,27 +341,79 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const homeLogoPath = `/logos/${teamSlug(row.homeTeam)}.png`;
   const mainLogoPath = "/logo.png";
 
+  const awayColorHex = getTeamColorHex(awayTeam);
+  const homeColorHex = getTeamColorHex(homeTeam);
+
   const [
-  awayLogoImg,
-  homeLogoImg,
-  awayFactionImg,
-  homeFactionImg,
-  mainLogoImg,
-  awayShipGlyphs,
-  homeShipGlyphs,
-] = await Promise.all([
-  loadImageSafe(awayLogoPath),
-  loadImageSafe(homeLogoPath),
-  loadImageSafe(awayFactionIcon),
-  loadImageSafe(homeFactionIcon),
-  loadImageSafe(mainLogoPath),
-  fetchShipGlyphs(awayListUrl),
-  fetchShipGlyphs(homeListUrl),
-]);
+    awayLogoImg,
+    homeLogoImg,
+    awayFactionImg,
+    homeFactionImg,
+    mainLogoImg,
+    awayShipGlyphs,
+    homeShipGlyphs,
+  ] = await Promise.all([
+    loadImageSafe(awayLogoPath),
+    loadImageSafe(homeLogoPath),
+    loadImageSafe(awayFactionIcon),
+    loadImageSafe(homeFactionIcon),
+    loadImageSafe(mainLogoPath),
+    fetchShipGlyphs(awayListUrl),
+    fetchShipGlyphs(homeListUrl),
+  ]);
 
-const hasShips = Boolean(awayShipGlyphs || homeShipGlyphs);
+  const hasShips = Boolean(awayShipGlyphs || homeShipGlyphs);
 
-  // ===== CENTER LOGO (PRESERVE ASPECT RATIO) =====
+  /************************************************************
+   * BACKGROUND: PURE TEAM GRADIENT
+   ************************************************************/
+
+  // Big left->right gradient from away team color to home team color
+  const baseGrad = ctx.createLinearGradient(0, 0, W, 0);
+  baseGrad.addColorStop(0, awayColorHex);
+  baseGrad.addColorStop(0.5, hexToRgba(awayColorHex, 0.5));
+  baseGrad.addColorStop(0.5, hexToRgba(homeColorHex, 0.5));
+  baseGrad.addColorStop(1, homeColorHex);
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Very light vertical darken for text contrast
+  const vGrad = ctx.createLinearGradient(0, 0, 0, H);
+  vGrad.addColorStop(0, "rgba(15,23,42,0.35)");
+  vGrad.addColorStop(0.5, "rgba(15,23,42,0.15)");
+  vGrad.addColorStop(1, "rgba(15,23,42,0.35)");
+  ctx.fillStyle = vGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Thin divider in the middle
+  ctx.save();
+  ctx.fillStyle = "rgba(248,250,252,0.5)";
+  ctx.fillRect(W / 2 - 2, 0, 4, H);
+  ctx.restore();
+
+  /************************************************************
+   * TOP TEXT
+   ************************************************************/
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font =
+    "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText("NICKEL CITY X-WING", W / 2, 95);
+
+  if (weekLabel) {
+    ctx.fillStyle = "#f9fafb";
+    ctx.font =
+      "700 40px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    ctx.fillText(weekLabel.toUpperCase(), W / 2, 150);
+  }
+
+  /************************************************************
+   * CENTER LOGO
+   ************************************************************/
+
   if (mainLogoImg) {
     const maxW = 380;
     const maxH = 380;
@@ -397,47 +435,16 @@ const hasShips = Boolean(awayShipGlyphs || homeShipGlyphs);
     );
   }
 
-
-  // ===== HOLO PANELS =====
-  function drawHoloPanel(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    color: string
-  ) {
-    const r = 18;
-    ctx.save();
-    ctx.beginPath();
-
-    ctx.moveTo(x - w / 2 + r, y - h / 2);
-    ctx.lineTo(x + w / 2 - r, y - h / 2);
-    ctx.quadraticCurveTo(x + w / 2, y - h / 2, x + w / 2, y - h / 2 + r);
-    ctx.lineTo(x + w / 2, y + h / 2 - r);
-    ctx.quadraticCurveTo(x + w / 2, y + h / 2, x + w / 2 - r, y + h / 2);
-    ctx.lineTo(x - w / 2 + r, y + h / 2);
-    ctx.quadraticCurveTo(x - w / 2, y + h / 2, x - w / 2, y + h / 2 - r);
-    ctx.lineTo(x - w / 2, y - h / 2 + r);
-    ctx.quadraticCurveTo(x - w / 2, y - h / 2, x - w / 2 + r, y - h / 2);
-
-    ctx.closePath();
-    ctx.fillStyle = "rgba(15,23,42,0.85)";
-    ctx.fill();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    ctx.restore();
-  }
-
   const midY = H / 2;
   const leftX = W * 0.25;
   const rightX = W * 0.75;
 
   const factionSize = 210;
-  const teamLogoSize = 320;
 
-  // Faction icons (NO GLOW CIRCLES)
+  /************************************************************
+   * FACTION ICONS
+   ************************************************************/
+
   if (awayFactionImg) {
     ctx.drawImage(
       awayFactionImg,
@@ -457,29 +464,25 @@ const hasShips = Boolean(awayShipGlyphs || homeShipGlyphs);
     );
   }
 
-  // Slightly larger panels to fit name + ships + team comfortably
-  // drawHoloPanel(leftX, midY + 10, 640, 190, "rgb(236,72,153)");
-  // drawHoloPanel(rightX, midY + 10, 640, 190, "rgb(56,189,248)");
+  /************************************************************
+   * NAMES / SHIPS / TEAMS
+   ************************************************************/
 
-  // ===== TEXT LAYOUT: NAME / SHIPS / TEAM =====
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
-  // Names
+  // Player names
   ctx.fillStyle = "#ffffff";
-  ctx.font = "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.font =
+    "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   ctx.fillText(awayName, leftX, hasShips ? midY - 40 : midY - 20);
   ctx.fillText(homeName, rightX, hasShips ? midY - 40 : midY - 20);
 
-  // BIG ship icons row (if we have lists)
+  // Ship glyph rows
   if (hasShips) {
     ctx.save();
-    ctx.fillStyle = "#e5e7eb";
-
-    // BIG font size for ship iconographs
+    ctx.fillStyle = "#f9fafb";
     ctx.font = `700 86px "${SHIP_FONT_FAMILY}", system-ui, -apple-system, sans-serif`;
-
-    // Add a soft shadow so they pop off the background
     ctx.shadowColor = "rgba(0,0,0,0.7)";
     ctx.shadowBlur = 16;
     ctx.shadowOffsetX = 0;
@@ -495,40 +498,86 @@ const hasShips = Boolean(awayShipGlyphs || homeShipGlyphs);
     ctx.restore();
   }
 
-  // Team names (below ships)
+  // Team names
   ctx.fillStyle = "#e5e7eb";
-  ctx.font = "600 42px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.font =
+    "600 42px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   ctx.fillText(awayTeam, leftX, hasShips ? midY + 95 : midY + 50);
   ctx.fillText(homeTeam, rightX, hasShips ? midY + 95 : midY + 50);
 
-  // Team logos (PRESERVE ASPECT RATIO)
+  /************************************************************
+   * NORMALIZED LOGO CARDS
+   ************************************************************/
+
+  const cardW = 260;
+  const cardH = 260;
+  const cardRadius = 40;
+  const cardY = midY + 110;
+
+  // Away logo card
   if (awayLogoImg) {
-    const maxW = 320;
-    const maxH = 260;
+    const cardX = leftX - cardW / 2;
+
+    drawRoundedRect(
+      ctx,
+      cardX,
+      cardY,
+      cardW,
+      cardH,
+      cardRadius,
+      hexToRgba(awayColorHex, 0.25),
+      hexToRgba(awayColorHex, 0.9),
+      3
+    );
+
+    const maxLogoW = cardW - 60;
+    const maxLogoH = cardH - 60;
     let w = awayLogoImg.width;
     let h = awayLogoImg.height;
-    const scale = Math.min(maxW / w, maxH / h);
+    const scale = Math.min(maxLogoW / w, maxLogoH / h);
     w *= scale;
     h *= scale;
 
-    // top aligned below panel
-    ctx.drawImage(awayLogoImg, leftX - w / 2, midY + 110, w, h);
+    const logoX = leftX - w / 2;
+    const logoY = cardY + cardH / 2 - h / 2;
+
+    ctx.drawImage(awayLogoImg, logoX, logoY, w, h);
   }
 
+  // Home logo card
   if (homeLogoImg) {
-    const maxW = 320;
-    const maxH = 260;
+    const cardX = rightX - cardW / 2;
+
+    drawRoundedRect(
+      ctx,
+      cardX,
+      cardY,
+      cardW,
+      cardH,
+      cardRadius,
+      hexToRgba(homeColorHex, 0.25),
+      hexToRgba(homeColorHex, 0.9),
+      3
+    );
+
+    const maxLogoW = cardW - 60;
+    const maxLogoH = cardH - 60;
     let w = homeLogoImg.width;
     let h = homeLogoImg.height;
-    const scale = Math.min(maxW / w, maxH / h);
+    const scale = Math.min(maxLogoW / w, maxLogoH / h);
     w *= scale;
     h *= scale;
 
-    ctx.drawImage(homeLogoImg, rightX - w / 2, midY + 110, w, h);
+    const logoX = rightX - w / 2;
+    const logoY = cardY + cardH / 2 - h / 2;
+
+    ctx.drawImage(homeLogoImg, logoX, logoY, w, h);
   }
 
+  /************************************************************
+   * GAME LABEL + DOWNLOAD
+   ************************************************************/
 
-  // ===== GAME LABEL (BRIGHTER) =====
   ctx.fillStyle = "#ffffff";
   ctx.font = "700 34px system-ui";
   ctx.fillText(`GAME ${row.game}`, W / 2, H - 70);
@@ -545,10 +594,10 @@ const hasShips = Boolean(awayShipGlyphs || homeShipGlyphs);
   const fileAway = safeSlug(awayName);
   const fileHome = safeSlug(homeName);
 
-  // game15-gregvdan.jpg
   const filename = `game${row.game} - ${fileAway} v ${fileHome}.jpg`;
   downloadBlob(blob, filename);
 }
+
 
 /************************************************************
  *  Ship icon map + local proxy helpers (YASB + LaunchBayNext)
