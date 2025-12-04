@@ -1,4 +1,5 @@
 // /src/app/(desktop)/page.tsx
+
 // Cache the rendered page for 60s so we don't re-hit Sheets every request
 export const revalidate = 60;
 
@@ -43,7 +44,10 @@ function parseWeekNum(label: string | undefined | null): number | null {
 }
 
 function normalizeDiscordId(v: unknown): string {
-  return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
+  return String(v ?? "")
+    .trim()
+    .replace(/[<@!>]/g, "")
+    .replace(/\D/g, "");
 }
 
 /**
@@ -148,13 +152,12 @@ function mapAdvTable1Row(raw: any[]): TeamAdvStats {
   };
 }
 
-// NOTE: searchParams is a Promise in Next 15 server components
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Record<string, string | string[] | undefined>;
 }) {
-  const sp = await searchParams;
+  const sp = searchParams;
 
   // Read team param for the Team tab (slug like "kdb")
   const teamParam = (sp?.team as string | undefined) || undefined;
@@ -179,11 +182,15 @@ export default async function HomePage({
           message = `Welcome ${session.user.name ?? "Pilot"}! – No NCXID Found.`;
         }
       } else {
-        message = `Welcome ${session.user.name ?? "Pilot"}! – No Discord ID found`;
+        message = `Welcome ${
+          session.user.name ?? "Pilot"
+        }! – No Discord ID found`;
       }
     } catch (err) {
       console.error("Error fetching NCX info:", err);
-      message = `Welcome ${session.user.name ?? "Pilot"}! – (Error fetching NCXID)`;
+      message = `Welcome ${
+        session.user.name ?? "Pilot"
+      }! – (Error fetching NCXID)`;
     }
   }
 
@@ -314,7 +321,9 @@ export default async function HomePage({
               />
             }
             standingsPanel={<StandingsPanel key="standings" />}
-            indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
+            indStatsPanel={
+              <IndStatsPanel key="indstats" data={indStats ?? []} />
+            }
             advStatsPanel={<AdvStatsPanelServer key="advstats" />}
             playersPanel={<PlayersPanelServer key="players" />}
             reportPanel={<ReportPanel key="report" />}

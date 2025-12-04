@@ -1,14 +1,13 @@
 // /src/app/(desktop)/teams/[slug]/page.tsx
-export const runtime = "nodejs";
 
 import { redirect } from "next/navigation";
 
-// Next 15: params is a Promise in server components
-export default async function TeamRoute({
+export default function TeamRoute({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }) {
-  const { slug } = await params;
-  redirect(`/?tab=team&team=${encodeURIComponent(slug)}`);
+  const { slug } = params;
+
+  return redirect(`/?tab=team&team=${encodeURIComponent(slug)}`);
 }

@@ -37,10 +37,11 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
     if (!qq) return data;
     return data.filter((p) => {
       const name = fullName(p).toLowerCase();
+      const discord = (p.discord || "").toLowerCase(); // ✅ guard against null/undefined
       return (
         p.ncxid.toLowerCase().includes(qq) ||
         name.includes(qq) ||
-        p.discord.toLowerCase().includes(qq)
+        discord.includes(qq)
       );
     });
   }, [data, q]);
@@ -137,7 +138,9 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
 
                 // 🥚 Insert Smash Count right AFTER "PPG" for NCX94
                 if (selected.ncxid in SMASH_COUNTS) {
-                  const ppgIndex = stats.findIndex(([label]) => label === "PPG");
+                  const ppgIndex = stats.findIndex(
+                    ([label]) => label === "PPG"
+                  );
                   const insertAt = ppgIndex >= 0 ? ppgIndex + 1 : stats.length;
                   stats.splice(insertAt, 0, [
                     "Smash Count",
@@ -179,7 +182,8 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                     const isChampion =
                       !!team &&
                       !!CHAMPIONS_BY_SEASON[seasonNum] &&
-                      team.toUpperCase().trim() === CHAMPIONS_BY_SEASON[seasonNum];
+                      team.toUpperCase().trim() ===
+                        CHAMPIONS_BY_SEASON[seasonNum];
                     return (
                       <tr
                         key={idx}

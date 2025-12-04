@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useMemo, useState, useCallback } from "react";
 
 type VideoItem = {
@@ -39,14 +40,15 @@ export default function PlayerVideos({ ncxid }: { ncxid: string }) {
         setVideos(vids);
         if (vids.length) setSelectedId(vids[0].id);
       } catch (e: any) {
-        if (e?.name !== "AbortError")
+        if (e?.name !== "AbortError") {
           setErr(e?.message || "Failed to load videos");
+        }
       } finally {
         setLoading(false);
       }
     }
 
-    run();
+    void run();
     return () => ac.abort();
   }, [ncxid]);
 
@@ -57,7 +59,7 @@ export default function PlayerVideos({ ncxid }: { ncxid: string }) {
 
   // Keyboard navigation (left/right arrows)
   const onKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!videos.length || !selectedId) return;
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 

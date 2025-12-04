@@ -1127,7 +1127,11 @@ export default function MatchupsPanel({
             const homeTooltip = row.homeDiscordTag
               ? `@${row.homeDiscordTag}`
               : "Open DM";
-
+            
+            // List URLs (YASB or LBN) for this game
+            const awayListUrl = listsForWeek?.[row.game]?.awayList || null;
+            const homeListUrl = listsForWeek?.[row.game]?.homeList || null;
+            
             const handleClickThumbnail = async () => {
               try {
                 setGeneratingGame(row.game);
@@ -1147,11 +1151,6 @@ export default function MatchupsPanel({
                 );
               }
             };
-
-
-            // List URLs (YASB or LBN) for this game
-            const awayListUrl = listsForWeek?.[row.game]?.awayList || null;
-            const homeListUrl = listsForWeek?.[row.game]?.homeList || null;
 
             return (
               <div
