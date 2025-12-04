@@ -5,12 +5,11 @@ const config: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "cdn.discordapp.com", pathname: "/avatars/**" },
-      { protocol: "https", hostname: "img.youtube.com" },
-      { protocol: "https", hostname: "i.ytimg.com" },
+      { protocol: "https", hostname: "img.youtube.com", pathname: "/**" },
+      { protocol: "https", hostname: "i.ytimg.com", pathname: "/**" },
     ],
   },
   typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
   reactStrictMode: true,
 };
 
