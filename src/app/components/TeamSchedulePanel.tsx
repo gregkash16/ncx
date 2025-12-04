@@ -8,8 +8,6 @@ import {
 } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
 import PlayerDMLink from "@/app/components/PlayerDMLink";
-import { getWeekCsvRows } from "@/lib/weekCsv";
-
 
 /* ----------------------------- helpers ----------------------------- */
 
@@ -51,15 +49,18 @@ type PanelMode = "desktop" | "mobile";
  * We scan each 10-row block starting at visual row 10 (idx 9): 9, 19, 29, ... 119
  */
 async function deriveSeriesFromWeek(weekTab: string, away: string, home: string) {
-  let data: string[][] = [];
+  const spreadsheetId =
+    process.env.NCX_LEAGUE_SHEET_ID || process.env.SHEETS_SPREADSHEET_ID;
+  if (!spreadsheetId) return { awayWins: 0, homeWins: 0, found: false };
 
-  try {
-    data = await getWeekCsvRows(weekTab); // rows from WEEK N CSV
-  } catch {
-    return { awayWins: 0, homeWins: 0, found: false };
-  }
+  const sheets = getSheets();
+  const resp = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${weekTab}!A1:Q120`,
+    valueRenderOption: "FORMATTED_VALUE",
+  });
+  const data = resp.data.values ?? [];
 
-  // Same scanning logic as before, now over CSV rows
   for (let rowNum = 9; rowNum < 120; rowNum += 10) {
     const idx = rowNum - 1;
     const row = data[idx] ?? [];
