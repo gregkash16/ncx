@@ -92,7 +92,8 @@ export default function HomeLanding({
           <img
             src="/logo.webp"
             alt="Season Logo"
-            className="h-40 w-auto rounded-xl border border-purple-500/40 shadow-lg object-contain"
+            fetchPriority="high"
+            className="h-40 w-auto ..."
           />
           <div className="space-y-1">
             <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
