@@ -1,6 +1,8 @@
 // src/lib/googleSheets.ts
 import { google, sheets_v4 } from "googleapis";
 import { unstable_cache } from "next/cache";
+import { getScheduleCsvRows } from "./scheduleCsv";
+import { getWeekCsvRows } from "./weekCsv";
 
 /** ---------------------------- Auth client ---------------------------- **/
 export function getSheets(): sheets_v4.Sheets {
@@ -110,29 +112,21 @@ function mapGridRowToMatchRow(r: any[]): MatchRow {
 
 /** Non-cached helper (kept for completeness) */
 export async function fetchMatchupsData(): Promise<MatchupsData> {
-  const sheets = getSheets();
-  const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-  if (!spreadsheetId) throw new Error("Missing NCX_LEAGUE_SHEET_ID");
+  // Read the full SCHEDULE sheet via CSV
+  const scheduleRows = await getScheduleCsvRows();
+  if (scheduleRows.length < 2) {
+    // fallback: no rows, no matches
+    return { weekTab: "WEEK 1", matches: [] };
+  }
 
-  // Active week
-  const weekRes = await withBackoff(() =>
-    sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "SCHEDULE!U2",
-      valueRenderOption: "FORMATTED_VALUE",
-    })
-  );
-  const weekTab = norm(weekRes.data.values?.[0]?.[0]) || "WEEK 1";
+  // U2 = row 2, column U (21st column, 0-based index 20)
+  const activeWeekRaw = scheduleRows[1]?.[20] ?? "";
+  const weekTab = normalizeWeekLabel(activeWeekRaw || "WEEK 1");
 
-  // Week rows
-  const dataRes = await withBackoff(() =>
-    sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${weekTab}!A2:Q120`,
-      valueRenderOption: "FORMATTED_VALUE",
-    })
-  );
-  const rows = dataRes.data.values || [];
+  // Now read that WEEK tab via CSV and map to MatchRow[]
+  const allRows = await getWeekCsvRows(weekTab);
+  const [, ...rows] = allRows; // skip header row (old A2:Q120 range)
+
   const matches = rows
     .map(mapGridRowToMatchRow)
     .filter((m) => m.game !== "" && (m.awayTeam !== "" || m.homeTeam !== ""));
@@ -140,37 +134,34 @@ export async function fetchMatchupsData(): Promise<MatchupsData> {
   return { weekTab, matches };
 }
 
+
+
 /** Cached, param-aware matchups (revalidate 60s). */
-export async function fetchMatchupsDataCached(weekOverride?: string): Promise<MatchupsData> {
+/** Cached, param-aware matchups (revalidate 60s). */
+/** Cached, param-aware matchups (revalidate 60s). */
+export async function fetchMatchupsDataCached(
+  weekOverride?: string
+): Promise<MatchupsData> {
   const cached = unstable_cache(
     async (): Promise<MatchupsData> => {
-      const sheets = getSheets();
-      const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-      if (!spreadsheetId) throw new Error("Missing NCX_LEAGUE_SHEET_ID");
+      // Read SCHEDULE CSV to determine active week
+      const scheduleRows = await getScheduleCsvRows();
+      const activeWeekRaw = scheduleRows.length >= 2 ? scheduleRows[1]?.[20] ?? "" : "";
+      const activeWeek = normalizeWeekLabel(activeWeekRaw || "WEEK 1");
 
-      // Active week
-      const u2 = await withBackoff(() =>
-        sheets.spreadsheets.values.get({
-          spreadsheetId,
-          range: "SCHEDULE!U2",
-          valueRenderOption: "FORMATTED_VALUE",
-        })
-      );
-      const activeWeek = norm(u2.data.values?.[0]?.[0]) || "WEEK 1";
-      const targetWeek = (weekOverride && weekOverride.trim()) || activeWeek;
+      const targetWeekRaw =
+        (weekOverride && weekOverride.trim()) || activeWeek;
+      const targetWeek = normalizeWeekLabel(targetWeekRaw);
 
-      // Target week grid
-      const res = await withBackoff(() =>
-        sheets.spreadsheets.values.get({
-          spreadsheetId,
-          range: `${targetWeek}!A2:Q120`,
-          valueRenderOption: "FORMATTED_VALUE",
-        })
-      );
-      const rows = res.data.values ?? [];
+      // Read that week tab via CSV
+      const allRows = await getWeekCsvRows(targetWeek);
+      const [, ...rows] = allRows; // skip header row
+
       const matches = rows
         .map(mapGridRowToMatchRow)
-        .filter((m) => m.game !== "" && (m.awayTeam !== "" || m.homeTeam !== ""));
+        .filter(
+          (m) => m.game !== "" && (m.awayTeam !== "" || m.homeTeam !== "")
+        );
 
       return { weekTab: targetWeek, matches };
     },
@@ -180,6 +171,7 @@ export async function fetchMatchupsDataCached(weekOverride?: string): Promise<Ma
 
   return cached();
 }
+
 
 /** ---------------------- Individual player stats --------------------- **/
 export type IndRow = {
@@ -549,48 +541,68 @@ export const fetchTeamScheduleAllCached = unstable_cache(
  * Accepts a team name or slug. Returns the canonical team name (as written in the sheet)
  * and all WEEK rows (1..10) where that team appears (away or home), sorted by week number.
  */
-export async function fetchScheduleForTeam(teamKey: string): Promise<{
-  teamName: string;
-  rows: TeamScheduleRow[];
-}> {
-  const all = await fetchTeamScheduleAllCached();
+// helper: normalize team names from both slug + sheet
+function normalizeTeamKey(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[\s-]+/g, " ") // treat any spaces/hyphens as a single space
+    .trim();
+}
 
-  const key = teamKey.trim();
-  const toSlug = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/&/g, "and")
-      .replace(/[^\p{L}\p{N}]+/gu, "-")
-      .replace(/-+/g, "-")
-      .replace(/(^-|-$)/g, "");
+export async function fetchScheduleForTeam(
+  team: string
+): Promise<{ teamName: string; rows: TeamScheduleRow[] }> {
+  const rawRows = await getScheduleCsvRows(); // SCHEDULE CSV as string[][]
 
-  // find any row that matches by exact or slug
-  const candidate = all.find(
-    (r) =>
-      r.away.toLowerCase() === key.toLowerCase() ||
-      r.home.toLowerCase() === key.toLowerCase() ||
-      toSlug(r.away) === key ||
-      toSlug(r.home) === key
-  );
-  if (!candidate) return { teamName: key, rows: [] };
+  if (!rawRows.length) {
+    return { teamName: team, rows: [] };
+  }
 
-  // canonical name = whichever side matched first
-  const canonical =
-    candidate.away.toLowerCase() === key.toLowerCase() || toSlug(candidate.away) === key
-      ? candidate.away
-      : candidate.home;
+  const [header, ...data] = rawRows;
 
-  const teamRows = all
-    .filter((r) => r.away === canonical || r.home === canonical)
-    .sort((a, b) => {
-      const aw = parseInt(a.week.replace(/[^0-9]/g, ""), 10) || 0;
-      const bw = parseInt(b.week.replace(/[^0-9]/g, ""), 10) || 0;
-      return aw - bw;
+  const col = (name: string): number => {
+    const idx = header.findIndex(
+      (h) => String(h).trim().toLowerCase() === name.toLowerCase()
+    );
+    return idx === -1 ? -1 : idx;
+  };
+
+  // Adjust these if your SCHEDULE headers differ
+  const weekIdx = col("week");
+  const awayIdx = col("away");
+  const homeIdx = col("home");
+
+  const teamKey = normalizeTeamKey(team);
+
+  const rowsForTeam: TeamScheduleRow[] = data
+    .map((row) => {
+      const week = weekIdx >= 0 ? row[weekIdx] ?? "" : "";
+      const away = awayIdx >= 0 ? row[awayIdx] ?? "" : "";
+      const home = homeIdx >= 0 ? row[homeIdx] ?? "" : "";
+
+      return {
+        week,
+        away,
+        home,
+      } as TeamScheduleRow;
+    })
+    .filter((r) => {
+      const awayKey = normalizeTeamKey(r.away);
+      const homeKey = normalizeTeamKey(r.home);
+      return awayKey === teamKey || homeKey === teamKey;
     });
 
-  return { teamName: canonical, rows: teamRows };
-};
+  let teamName = team;
+  if (rowsForTeam.length > 0) {
+    const first = rowsForTeam[0];
+    const awayKey = normalizeTeamKey(first.away);
+    const homeKey = normalizeTeamKey(first.home);
+    if (awayKey === teamKey) teamName = first.away;
+    else if (homeKey === teamKey) teamName = first.home;
+  }
 
+  return { teamName, rows: rowsForTeam };
+}
 // --- Overall standings (OVERALL RECORD!A2:F25) -------------------------
 export type OverallRow = {
   rank: string;
