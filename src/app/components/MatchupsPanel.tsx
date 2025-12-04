@@ -671,7 +671,7 @@ const SHIP_ICON_MAP: Record<string, string> = {
   tiecapunisher: "N",
   tieddefender: "D",
   tiefofighter: "O",
-  tieinterceptor: "I",
+  tieininterceptor: "I",
   tielnfighter: "F",
   tiephphantom: "P",
   tierbheavy: "J",
