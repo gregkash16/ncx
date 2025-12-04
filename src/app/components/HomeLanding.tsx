@@ -90,7 +90,7 @@ export default function HomeLanding({
         {/* Header with centered season logo */}
         <div className="flex flex-col items-center text-center gap-4 mb-6">
           <img
-            src="/logo.png"
+            src="/logo.webp"
             alt="Season Logo"
             className="h-40 w-auto rounded-xl border border-purple-500/40 shadow-lg object-contain"
           />

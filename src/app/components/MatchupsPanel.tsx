@@ -339,7 +339,7 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
 
   const awayLogoPath = `/logos/${teamSlug(row.awayTeam)}.webp`;
   const homeLogoPath = `/logos/${teamSlug(row.homeTeam)}.webp`;
-  const mainLogoPath = "/logo.png";
+  const mainLogoPath = "/logo.webp";
 
   const awayColorHex = getTeamColorHex(awayTeam);
   const homeColorHex = getTeamColorHex(homeTeam);

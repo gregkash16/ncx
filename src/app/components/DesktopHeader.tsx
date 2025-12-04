@@ -25,7 +25,7 @@ export default function DesktopHeader() {
           </NotificationsDrawer>
 
           <a href="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="NCX" className="h-7 w-7 rounded-lg" />
+            <img src="/logo.webp" alt="NCX" className="h-7 w-7 rounded-lg" />
             <h1 className="text-base font-extrabold tracking-wide bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
               Nickel&nbsp;City&nbsp;X-Wing
             </h1>
