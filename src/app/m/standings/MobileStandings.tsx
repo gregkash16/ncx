@@ -32,7 +32,7 @@ function Logo({
   className?: string;
 }) {
   const slug = teamSlug(name);
-  const src = slug ? `/logos/${slug}.png` : `/logos/default.png`; // absolute path
+  const src = slug ? `/logos/${slug}.webp` : `/logos/default.png`; // absolute path
   return (
     <Image
       src={src}

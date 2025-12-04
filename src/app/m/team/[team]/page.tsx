@@ -150,7 +150,7 @@ function StatusCell({
       <div className="flex items-center justify-end gap-1 text-[11px] text-green-400 font-semibold">
         <span>Winner</span>
         <Image
-          src={`/logos/${teamSlug(teamName)}.png`}
+          src={`/logos/${teamSlug(teamName)}.webp`}
           alt={`${teamName} logo`}
           width={20}
           height={20}
@@ -165,7 +165,7 @@ function StatusCell({
       <div className="flex items-center justify-end gap-1 text-[11px] text-red-400 font-semibold">
         <span>Loser</span>
         <Image
-          src={`/logos/${teamSlug(teamName)}.png`}
+          src={`/logos/${teamSlug(teamName)}.webp`}
           alt={`${teamName} logo`}
           width={20}
           height={20}
@@ -312,7 +312,7 @@ export default async function MobileTeamSchedulePage({
           <header className="mb-1 flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border border-neutral-700 bg-neutral-900">
               <Image
-                src={`/logos/${teamSlug(teamName)}.png`}
+                src={`/logos/${teamSlug(teamName)}.webp`}
                 alt={`${teamName} logo`}
                 width={32}
                 height={32}
@@ -485,7 +485,7 @@ async function TeamTable({
                 <td className="py-1.5 px-2 align-top">
                   <div className="flex items-center gap-1 min-w-0">
                     <Image
-                      src={`/logos/${teamSlug(r.away)}.png`}
+                      src={`/logos/${teamSlug(r.away)}.webp`}
                       alt={`${r.away} logo`}
                       width={20}
                       height={20}
@@ -498,7 +498,7 @@ async function TeamTable({
                 <td className="py-1.5 px-2 align-top">
                   <div className="flex items-center gap-1 min-w-0">
                     <Image
-                      src={`/logos/${teamSlug(r.home)}.png`}
+                      src={`/logos/${teamSlug(r.home)}.webp`}
                       alt={`${r.home} logo`}
                       width={20}
                       height={20}

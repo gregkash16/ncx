@@ -126,7 +126,7 @@ export default function IndStatsSearch() {
               const name = `${p.first} ${p.last}`.trim() || p.ncxid;
               const wl = `${p.wins}-${p.losses}`;
               const slug = teamSlug(p.team);
-              const logoSrc = slug ? `/logos/${slug}.png` : `/logos/default.png`;
+              const logoSrc = slug ? `/logos/${slug}.webp` : `/logos/default.png`;
 
               return (
                 <li

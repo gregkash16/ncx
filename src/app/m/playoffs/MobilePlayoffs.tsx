@@ -88,8 +88,8 @@ function RegionCard({ region }: { region: Region }) {
     const awayHref = `/m/team/${encodeURIComponent(away.slug)}`;
     const homeHref = `/m/team/${encodeURIComponent(home.slug)}`;
 
-    const awayLogo = `/logos/${away.slug}.png`;
-    const homeLogo = `/logos/${home.slug}.png`;
+    const awayLogo = `/logos/${away.slug}.webp`;
+    const homeLogo = `/logos/${home.slug}.webp`;
 
     return (
       <div className="rounded-xl bg-neutral-950/70 border border-neutral-800 px-3 py-2 text-sm">
@@ -164,7 +164,7 @@ function RegionCard({ region }: { region: Region }) {
       <header className="flex items-center gap-3">
         <div className="h-9 w-9 rounded-xl bg-neutral-950 border border-neutral-700 flex items-center justify-center overflow-hidden">
           <Image
-            src={`/logos/${oneSeed.slug}.png`}
+            src={`/logos/${oneSeed.slug}.webp`}
             alt={`${topSeedTeam} logo`}
             width={36}
             height={36}

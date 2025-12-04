@@ -39,7 +39,7 @@ function Logo({
   side: "left" | "right";
 }) {
   const slug = teamSlug(name);
-  const src = slug ? `/logos/${slug}.png` : `/logos/default.png`;
+  const src = slug ? `/logos/${slug}.webp` : `/logos/default.png`;
   return (
     <Image
       src={src}

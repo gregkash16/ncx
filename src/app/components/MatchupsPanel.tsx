@@ -337,8 +337,8 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const awayTeam = row.awayTeam || "Away Team";
   const homeTeam = row.homeTeam || "Home Team";
 
-  const awayLogoPath = `/logos/${teamSlug(row.awayTeam)}.png`;
-  const homeLogoPath = `/logos/${teamSlug(row.homeTeam)}.png`;
+  const awayLogoPath = `/logos/${teamSlug(row.awayTeam)}.webp`;
+  const homeLogoPath = `/logos/${teamSlug(row.homeTeam)}.webp`;
   const mainLogoPath = "/logo.png";
 
   const awayColorHex = getTeamColorHex(awayTeam);
@@ -1085,8 +1085,8 @@ export default function MatchupsPanel({
                 ? "home"
                 : "tie";
 
-            const awayLogo = `/logos/${teamSlug(row.awayTeam)}.png`;
-            const homeLogo = `/logos/${teamSlug(row.homeTeam)}.png`;
+            const awayLogo = `/logos/${teamSlug(row.awayTeam)}.webp`;
+            const homeLogo = `/logos/${teamSlug(row.homeTeam)}.webp`;
 
             const leftColor =
               winner === "away" ? GREEN : winner === "home" ? RED : TIE;

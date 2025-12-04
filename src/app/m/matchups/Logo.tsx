@@ -19,7 +19,7 @@ function teamSlug(name: string) {
 }
 
 export default function Logo({ team, size = 32, className = '', altPrefix = '' }: LogoProps) {
-  const [src, setSrc] = useState(`/logos/${teamSlug(team)}.png`);
+  const [src, setSrc] = useState(`/logos/${teamSlug(team)}.webp`);
 
   return (
     <Image

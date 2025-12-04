@@ -298,7 +298,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
     if (!slug) return null;
     return (
       <Image
-        src={`/logos/${slug}.png`} // ✅ absolute path under /public/logos
+        src={`/logos/${slug}.webp`} // ✅ absolute path under /public/logos
         alt={`${name} logo`}
         width={24}
         height={24}

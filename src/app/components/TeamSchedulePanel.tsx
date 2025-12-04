@@ -144,7 +144,7 @@ function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
       <div className="flex items-center justify-end gap-2 text-green-400 font-semibold">
         <span>Winner</span>
         <Image
-          src={`/logos/${teamSlug(teamName)}.png`}
+          src={`/logos/${teamSlug(teamName)}.webp`}
           alt={`${teamName} logo`}
           width={24}
           height={24}
@@ -159,7 +159,7 @@ function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
       <div className="flex items-center justify-end gap-2 text-red-400 font-semibold">
         <span>Loser</span>
         <Image
-          src={`/logos/${teamSlug(teamName)}.png`}
+          src={`/logos/${teamSlug(teamName)}.webp`}
           alt={`${teamName} logo`}
           width={24}
           height={24}
@@ -266,7 +266,7 @@ export default async function TeamSchedulePanel({
           <header className="flex items-center gap-3">
             <span className="shrink-0 rounded-md overflow-hidden bg-zinc-800 border border-zinc-700 w-[40px] h-[40px] flex items-center justify-center">
               <Image
-                src={`/logos/${teamSlug(teamName)}.png`}
+                src={`/logos/${teamSlug(teamName)}.webp`}
                 alt={`${teamName} logo`}
                 width={40}
                 height={40}
@@ -525,7 +525,7 @@ async function TeamTable({
                 <td className="py-2 px-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <Image
-                      src={`/logos/${teamSlug(r.away)}.png`}
+                      src={`/logos/${teamSlug(r.away)}.webp`}
                       alt={`${r.away} logo`}
                       width={24}
                       height={24}
@@ -540,7 +540,7 @@ async function TeamTable({
                 <td className="py-2 px-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <Image
-                      src={`/logos/${teamSlug(r.home)}.png`}
+                      src={`/logos/${teamSlug(r.home)}.webp`}
                       alt={`${r.home} logo`}
                       width={24}
                       height={24}

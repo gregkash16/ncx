@@ -6,7 +6,7 @@ import MyMatchupWidget from "@/app/components/MyMatchupWidget";
 type TeamLogo = {
   /** Display name, used for alt text + tooltip */
   name: string;
-  /** Path to the logo in /public/logos, e.g. "/logos/jagged-axe.png" */
+  /** Path to the logo in /public/logos, e.g. "/logos/jagged-axe.webp" */
   logoSrc: string;
   /**
    * Value used to pre-filter Ind. Stats by team
@@ -40,30 +40,30 @@ type HomeLandingProps = {
 };
 
 const teams: TeamLogo[] = [
-  { name: "BERSERKERS",           logoSrc: "/logos/berserkers.png",           filterValue: "BERSERKERS" },
-  { name: "DEGENERATES",          logoSrc: "/logos/degenerates.png",          filterValue: "DEGENERATES" },
-  { name: "FIREBIRDS",            logoSrc: "/logos/firebirds.png",            filterValue: "FIREBIRDS" },
-  { name: "FOXES",                logoSrc: "/logos/foxes.png",                filterValue: "FOXES" },
-  { name: "GALACTIC WARDENS",     logoSrc: "/logos/galactic-wardens.png",     filterValue: "GALACTIC WARDENS" },
-  { name: "HAVOC",                logoSrc: "/logos/havoc.png",                filterValue: "HAVOC" },
-  { name: "HEADHUNTERS",          logoSrc: "/logos/headhunters.png",          filterValue: "HEADHUNTERS" },
-  { name: "HOTSHOTS",             logoSrc: "/logos/hotshots.png",             filterValue: "HOTSHOTS" },
-  { name: "JAGGED AXE",           logoSrc: "/logos/jagged-axe.png",           filterValue: "JAGGED AXE" },
-  { name: "KDB",                  logoSrc: "/logos/kdb.png",                  filterValue: "KDB" },
-  { name: "MAWLERS",              logoSrc: "/logos/mawlers.png",              filterValue: "MAWLERS" },
-  { name: "MEATBAGS",             logoSrc: "/logos/meatbags.png",             filterValue: "MEATBAGS" },
-  { name: "MEGA MILK UNION",      logoSrc: "/logos/mega-milk-union.png",      filterValue: "MEGA MILK UNION" },
-  { name: "MISFITS",              logoSrc: "/logos/misfits.png",              filterValue: "MISFITS" },
-  { name: "MON CALA SC",          logoSrc: "/logos/mon-cala-sc.png",          filterValue: "MON CALA SC" },
-  { name: "NERF HERDERS",         logoSrc: "/logos/nerf-herders.png",         filterValue: "NERF HERDERS" },
-  { name: "ORDER 66",             logoSrc: "/logos/order-66.png",             filterValue: "ORDER 66" },
-  { name: "OUTER RIM HEROES",     logoSrc: "/logos/outer-rim-heroes.png",     filterValue: "OUTER RIM HEROES" },
-  { name: "PUDDLE JUMPERS",       logoSrc: "/logos/puddle-jumpers.png",       filterValue: "PUDDLE JUMPERS" },
-  { name: "PUNISHERS",            logoSrc: "/logos/punishers.png",            filterValue: "PUNISHERS" },
-  { name: "RAVE CRAB CHAMPIONS",  logoSrc: "/logos/rave-crab-champions.png",  filterValue: "RAVE CRAB CHAMPIONS" },
-  { name: "STARKILLERS",          logoSrc: "/logos/starkillers.png",          filterValue: "STARKILLERS" },
-  { name: "VOODOO KREWE",         logoSrc: "/logos/voodoo-krewe.png",         filterValue: "VOODOO KREWE" },
-  { name: "WOLFPACK",             logoSrc: "/logos/wolfpack.png",             filterValue: "WOLFPACK" },
+  { name: "BERSERKERS",           logoSrc: "/logos/berserkers.webp",           filterValue: "BERSERKERS" },
+  { name: "DEGENERATES",          logoSrc: "/logos/degenerates.webp",          filterValue: "DEGENERATES" },
+  { name: "FIREBIRDS",            logoSrc: "/logos/firebirds.webp",            filterValue: "FIREBIRDS" },
+  { name: "FOXES",                logoSrc: "/logos/foxes.webp",                filterValue: "FOXES" },
+  { name: "GALACTIC WARDENS",     logoSrc: "/logos/galactic-wardens.webp",     filterValue: "GALACTIC WARDENS" },
+  { name: "HAVOC",                logoSrc: "/logos/havoc.webp",                filterValue: "HAVOC" },
+  { name: "HEADHUNTERS",          logoSrc: "/logos/headhunters.webp",          filterValue: "HEADHUNTERS" },
+  { name: "HOTSHOTS",             logoSrc: "/logos/hotshots.webp",             filterValue: "HOTSHOTS" },
+  { name: "JAGGED AXE",           logoSrc: "/logos/jagged-axe.webp",           filterValue: "JAGGED AXE" },
+  { name: "KDB",                  logoSrc: "/logos/kdb.webp",                  filterValue: "KDB" },
+  { name: "MAWLERS",              logoSrc: "/logos/mawlers.webp",              filterValue: "MAWLERS" },
+  { name: "MEATBAGS",             logoSrc: "/logos/meatbags.webp",             filterValue: "MEATBAGS" },
+  { name: "MEGA MILK UNION",      logoSrc: "/logos/mega-milk-union.webp",      filterValue: "MEGA MILK UNION" },
+  { name: "MISFITS",              logoSrc: "/logos/misfits.webp",              filterValue: "MISFITS" },
+  { name: "MON CALA SC",          logoSrc: "/logos/mon-cala-sc.webp",          filterValue: "MON CALA SC" },
+  { name: "NERF HERDERS",         logoSrc: "/logos/nerf-herders.webp",         filterValue: "NERF HERDERS" },
+  { name: "ORDER 66",             logoSrc: "/logos/order-66.webp",             filterValue: "ORDER 66" },
+  { name: "OUTER RIM HEROES",     logoSrc: "/logos/outer-rim-heroes.webp",     filterValue: "OUTER RIM HEROES" },
+  { name: "PUDDLE JUMPERS",       logoSrc: "/logos/puddle-jumpers.webp",       filterValue: "PUDDLE JUMPERS" },
+  { name: "PUNISHERS",            logoSrc: "/logos/punishers.webp",            filterValue: "PUNISHERS" },
+  { name: "RAVE CRAB CHAMPIONS",  logoSrc: "/logos/rave-crab-champions.webp",  filterValue: "RAVE CRAB CHAMPIONS" },
+  { name: "STARKILLERS",          logoSrc: "/logos/starkillers.webp",          filterValue: "STARKILLERS" },
+  { name: "VOODOO KREWE",         logoSrc: "/logos/voodoo-krewe.webp",         filterValue: "VOODOO KREWE" },
+  { name: "WOLFPACK",             logoSrc: "/logos/wolfpack.webp",             filterValue: "WOLFPACK" },
 ];
 
 // Ensure alphabetical order by name

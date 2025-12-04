@@ -441,7 +441,7 @@ export default async function StandingsPanel() {
             <tbody className="text-sm">
               {data.map((row) => {
                 const slug = teamNameToSlug(row.team);
-                const logoSrc = `/logos/${slug}.png`;
+                const logoSrc = `/logos/${slug}.webp`;
                 const href = `/?tab=team&team=${encodeURIComponent(slug)}`;
 
                 const { dir, count } = getStreakForTeam(

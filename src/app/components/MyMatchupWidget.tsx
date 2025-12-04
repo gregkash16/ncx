@@ -225,10 +225,10 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
   const { game, away, home, alreadyFilled } = myGame;
 
   const awayLogo = teamSlug(away.team)
-    ? `/logos/${teamSlug(away.team)}.png`
+    ? `/logos/${teamSlug(away.team)}.webp`
     : "/logos/default.png";
   const homeLogo = teamSlug(home.team)
-    ? `/logos/${teamSlug(home.team)}.png`
+    ? `/logos/${teamSlug(home.team)}.webp`
     : "/logos/default.png";
 
   const awayScoreDisplay = awayPts === "" ? "—" : awayPts;

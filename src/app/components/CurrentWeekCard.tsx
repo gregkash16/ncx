@@ -50,7 +50,7 @@ function Logo({
   size?: number;
   className?: string;
 }) {
-  const src = `/logos/${teamSlug(name)}.png`;
+  const src = `/logos/${teamSlug(name)}.webp`;
   return (
     <img
       src={src}

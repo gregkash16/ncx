@@ -244,7 +244,7 @@ export default function MobileReportPage() {
     if (!slug) return null;
     return (
       <Image
-        src={`/logos/${slug}.png`}
+        src={`/logos/${slug}.webp`}
         alt={`${name} logo`}
         width={20}
         height={20}
