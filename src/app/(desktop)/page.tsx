@@ -1,11 +1,10 @@
 // /src/app/(desktop)/page.tsx
 
-// Cache the rendered page for 60s so we don't re-hit Sheets every request
+// Cache the rendered page for 60s so we don't re-hit DB / Sheets every request
 export const revalidate = 60;
 
 import { Suspense } from "react";
 
-// components live at /src/app/components relative to (desktop)
 import CurrentWeekCard from "../components/CurrentWeekCard";
 import StandingsPanel from "../components/StandingsPanel";
 import MatchupsPanel from "../components/MatchupsPanel";
@@ -31,7 +30,7 @@ import {
   fetchStreamScheduleCached,
   fetchFactionMapCached,
   fetchAdvStatsCached,
-  fetchListsForWeekCached, // 👈 NEW
+  fetchListsForWeekCached,
   type MatchRow,
   type IndRow,
 } from "@/lib/googleSheets";
@@ -155,9 +154,10 @@ function mapAdvTable1Row(raw: any[]): TeamAdvStats {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Record<string, string | string[] | undefined>;
+  // Next 15: searchParams is async in server components
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const sp = searchParams;
+  const sp = await searchParams;
 
   // Read team param for the Team tab (slug like "kdb")
   const teamParam = (sp?.team as string | undefined) || undefined;
@@ -202,11 +202,11 @@ export default async function HomePage({
     factionMap,
     advStatsRaw,
   ] = await Promise.all([
-    fetchMatchupsDataCached(), // active week (cached 60s)
-    fetchIndStatsDataCached(), // cached 5m
-    fetchStreamScheduleCached(), // cached 5m
-    fetchFactionMapCached(), // tiny in-memory cache + live read
-    fetchAdvStatsCached(), // advanced stats (same source as AdvStatsPanelServer)
+    fetchMatchupsDataCached(), // active week (cached)
+    fetchIndStatsDataCached(), // ind stats (cached)
+    fetchStreamScheduleCached(), // stream schedule (cached)
+    fetchFactionMapCached(), // NCXID -> faction
+    fetchAdvStatsCached(), // advanced stats (AdvStatsPanel)
   ]);
 
   // 2) Read ?w=WEEK N and enforce "only up to active"
@@ -227,7 +227,7 @@ export default async function HomePage({
   // 3b) Fetch Lists for that same week (cached)
   const { listsMap } = await fetchListsForWeekCached(weekLabelForPanel);
 
-  // Attach Discord IDs by NCXID (for Matchups + roster DM links)
+  // 4) Attach Discord IDs by NCXID (for Matchups + roster DM links)
   const discordMap = await getDiscordMapCached();
   const ncxToDiscord: Record<string, string> = {};
   for (const [discordId, payload] of Object.entries(discordMap ?? {})) {
@@ -317,7 +317,7 @@ export default async function HomePage({
                 scheduleMap={streamSched.scheduleMap}
                 indStats={indStats ?? []}
                 factionMap={factionMap}
-                listsForWeek={listsMap} // 👈 NEW PROP
+                listsForWeek={listsMap}
               />
             }
             standingsPanel={<StandingsPanel key="standings" />}

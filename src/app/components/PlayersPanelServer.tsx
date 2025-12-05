@@ -1,12 +1,12 @@
 // src/app/components/PlayersPanelServer.tsx
 // Server Component (no 'use client')
+
 import PlayersPanel from "./PlayersPanel";
-import { fetchAllTimeStatsCached } from "@/lib/googleSheets";
+import { getMysqlPool } from "@/lib/mysql";
 import { fetchVideosByNCXID } from "@/lib/youtube";
 
 /**
- * Exported so PlayersPanel.tsx (client) can `import type { PlayerRow } from "./PlayersPanelServer"`.
- * NOTE: Do not add runtime-only fields here unless PlayersPanel also expects them.
+ * Exported so PlayersPanel.tsx (client) can `import type { PlayerRow }`.
  */
 export type PlayerRow = {
   ncxid: string;
@@ -20,114 +20,78 @@ export type PlayerRow = {
   games: string;
   winPct: string;
   ppg: string;
-  seasons: (string | null)[]; // S1..S8 team names, null if empty
+  seasons: (string | null)[];
   championships: string;
 };
 
-/**
- * ⬇️ Add your playlist IDs here. Only these will be scanned for ncxid tags.
- * You can update this list at deploy time without touching any client code.
- *
- * Examples:
- *  - https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxx  -> list param is the playlistId
- */
+/** Playlists to scan for tagged videos */
 export const PLAYLIST_IDS: string[] = [
-  // S8
-  "PLthDdnmc3AhMNcXcyb6thZpdCjWbt8RoP",
-  // S7
-  "PLthDdnmc3AhPIAWm3Eg14LKA-DXDcqsGf",
-  // S6
-  "PLthDdnmc3AhMAmg_RiTD6M5_Im5Me9Pb-",
-  // S5
-  "PLthDdnmc3AhObY8AVPxno8D5eIUMPTTh0",
-  // S4
-  "PLthDdnmc3AhMXKzs-EVzwT1sibGpOXLGo",
-  // S3
-  "PLthDdnmc3AhPeLNZTI36p2eMFkSk1JbqM",
-  // S2
-  "PLthDdnmc3AhNxzabFnsm3kKVWNXl5qdkG",
-  // S1
-  "PLthDdnmc3AhNfRyS_9RA3PY6v1g2ZmYLz",
+  "PLthDdnmc3AhMNcXcyb6thZpdCjWbt8RoP", // S8
+  "PLthDdnmc3AhPIAWm3Eg14LKA-DXDcqsGf", // S7
+  "PLthDdnmc3AhMAmg_RiTD6M5_Im5Me9Pb-", // S6
+  "PLthDdnmc3AhObY8AVPxno8D5eIUMPTTh0", // S5
+  "PLthDdnmc3AhMXKzs-EVzwT1sibGpOXLGo", // S4
+  "PLthDdnmc3AhPeLNZTI36p2eMFkSk1JbqM", // S3
+  "PLthDdnmc3AhNxzabFnsm3kKVWNXl5qdkG", // S2
+  "PLthDdnmc3AhNfRyS_9RA3PY6v1g2ZmYLz", // S1
 ];
 
-
-/**
- * Server-helper: fetch videos for an NCXID across the configured playlists.
- * Returns a minimal shape you can pass to a client video gallery.
- *
- * Usage (server-side only):
- *   const vids = await fetchPlayerVideos("NCX123");
- */
-export async function fetchPlayerVideos(ncxid: string) {
-  if (!ncxid) return [];
-  if (!PLAYLIST_IDS.length) return [];
-
-  try {
-    const videos = await fetchVideosByNCXID(ncxid, PLAYLIST_IDS);
-    // Normalize to a lean shape for the client
-    return videos.map(v => ({
-      id: v.id,
-      title: v.title,
-      tags: v.tags ?? [],
-      thumb: `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`,
-      embedUrl: `https://www.youtube.com/embed/${v.id}`,
-    }));
-  } catch (err) {
-    console.error("[fetchPlayerVideos] Failed:", err);
-    return [];
-  }
-}
-
-/** ---------- existing logic below (unchanged) ---------- */
-
-function toStr(v: unknown) {
-  return (v ?? "").toString().trim();
-}
+/** Helper: numeric sort based on NCXID */
 function ncxNumber(id: string): number {
   const m = (id || "").match(/\d+/);
   return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
 }
 
+/** Main server component */
 export default async function PlayersPanelServer() {
+  const pool = getMysqlPool();
+
   try {
-    // Pull from cached helper (10 min revalidate)
-    const rows = (await fetchAllTimeStatsCached()) as string[][];
+    const [rows] = await pool.query<any[]>(`
+      SELECT
+        ncxid,
+        first_name,
+        last_name,
+        discord,
+        wins,
+        losses,
+        points,
+        plms,
+        games,
+        win_pct,
+        ppg,
+        s1, s2, s3, s4, s5, s6, s7, s8,
+        championships
+      FROM S8.all_time_stats
+      ORDER BY id ASC
+    `);
 
-    const data: PlayerRow[] = (rows ?? [])
-      .map((r) => {
-        const first = toStr(r[1]);
-        if (!first) return null; // skip rows without first name
+    const data: PlayerRow[] = rows.map((r) => ({
+      ncxid: String(r.ncxid ?? ""),
+      first: String(r.first_name ?? ""),
+      last: String(r.last_name ?? ""),
+      discord: String(r.discord ?? ""),
+      wins: String(r.wins ?? ""),
+      losses: String(r.losses ?? ""),
+      points: String(r.points ?? ""),
+      plms: String(r.plms ?? ""),
+      games: String(r.games ?? ""),
+      winPct: String(r.win_pct ?? ""),
+      ppg: String(r.ppg ?? ""),
+      seasons: [
+        r.s1 || null,
+        r.s2 || null,
+        r.s3 || null,
+        r.s4 || null,
+        r.s5 || null,
+        r.s6 || null,
+        r.s7 || null,
+        r.s8 || null,
+      ],
+      championships: String(r.championships ?? ""),
+    }));
 
-        const seasons = [
-          toStr(r[12]) || null, // M: S1
-          toStr(r[13]) || null, // N: S2
-          toStr(r[14]) || null, // O: S3
-          toStr(r[15]) || null, // P: S4
-          toStr(r[16]) || null, // Q: S5
-          toStr(r[17]) || null, // R: S6
-          toStr(r[18]) || null, // S: S7
-          toStr(r[19]) || null, // T: S8
-        ];
-
-        return {
-          ncxid: toStr(r[0]),
-          first,
-          last: toStr(r[2]),
-          discord: toStr(r[3]),
-          wins: toStr(r[4]),
-          losses: toStr(r[5]),
-          points: toStr(r[6]),
-          plms: toStr(r[7]),
-          games: toStr(r[8]),
-          winPct: toStr(r[9]),
-          ppg: toStr(r[10]),
-          seasons,
-          championships: toStr(r[20]), // U: Championships
-        };
-      })
-      .filter(Boolean) as PlayerRow[];
-
-    // Sort by NCXID numeric part: NCX01, NCX02, ..., NCX99
+    // Sort NCXID numerically: NCX01 → NCX99
     data.sort((a, b) => {
       const na = ncxNumber(a.ncxid);
       const nb = ncxNumber(b.ncxid);
@@ -135,17 +99,31 @@ export default async function PlayersPanelServer() {
       return a.ncxid.localeCompare(b.ncxid, undefined, { numeric: true });
     });
 
-    // Note: We intentionally do NOT pass any YouTube data to PlayersPanel yet,
-    // to avoid changing its prop shape. You can fetch on-demand in a client
-    // component via an API route that calls `fetchPlayerVideos()`, or create a
-    // small server wrapper to hydrate the initial player's videos.
-
     return <PlayersPanel data={data} />;
+
   } catch (err: any) {
     return (
       <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">
-        Failed to load Player Stats. {toStr(err?.message)}
+        Failed to load Player Stats. {String(err?.message ?? "")}
       </div>
     );
+  }
+}
+
+/** Optional server helper for fetching videos for an NCXID */
+export async function fetchPlayerVideos(ncxid: string) {
+  if (!ncxid || !PLAYLIST_IDS.length) return [];
+
+  try {
+    const videos = await fetchVideosByNCXID(ncxid, PLAYLIST_IDS);
+    return videos.map((v) => ({
+      id: v.id,
+      title: v.title,
+      tags: v.tags ?? [],
+      thumb: `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`,
+      embedUrl: `https://www.youtube.com/embed/${v.id}`,
+    }));
+  } catch {
+    return [];
   }
 }

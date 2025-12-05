@@ -1,13 +1,27 @@
-// /src/app/(desktop)/teams/[slug]/page.tsx
+import { NextResponse } from "next/server";
+import { getMysqlPool } from "@/lib/mysql";
 
-import { redirect } from "next/navigation";
+export async function GET() {
+  try {
+    const pool = getMysqlPool();
 
-export default function TeamRoute({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const { slug } = params;
+    const [rows] = await pool.query<any[]>(
+      `
+        SELECT DISTINCT awayTeam AS team FROM weekly_matchups
+        UNION
+        SELECT DISTINCT homeTeam AS team FROM weekly_matchups
+        ORDER BY team ASC
+      `
+    );
 
-  return redirect(`/?tab=team&team=${encodeURIComponent(slug)}`);
+    const teams = rows.map((r) => r.team).filter(Boolean);
+
+    return NextResponse.json({ ok: true, teams });
+  } catch (err: any) {
+    console.error("GET /api/teams error:", err);
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Failed to load teams" },
+      { status: 500 }
+    );
+  }
 }

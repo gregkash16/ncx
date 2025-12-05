@@ -2,8 +2,11 @@
 // Server Component: no 'use client'
 import type React from "react";
 import Link from "next/link";
-import { getSheets } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
+import {
+  fetchMatchupsDataCached,
+  type MatchRow,
+} from "@/lib/googleSheets";
 
 type SeriesRow = {
   awayTeam: string;
@@ -17,7 +20,13 @@ function toInt(val: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function WinBoxes({ wins, direction = "right" }: { wins: number; direction?: "left" | "right" }) {
+function WinBoxes({
+  wins,
+  direction = "right",
+}: {
+  wins: number;
+  direction?: "left" | "right";
+}) {
   const count = Math.max(0, Math.min(4, wins)); // clamp between 0–4
   return (
     <div className="flex items-center gap-1">
@@ -82,6 +91,76 @@ function normalizeWeekTab(label?: string | null) {
   return String(label ?? "").trim().toUpperCase() || "WEEK 1";
 }
 
+/**
+ * Build series rows from weekly_matchups in MySQL.
+ * We treat each 7-game block (seriesNo) between a pair of teams as a series.
+ * Wins are derived from game points.
+ */
+function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
+  type SeriesAgg = {
+    teamA: string;
+    teamB: string;
+    winsA: number;
+    winsB: number;
+  };
+
+  const map = new Map<string, SeriesAgg>();
+
+  for (const m of matches) {
+    const rawAway = (m.awayTeam ?? "").trim();
+    const rawHome = (m.homeTeam ?? "").trim();
+    if (!rawAway || !rawHome) continue;
+
+    // Determine series number (already computed in MatchRow, but fall back if missing)
+    const gameNum = toInt(m.game);
+    const seriesNo =
+      typeof m.seriesNo === "number" && m.seriesNo > 0
+        ? m.seriesNo
+        : gameNum > 0
+        ? Math.ceil(gameNum / 7)
+        : 0;
+    if (!seriesNo) continue;
+
+    // Sort teams to get a stable "left/right" order
+    const [teamA, teamB] =
+      rawAway.localeCompare(rawHome) <= 0
+        ? [rawAway, rawHome]
+        : [rawHome, rawAway];
+
+    const key = `${seriesNo}|${teamA}|${teamB}`;
+
+    let agg = map.get(key);
+    if (!agg) {
+      agg = { teamA, teamB, winsA: 0, winsB: 0 };
+      map.set(key, agg);
+    }
+
+    // Try to award a win if scores are filled
+    const awayPts = Number(String(m.awayPts ?? "").trim() || "NaN");
+    const homePts = Number(String(m.homePts ?? "").trim() || "NaN");
+    const awayValid = Number.isFinite(awayPts);
+    const homeValid = Number.isFinite(homePts);
+
+    if (awayValid && homeValid && awayPts !== homePts) {
+      const winnerName = awayPts > homePts ? rawAway : rawHome;
+      if (winnerName === agg.teamA) agg.winsA += 1;
+      else if (winnerName === agg.teamB) agg.winsB += 1;
+    }
+  }
+
+  const series: SeriesRow[] = [];
+  for (const agg of map.values()) {
+    series.push({
+      awayTeam: agg.teamA,
+      awayWins: agg.winsA,
+      homeTeam: agg.teamB,
+      homeWins: agg.winsB,
+    });
+  }
+
+  return series;
+}
+
 export default async function CurrentWeekCard({
   activeWeek,
   selectedWeek,
@@ -89,51 +168,35 @@ export default async function CurrentWeekCard({
   activeWeek: string;
   selectedWeek?: string | null;
 }) {
-  const spreadsheetId =
-    process.env.NCX_LEAGUE_SHEET_ID || process.env.SHEETS_SPREADSHEET_ID;
+  // 🔹 Match the logic from page.tsx exactly:
+  // - If selectedWeek is valid, fetch that week.
+  // - Otherwise, fetch the active week.
+  let weekLabelForCard: string;
+  let matches: MatchRow[] = [];
 
-  if (!spreadsheetId) {
-    return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
-        <h2 className="text-xl font-semibold text-pink-400">Current Week</h2>
-        <p className="mt-2 text-zinc-400">
-          Missing env var <code>NCX_LEAGUE_SHEET_ID</code>.
-        </p>
-      </div>
-    );
-  }
-
-  const sheets = getSheets();
-
-  // Determine which week to display
-  const showWeek = (selectedWeek && selectedWeek.trim()) || activeWeek || "WEEK 1";
-  const targetTab = normalizeWeekTab(showWeek);
-
-  const activeNum = parseWeekNum(activeWeek);
-  const pastWeeks =
-    activeNum && activeNum > 0
-      ? Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1))
-      : [];
-
-  // Fetch data for targetTab with graceful handling
-  let data: any[][] = [];
   try {
-    const resp = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${targetTab}!A1:Q120`,
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    data = resp.data.values ?? [];
+    if (selectedWeek && selectedWeek.trim()) {
+      const { weekTab, matches: fetched } = await fetchMatchupsDataCached(
+        selectedWeek
+      );
+      weekLabelForCard = weekTab;
+      matches = fetched ?? [];
+    } else {
+      const { weekTab, matches: fetched } = await fetchMatchupsDataCached();
+      weekLabelForCard = weekTab;
+      matches = fetched ?? [];
+    }
   } catch (err: any) {
     return (
       <div className="p-6 rounded-2xl bg-zinc-900/70 border border-red-800/60">
-        <h2 className="text-xl font-semibold text-red-400">Couldn’t load {targetTab}</h2>
+        <h2 className="text-xl font-semibold text-red-400">
+          Couldn’t load current week
+        </h2>
         <p className="mt-2 text-zinc-400">
           {process.env.NODE_ENV !== "production" && (
             <>
-              <span className="block">{String(err?.message ?? "Sheets API error")}</span>
-              <span className="block mt-1 text-zinc-500">
-                Checked range: <code>{`${targetTab}!A1:Q120`}</code>
+              <span className="block">
+                {String(err?.message ?? "MySQL / matchups load error")}
               </span>
             </>
           )}
@@ -142,30 +205,17 @@ export default async function CurrentWeekCard({
     );
   }
 
-  const series: SeriesRow[] = [];
-  for (let rowNum = 9; rowNum < 120; rowNum += 10) {
-    const idx = rowNum - 1;
-    const row = data[idx] ?? [];
+  const targetTab = normalizeWeekTab(weekLabelForCard);
+  const activeWeekNorm = normalizeWeekTab(activeWeek);
 
-    const awayTeam = (row[3] ?? "").toString().trim();
-    const awayWins = toInt(row[4]);
-    const homeTeam = (row[11] ?? "").toString().trim();
-    const homeWins = toInt(row[12]);
+  const activeNum = parseWeekNum(activeWeek);
+  const pastWeeks =
+    activeNum && activeNum > 0
+      ? Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1))
+      : [];
 
-    const emptyTeams =
-      (!awayTeam || awayTeam === "TBD") && (!homeTeam || homeTeam === "TBD");
-    const emptyWins =
-      (String(row[4] ?? "").trim() === "" ||
-        String(row[4]).trim() === "0" ||
-        String(row[4]).trim() === "-") &&
-      (String(row[12] ?? "").trim() === "" ||
-        String(row[12]).trim() === "0" ||
-        String(row[12]).trim() === "-");
-
-    if (emptyTeams && emptyWins) continue;
-
-    series.push({ awayTeam, awayWins, homeTeam, homeWins });
-  }
+  // Build series rows (aggregate per 7-game block & team pair)
+  const series = buildSeriesFromMatches(matches);
 
   const items = series.map((s) => {
     const seriesOver = s.awayWins >= 4 || s.homeWins >= 4;
@@ -185,7 +235,8 @@ export default async function CurrentWeekCard({
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 hover:border-purple-500/40 transition w-full">
       <h2 className="text-2xl font-extrabold text-center uppercase bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_20px_rgba(255,0,255,0.25)] mb-4 tracking-wide">
-        {targetTab === normalizeWeekTab(activeWeek) ? "Current Week" : "Week View"} — {targetTab}
+        {targetTab === activeWeekNorm ? "Current Week" : "Week View"} —{" "}
+        {targetTab}
       </h2>
 
       {/* Week selector strip */}
@@ -193,7 +244,8 @@ export default async function CurrentWeekCard({
         <div className="flex flex-wrap justify-center gap-2 mb-5">
           {pastWeeks.map((wk) => {
             const selected = wk.toUpperCase() === targetTab.toUpperCase();
-            const isActive = wk.toUpperCase() === normalizeWeekTab(activeWeek).toUpperCase();
+            const isActive =
+              wk.toUpperCase() === activeWeekNorm.toUpperCase();
 
             // 🔗 Always stay on Current Week tab when switching weeks
             const href =
@@ -251,7 +303,7 @@ export default async function CurrentWeekCard({
 
             const q = `${m.awayTeam} ${m.homeTeam}`;
             const href = `/?tab=matchups&w=${encodeURIComponent(
-              showWeek
+              targetTab
             )}&q=${encodeURIComponent(q)}`;
 
             return (
@@ -262,18 +314,22 @@ export default async function CurrentWeekCard({
                   className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border border-zinc-800 rounded-xl px-5 py-3 bg-zinc-950/60 relative overflow-hidden hover:border-purple-500/50 hover:bg-zinc-900/40 cursor-pointer"
                   style={gradientStyle}
                 >
-                  {/* Away */}
+                  {/* Away (left) */}
                   <div
                     className={[
                       "flex items-center justify-start text-zinc-300",
-                      m.awayWinner ? "font-bold uppercase" : m.homeWinner ? "line-through" : "",
+                      m.awayWinner
+                        ? "font-bold uppercase"
+                        : m.homeWinner
+                        ? "line-through"
+                        : "",
                     ].join(" ")}
                   >
                     <Logo name={m.awayTeam} side="left" />
                     <span className="break-words">{m.awayTeam}</span>
                   </div>
 
-                  {/* Center */}
+                  {/* Center score / win boxes */}
                   <div className="flex items-center justify-center gap-3 z-10">
                     <WinBoxes wins={m.awayWins} direction="left" />
                     <div className="text-center min-w-[5.5rem] font-semibold text-zinc-100">
@@ -282,11 +338,15 @@ export default async function CurrentWeekCard({
                     <WinBoxes wins={m.homeWins} direction="right" />
                   </div>
 
-                  {/* Home */}
+                  {/* Home (right) */}
                   <div
                     className={[
                       "flex items-center justify-end text-zinc-300",
-                      m.homeWinner ? "font-bold uppercase" : m.awayWinner ? "line-through" : "",
+                      m.homeWinner
+                        ? "font-bold uppercase"
+                        : m.awayWinner
+                        ? "line-through"
+                        : "",
                     ].join(" ")}
                   >
                     <span className="break-words">{m.homeTeam}</span>
