@@ -1,78 +1,105 @@
 // src/app/api/players/route.ts
 import { NextResponse } from "next/server";
-import { getSheets } from "@/lib/googleSheets";
+import { getMysqlPool } from "@/lib/mysql";
 
-// Keep this in sync with desktop columns (A..U)
-function toStr(v: unknown) {
-  return (v ?? "").toString().trim();
-}
+type Player = {
+  ncxid: string;
+  first: string;
+  last: string;
+  discord: string;
+  wins: number;
+  losses: number;
+  points: number;
+  plms: number;
+  games: number;
+  winPct: number;
+  ppg: number;
+  seasons: (string | null)[];
+  championships: string;
+};
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") || "").trim().toLowerCase();
-  const limit = Math.min(50, Math.max(5, Number(searchParams.get("limit") || 25)));
+  const limit = Math.min(
+    50,
+    Math.max(5, Number(searchParams.get("limit") || 25))
+  );
 
   if (!q) return NextResponse.json({ items: [] });
 
-  const spreadsheetId =
-    process.env.NCX_STATS_SHEET_ID || process.env.SHEETS_SPREADSHEET_ID;
+  const pool = getMysqlPool();
 
-  if (!spreadsheetId) {
-    return NextResponse.json({ items: [], error: "Missing NCX_STATS_SHEET_ID" }, { status: 500 });
-  }
+  // Mirror the SELECT used in PlayersPanelServer
+  const [rows] = await pool.query<any[]>(`
+      SELECT
+        ncxid,
+        first_name,
+        last_name,
+        discord,
+        wins,
+        losses,
+        points,
+        plms,
+        games,
+        win_pct,
+        ppg,
+        s1, s2, s3, s4, s5, s6, s7, s8,
+        championships
+      FROM S8.all_time_stats
+      ORDER BY id ASC
+  `);
 
-  const sheets = getSheets();
-  // ALL TIME STATS!A2:U500 (Row 1 headers) — same as desktop PlayersPanelServer
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "ALL TIME STATS!A2:U500",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-
-  const rows = (res.data.values ?? []) as string[][];
-  const all = rows
+  const all: Player[] = rows
     .map((r) => {
-      const first = toStr(r[1]);
-      if (!first) return null; // skip empty
-      const seasons = [
-        toStr(r[12]) || null,
-        toStr(r[13]) || null,
-        toStr(r[14]) || null,
-        toStr(r[15]) || null,
-        toStr(r[16]) || null,
-        toStr(r[17]) || null,
-        toStr(r[18]) || null,
-        toStr(r[19]) || null,
-      ];
+      const first = (r.first_name ?? "").toString().trim();
+      if (!first) return null; // skip blank rows
+
       return {
-        ncxid: toStr(r[0]),
+        ncxid: (r.ncxid ?? "").toString().trim(),
         first,
-        last: toStr(r[2]),
-        discord: toStr(r[3]),
-        wins: Number(toStr(r[4]) || 0),
-        losses: Number(toStr(r[5]) || 0),
-        points: Number(toStr(r[6]) || 0),
-        plms: Number(toStr(r[7]) || 0),
-        games: Number(toStr(r[8]) || 0),
-        winPct: Number(toStr(r[9]) || 0),
-        ppg: Number(toStr(r[10]) || 0),
-        seasons,
-        championships: toStr(r[20]),
+        last: (r.last_name ?? "").toString().trim(),
+        discord: (r.discord ?? "").toString().trim(),
+
+        // numeric stats
+        wins: Number(r.wins ?? 0),
+        losses: Number(r.losses ?? 0),
+        points: Number(r.points ?? 0),
+        plms: Number(r.plms ?? 0),
+        games: Number(r.games ?? 0),
+        winPct: Number(r.win_pct ?? 0),
+        ppg: Number(r.ppg ?? 0),
+
+        // seasons S1–S8
+        seasons: [
+          r.s1 || null,
+          r.s2 || null,
+          r.s3 || null,
+          r.s4 || null,
+          r.s5 || null,
+          r.s6 || null,
+          r.s7 || null,
+          r.s8 || null,
+        ],
+
+        // champ count (string so the badge renders the same)
+        championships: (r.championships ?? "").toString().trim(),
       };
     })
-    .filter(Boolean) as any[];
+    .filter(Boolean) as Player[];
 
-  // search by ncxid / name / discord — same fields desktop panel exposes
+  // search by ncxid / name / discord — same semantics as before
   const matches = all.filter((p) => {
     const name = `${p.first} ${p.last}`.toLowerCase();
+    const discord = (p.discord || "").toLowerCase();
     return (
       p.ncxid.toLowerCase().includes(q) ||
       name.includes(q) ||
-      p.discord.toLowerCase().includes(q)
+      discord.includes(q)
     );
   });
 
-  // sort: by games desc, then wins desc, then ncxid
+  // sort: games desc, then wins desc, then ncxid (same behavior as old route)
   matches.sort((a, b) => {
     if (b.games !== a.games) return b.games - a.games;
     if (b.wins !== a.wins) return b.wins - a.wins;

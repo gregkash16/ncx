@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { teamSlug } from "@/lib/slug";
 
-type TabKey = "current" | "matchups" | "standings" | "report" | "indstats";
 type Role = "player" | "captain" | "admin";
 
 type GameRow = {
@@ -34,6 +33,9 @@ type GameRow = {
   isMyGame: boolean;
   canEditAwayId: boolean;
   canEditHomeId: boolean;
+  // NEW: list URLs coming from GET /api/report-game
+  awayList?: string;
+  homeList?: string;
 };
 
 type FoundPayload = {
@@ -71,6 +73,10 @@ export default function MobileReportPage() {
   const [homeId, setHomeId] = useState("");
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
 
+  // NEW: list URLs
+  const [awayList, setAwayList] = useState("");
+  const [homeList, setHomeList] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -107,6 +113,8 @@ export default function MobileReportPage() {
           setScenario(g.scenario || "");
           setAwayId(g.away.id || "");
           setHomeId(g.home.id || "");
+          setAwayList(g.awayList || "");
+          setHomeList(g.homeList || "");
           setConfirmOverwrite(false);
         }
       } catch {
@@ -149,11 +157,20 @@ export default function MobileReportPage() {
     );
   }, [selectedGame, awayId, homeId]);
 
+  // NEW: detect list changes
+  const editingLists = useMemo(() => {
+    if (!selectedGame) return false;
+    return (
+      awayList !== (selectedGame.awayList || "") ||
+      homeList !== (selectedGame.homeList || "")
+    );
+  }, [selectedGame, awayList, homeList]);
+
   const canSubmit = useMemo(() => {
     if (!data || !data.ok || !selectedGame) return false;
 
     // Nothing changed? No submit.
-    if (!editingScores && !editingIds) return false;
+    if (!editingScores && !editingIds && !editingLists) return false;
 
     // If we’re editing scores, require scores + scenario,
     // and confirm overwrite if scores already exist.
@@ -162,13 +179,14 @@ export default function MobileReportPage() {
       if (selectedGame.alreadyFilled && !confirmOverwrite) return false;
     }
 
-    // If only IDs changed, that’s fine – backend enforces perms.
+    // If we’re only changing IDs or lists, that's fine – backend enforces perms & link validity.
     return true;
   }, [
     data,
     selectedGame,
     editingScores,
     editingIds,
+    editingLists,
     awayPts,
     homePts,
     scenario,
@@ -186,6 +204,9 @@ export default function MobileReportPage() {
         force: confirmOverwrite,
         newAwayId: awayId,
         newHomeId: homeId,
+        // always send lists; API will decide what to do
+        awayList: awayList.trim(),
+        homeList: homeList.trim(),
       };
 
       // Only send scores + scenario if they actually changed
@@ -205,9 +226,11 @@ export default function MobileReportPage() {
 
       if (!res.ok) {
         if (json?.reason === "ALREADY_FILLED") {
-          setNotice(
-            "Already filled. Check 'Confirm overwrite' to proceed."
-          );
+          setNotice("Already filled. Check 'Confirm overwrite' to proceed.");
+          return;
+        }
+        if (json?.reason === "BAD_LIST_LINK") {
+          setNotice(json?.message || "List link looks invalid. Use YASB or LBN.");
           return;
         }
         setNotice("Submission failed. " + (json?.reason ?? ""));
@@ -235,6 +258,8 @@ export default function MobileReportPage() {
     setScenario(g.scenario || "");
     setAwayId(g.away.id || "");
     setHomeId(g.home.id || "");
+    setAwayList(g.awayList || "");
+    setHomeList(g.homeList || "");
     setConfirmOverwrite(false);
     setNotice("");
   }
@@ -489,6 +514,38 @@ export default function MobileReportPage() {
             ))}
           </select>
         </label>
+      </div>
+
+      {/* Lists (optional) */}
+      <div className="space-y-2">
+        <span className="text-xs text-neutral-400">
+          Squad list links <span className="text-neutral-500">(optional)</span>
+        </span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-[11px] text-neutral-400">Away list (YASB / LBN)</span>
+            <input
+              type="url"
+              value={awayList}
+              onChange={(e) => setAwayList(e.target.value)}
+              className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-xs text-neutral-100 outline-none focus:border-pink-400/60"
+              placeholder="https://yasb.app/..."
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] text-neutral-400">Home list (YASB / LBN)</span>
+            <input
+              type="url"
+              value={homeList}
+              onChange={(e) => setHomeList(e.target.value)}
+              className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-xs text-neutral-100 outline-none focus:border-pink-400/60"
+              placeholder="https://launchbaynext.app/..."
+            />
+          </label>
+        </div>
+        <p className="text-[11px] text-neutral-500">
+          Paste YASB or LaunchBayNext URLs. Leave blank if you don&apos;t want to share lists.
+        </p>
       </div>
 
       {alreadyFilled && editingScores && (

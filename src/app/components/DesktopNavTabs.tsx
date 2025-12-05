@@ -1,4 +1,3 @@
-// src/app/components/DesktopNavTabs.tsx
 "use client";
 
 import Link from "next/link";
@@ -31,7 +30,7 @@ export default function DesktopNavTabs() {
   const paramTab = (searchParams.get("tab") as TabKey | null) ?? "home";
 
   const active =
-    pathname === "/" ? paramTab : (null as TabKey | null); // only highlight on home
+    pathname === "/" ? paramTab : (null as TabKey | null);
 
   const btnBase =
     "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
@@ -47,15 +46,18 @@ export default function DesktopNavTabs() {
         {tabs.map(({ key, label, href }) => {
           const isActive = pathname === "/" && active === key;
           return (
-            <Link key={key} href={href} scroll={false}>
-              <button type="button" className={btnBase}>
-                <span
-                  className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
-                    isActive ? "opacity-100" : ""
-                  }`}
-                />
-                <span className={labelLayer}>{label}</span>
-              </button>
+            <Link
+              key={key}
+              href={href}
+              scroll={false}
+              className={btnBase}
+            >
+              <span
+                className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
+                  isActive ? "opacity-100" : ""
+                }`}
+              />
+              <span className={labelLayer}>{label}</span>
             </Link>
           );
         })}
