@@ -4,66 +4,32 @@ type Props = {
   name: string;
   discordId?: string | null; // if missing, we render plain text
   className?: string;
-  titleSuffix?: string;      // tooltip text, e.g. "Open DM"
+  titleSuffix?: string;      // tooltip text, e.g. "Open in Discord app"
 };
 
-function isAndroid() {
-  if (typeof navigator === "undefined") return false;
-  return /Android/i.test(navigator.userAgent);
-}
-
-function appHref(discordId: string) {
-  // Desktop/Mac/iOS can usually handle the custom scheme directly.
-  // Android prefers an intent with a web fallback.
-  const https = `https://discord.com/users/${discordId}`;
-  if (isAndroid()) {
-    // Opens the Discord app if present; otherwise falls back to browser URL
-    return `intent://-/users/${discordId}#Intent;scheme=discord;package=com.discord;S.browser_fallback_url=${encodeURIComponent(
-      https
-    )};end`;
-  }
-  return `discord://-/users/${discordId}`;
+function isValidSnowflake(id: string | null | undefined): id is string {
+  return !!id && /^\d{5,}$/.test(id);
 }
 
 export default function PlayerDMLink({
   name,
   discordId,
   className,
-  titleSuffix = "Open DM",
+  titleSuffix = "Open in Discord app",
 }: Props) {
   // If we don't have a valid snowflake, just show text
-  if (!discordId || !/^\d{5,}$/.test(discordId)) {
+  if (!isValidSnowflake(discordId)) {
     return <span className={className}>{name}</span>;
   }
 
-  const httpsHref = `https://discord.com/users/${discordId}`;
-  const deepHref = appHref(discordId);
-
-  const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // For non-Android, we manually try the deep link then fallback to https
-    if (!isAndroid()) {
-      e.preventDefault();
-      const start = Date.now();
-      // Attempt to open the app
-      window.location.href = deepHref;
-
-      // If nothing handled it within ~1s, fallback to https
-      setTimeout(() => {
-        // Heuristic: if the page is still in foreground after 1s, assume it failed
-        if (!document.hidden && Date.now() - start > 900) {
-          window.open(httpsHref, "_blank", "noopener,noreferrer");
-        }
-      }, 1000);
-    }
-    // On Android, let the intent:// navigate normally (browser handles fallback)
-  };
+  // App deep link to the user's profile
+  const appHref = `discord://-/users/${discordId}`;
 
   return (
     <a
-      href={deepHref}
-      onClick={onClick}
-      target={isAndroid() ? "_self" : "_blank"}
-      rel="noopener noreferrer"
+      href={appHref}
+      target="_self"              // let the OS route to the app
+      rel="noreferrer"
       className={
         className
           ? `${className} hover:underline inline-flex items-center gap-1`

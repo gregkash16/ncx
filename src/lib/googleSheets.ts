@@ -264,7 +264,11 @@ export async function getDiscordMapCached(): Promise<
   Record<string, { ncxid: string; first: string; last: string }>
 > {
   const rows = await dbQuery<any>(`
-    SELECT discord_id, ncxid, first_name, last_name
+    SELECT
+      CAST(discord_id AS CHAR) AS discord_id,
+      ncxid,
+      first_name,
+      last_name
     FROM discord_map
   `);
 
@@ -274,7 +278,7 @@ export async function getDiscordMapCached(): Promise<
   > = {};
 
   for (const r of rows) {
-    const id = norm(r.discord_id);
+    const id = norm(r.discord_id); // now a precise string
     if (!id) continue;
     result[id] = {
       ncxid: norm(r.ncxid),
