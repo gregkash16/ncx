@@ -480,11 +480,18 @@ export type ListRow = {
   game: string;
   awayList: string;
   homeList: string;
+  awayLetters: string;
+  homeLetters: string;
 };
 
 export type ListsMapForWeek = Record<
   string,
-  { awayList?: string; homeList?: string }
+  {
+    awayList?: string;
+    homeList?: string;
+    awayLetters?: string;
+    homeLetters?: string;
+  }
 >;
 
 export async function fetchListsForWeek(weekOverride?: string) {
@@ -495,7 +502,7 @@ export async function fetchListsForWeek(weekOverride?: string) {
 
   const rows = await dbQuery<any>(
     `
-    SELECT week_label, game, away_list, home_list
+    SELECT week_label, game, away_list, home_list, away_letters, home_letters
     FROM lists
     WHERE week_label = ?
     `,
@@ -510,10 +517,14 @@ export async function fetchListsForWeek(weekOverride?: string) {
 
     const awayList = norm(r.away_list);
     const homeList = norm(r.home_list);
+    const awayLetters = norm(r.away_letters);
+    const homeLetters = norm(r.home_letters);
 
     map[game] = {
       awayList: awayList || undefined,
       homeList: homeList || undefined,
+      awayLetters: awayLetters || undefined,
+      homeLetters: homeLetters || undefined,
     };
   }
 

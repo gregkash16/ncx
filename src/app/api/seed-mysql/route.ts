@@ -80,6 +80,152 @@ function normalizeWeekLabel(label: string): string {
   return s.toUpperCase();
 }
 
+// ===== XWS + glyph helpers for lists =====
+
+const SHIP_ICON_MAP: Record<string, string> = {
+  aggressorassaultfighter: "i",
+  alphaclassstarwing: "&",
+  arc170starfighter: "c",
+  asf01bwing: "b",
+  attackshuttle: "g",
+  auzituckgunship: "@",
+  belbullab22starfighter: "[",
+  btanr2ywing: "{",
+  btanr2wywing: "{",
+  btla4ywing: "y",
+  btlbywing: ":",
+  btls8kwing: "k",
+  clonez95headhunter: "¡",
+  cr90corvette: "2",
+  croccruiser: "5",
+  customizedyt1300lightfreighter: "W",
+  droidtrifighter: "+",
+  delta7aethersprite: "\\",
+  delta7baethersprite: "\\",
+  escapecraft: "X",
+  eta2actis: "-",
+  ewing: "e",
+  fangfighter: "M",
+  fireball: "0",
+  firesprayclasspatrolcraft: "f",
+  g1astarfighter: "n",
+  gauntletfighter: "|",
+  gozanticlasscruiser: "4",
+  gr75mediumtransport: "1",
+  hmpdroidgunship: ".",
+  hwk290lightfreighter: "h",
+  hyenaclassdroidbomber: "=",
+  jumpmaster5000: "p",
+  kihraxzfighter: "r",
+  laatigunship: "/",
+  lambdaclasst4ashuttle: "l",
+  lancerclasspursuitcraft: "L",
+  m12lkimogilafighter: "K",
+  m3ainterceptor: "s",
+  mg100starfortress: "Z",
+  modifiedtielnfighter: "C",
+  modifiedyt1300lightfreighter: "m",
+  nabooroyaln1starfighter: "<",
+  nantexclassstarfighter: ";",
+  nimbusclassvwing: ",",
+  quadrijettransferspacetug: "q",
+  raiderclasscorvette: "3",
+  resistancetransport: ">",
+  resistancetransportpod: "?",
+  rogueclassstarfighter: "~",
+  rz1awing: "a",
+  rz2awing: "E",
+  scavengedyt1300: "Y",
+  scurrgh6bomber: "H",
+  sheathipedeclassshuttle: "%",
+  sithinfiltrator: "]",
+  st70assaultship: "}",
+  starviperclassattackplatform: "v",
+  syliureclasshyperspacering: "*",
+  t65xwing: "x",
+  t70xwing: "w",
+  tieadvancedv1: "R",
+  tieadvancedx1: "A",
+  tieagaggressor: "`",
+  tiebainterceptor: "j",
+  tiecapunisher: "N",
+  tieddefender: "D",
+  tiefofighter: "O",
+  tieininterceptor: "I",
+  tielnfighter: "F",
+  tiephphantom: "P",
+  tierbheavy: "J",
+  tiereaper: "V",
+  tiesabomber: "B",
+  tiesebomber: "!",
+  tiesffighter: "S",
+  tieskstriker: "T",
+  tievnsilencer: "$",
+  tiewiwhispermodifiedinterceptor: "#",
+  tridentclassassaultship: "6",
+  upsilonclasscommandshuttle: "U",
+  ut60duwing: "u",
+  v19torrentstarfighter: "^",
+  vcx100lightfreighter: "G",
+  vt49decimator: "d",
+  vultureclassdroidfighter: "_",
+  xiclasslightshuttle: "Q",
+  yt2400lightfreighter: "o",
+  yv666lightfreighter: "t",
+  z95af4headhunter: "z",
+};
+
+type XwsPilot = { ship: string };
+type XwsResponse = { pilots?: XwsPilot[] };
+
+function shipsToGlyphs(pilots: XwsPilot[] = []): string {
+  return pilots.map((p) => SHIP_ICON_MAP[p.ship] ?? "·").join("");
+}
+
+function buildPatternAnalyzerUrlFromList(listUrl: string): string | null {
+  if (!listUrl.startsWith("https://yasb.app")) return null;
+  const parts = listUrl.split("yasb.app/");
+  if (parts.length < 2) return null;
+  const dataLink = parts[1]; // "?f=...&d=..."
+  return `https://www.pattern-analyzer.app/api/yasb/xws${dataLink}`;
+}
+
+function buildLaunchBayUrlFromList(listUrl: string): string | null {
+  if (!listUrl.startsWith("https://launchbaynext.app")) return null;
+
+  const idx = listUrl.indexOf("lbx=");
+  if (idx === -1) return null;
+
+  let value = listUrl.slice(idx + "lbx=".length);
+  const ampIdx = value.indexOf("&");
+  if (ampIdx !== -1) {
+    value = value.slice(0, ampIdx);
+  }
+
+  return `https://launchbaynext.app/api/xws?lbx=${encodeURIComponent(value)}`;
+}
+
+async function fetchXwsFromListUrl(listUrl: string): Promise<XwsResponse | null> {
+  let upstream: string | null = null;
+
+  if (listUrl.startsWith("https://yasb.app")) {
+    upstream = buildPatternAnalyzerUrlFromList(listUrl);
+  } else if (listUrl.startsWith("https://launchbaynext.app")) {
+    upstream = buildLaunchBayUrlFromList(listUrl);
+  }
+
+  if (!upstream) return null;
+
+  try {
+    const res = await fetch(upstream, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as XwsResponse;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 // =============== GOOGLE SHEETS CLIENT ===============
 
 async function getSheetsClient() {
@@ -702,8 +848,15 @@ async function loadLists(sheets: any, conn: mysql.Connection) {
 
   const sql = `
     INSERT INTO lists (
-      week_label, game, away_list, home_list
-    ) VALUES (?,?,?,?)
+      week_label,
+      game,
+      away_list,
+      home_list,
+      away_xws,
+      home_xws,
+      away_letters,
+      home_letters
+    ) VALUES (?,?,?,?,?,?,?,?)
   `;
 
   for (const r0 of rows) {
@@ -716,7 +869,40 @@ async function loadLists(sheets: any, conn: mysql.Connection) {
     if (!weekRaw || !game) continue;
 
     const weekLabel = normalizeWeekLabel(weekRaw);
-    await conn.execute(sql, [weekLabel, game, awayList, homeList]);
+
+    let awayXwsJson: string | null = null;
+    let homeXwsJson: string | null = null;
+    let awayLetters: string | null = null;
+    let homeLetters: string | null = null;
+
+    if (awayList) {
+      const xws = await fetchXwsFromListUrl(awayList);
+      if (xws) {
+        awayXwsJson = JSON.stringify(xws);
+        const glyphs = shipsToGlyphs(xws.pilots ?? []);
+        awayLetters = glyphs || null;
+      }
+    }
+
+    if (homeList) {
+      const xws = await fetchXwsFromListUrl(homeList);
+      if (xws) {
+        homeXwsJson = JSON.stringify(xws);
+        const glyphs = shipsToGlyphs(xws.pilots ?? []);
+        homeLetters = glyphs || null;
+      }
+    }
+
+    await conn.execute(sql, [
+      weekLabel,
+      game,
+      awayList,
+      homeList,
+      awayXwsJson,
+      homeXwsJson,
+      awayLetters,
+      homeLetters,
+    ]);
   }
 }
 

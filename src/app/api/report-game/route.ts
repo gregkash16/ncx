@@ -1,4 +1,3 @@
-// src/app/api/report-game/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -271,6 +270,204 @@ function resolveRole(
   if (captainTeams.length > 0) return "captain";
   if (who?.ncxid) return "player";
   return null;
+}
+
+/* --------------------------- XWS / glyph helpers ------------------------- */
+
+type XwsPilot = {
+  ship: string;
+};
+
+type XwsResponse = {
+  pilots?: XwsPilot[];
+  [key: string]: any;
+};
+
+const SHIP_ICON_MAP: Record<string, string> = {
+  aggressorassaultfighter: "i",
+  alphaclassstarwing: "&",
+  arc170starfighter: "c",
+  asf01bwing: "b",
+  attackshuttle: "g",
+  auzituckgunship: "@",
+  belbullab22starfighter: "[",
+  btanr2ywing: "{",
+  btanr2wywing: "{",
+  btla4ywing: "y",
+  btlbywing: ":",
+  btls8kwing: "k",
+  clonez95headhunter: "¡",
+  cr90corvette: "2",
+  croccruiser: "5",
+  customizedyt1300lightfreighter: "W",
+  droidtrifighter: "+",
+  delta7aethersprite: "\\",
+  delta7baethersprite: "\\",
+  escapecraft: "X",
+  eta2actis: "-",
+  ewing: "e",
+  fangfighter: "M",
+  fireball: "0",
+  firesprayclasspatrolcraft: "f",
+  g1astarfighter: "n",
+  gauntletfighter: "|",
+  gozanticlasscruiser: "4",
+  gr75mediumtransport: "1",
+  hmpdroidgunship: ".",
+  hwk290lightfreighter: "h",
+  hyenaclassdroidbomber: "=",
+  jumpmaster5000: "p",
+  kihraxzfighter: "r",
+  laatigunship: "/",
+  lambdaclasst4ashuttle: "l",
+  lancerclasspursuitcraft: "L",
+  m12lkimogilafighter: "K",
+  m3ainterceptor: "s",
+  mg100starfortress: "Z",
+  modifiedtielnfighter: "C",
+  modifiedyt1300lightfreighter: "m",
+  nabooroyaln1starfighter: "<",
+  nantexclassstarfighter: ";",
+  nimbusclassvwing: ",",
+  quadrijettransferspacetug: "q",
+  raiderclasscorvette: "3",
+  resistancetransport: ">",
+  resistancetransportpod: "?",
+  rogueclassstarfighter: "~",
+  rz1awing: "a",
+  rz2awing: "E",
+  scavengedyt1300: "Y",
+  scurrgh6bomber: "H",
+  sheathipedeclassshuttle: "%",
+  sithinfiltrator: "]",
+  st70assaultship: "}",
+  starviperclassattackplatform: "v",
+  syliureclasshyperspacering: "*",
+  t65xwing: "x",
+  t70xwing: "w",
+  tieadvancedv1: "R",
+  tieadvancedx1: "A",
+  tieagaggressor: "`",
+  tiebainterceptor: "j",
+  tiecapunisher: "N",
+  tieddefender: "D",
+  tiefofighter: "O",
+  tieininterceptor: "I",
+  tielnfighter: "F",
+  tiephphantom: "P",
+  tierbheavy: "J",
+  tiereaper: "V",
+  tiesabomber: "B",
+  tiesebomber: "!",
+  tiesffighter: "S",
+  tieskstriker: "T",
+  tievnsilencer: "$",
+  tiewiwhispermodifiedinterceptor: "#",
+  tridentclassassaultship: "6",
+  upsilonclasscommandshuttle: "U",
+  ut60duwing: "u",
+  v19torrentstarfighter: "^",
+  vcx100lightfreighter: "G",
+  vt49decimator: "d",
+  vultureclassdroidfighter: "_",
+  xiclasslightshuttle: "Q",
+  yt2400lightfreighter: "o",
+  yv666lightfreighter: "t",
+  z95af4headhunter: "z",
+};
+
+function shipsToGlyphs(pilots?: XwsPilot[] | null): string | null {
+  if (!pilots || !pilots.length) return null;
+  const s = pilots.map((p) => SHIP_ICON_MAP[p.ship] ?? "·").join("");
+  return s || null;
+}
+
+async function fetchXwsFromListUrlServer(listUrl: string): Promise<XwsResponse | null> {
+  try {
+    let upstreamUrl: string | null = null;
+
+    // YASB: proxy via pattern-analyzer
+    if (listUrl.startsWith("https://yasb.app")) {
+      const parts = listUrl.split("yasb.app/");
+      if (parts.length >= 2) {
+        const dataLink = parts[1]; // "?f=...&d=..."
+        upstreamUrl = `https://www.pattern-analyzer.app/api/yasb/xws${dataLink}`;
+      }
+    } else if (listUrl.startsWith("https://launchbaynext.app")) {
+      // LaunchBayNext: pull lbx=... piece
+      const idx = listUrl.indexOf("lbx=");
+      if (idx !== -1) {
+        let value = listUrl.slice(idx + "lbx=".length);
+        const ampIdx = value.indexOf("&");
+        if (ampIdx !== -1) {
+          value = value.slice(0, ampIdx);
+        }
+        upstreamUrl = `https://launchbaynext.app/api/xws?lbx=${value}`;
+      }
+    }
+
+    if (!upstreamUrl) return null;
+
+    const res = await fetch(upstreamUrl, { cache: "no-store" });
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as XwsResponse;
+    return data;
+  } catch (err) {
+    console.warn("fetchXwsFromListUrlServer error:", err);
+    return null;
+  }
+}
+
+async function syncSingleListXwsAndLetters(
+  conn: mysql.Connection,
+  weekLabel: string,
+  game: string
+) {
+  // Read current row from lists table
+  const [rows] = await conn.execute(
+    "SELECT away_list, home_list FROM lists WHERE week_label = ? AND game = ?",
+    [weekLabel, game]
+  ) as any[];
+
+  if (!rows || rows.length === 0) return;
+
+  const awayListUrl = (rows[0].away_list ?? "").trim();
+  const homeListUrl = (rows[0].home_list ?? "").trim();
+
+  let awayXwsJson: string | null = null;
+  let awayLetters: string | null = null;
+  let homeXwsJson: string | null = null;
+  let homeLetters: string | null = null;
+
+  if (awayListUrl && isValidListLink(awayListUrl)) {
+    const xws = await fetchXwsFromListUrlServer(awayListUrl);
+    if (xws) {
+      awayXwsJson = JSON.stringify(xws);
+      awayLetters = shipsToGlyphs(xws.pilots ?? []) ?? null;
+    }
+  }
+
+  if (homeListUrl && isValidListLink(homeListUrl)) {
+    const xws = await fetchXwsFromListUrlServer(homeListUrl);
+    if (xws) {
+      homeXwsJson = JSON.stringify(xws);
+      homeLetters = shipsToGlyphs(xws.pilots ?? []) ?? null;
+    }
+  }
+
+  await conn.execute(
+    `
+    UPDATE lists
+    SET
+      away_xws = ?,
+      away_letters = ?,
+      home_xws = ?,
+      home_letters = ?
+    WHERE week_label = ? AND game = ?
+  `,
+    [awayXwsJson, awayLetters, homeXwsJson, homeLetters, weekLabel, game]
+  );
 }
 
 /* --------------------------- MySQL sync helpers ------------------------- */
@@ -1228,6 +1425,7 @@ export async function POST(req: Request) {
       valueRenderOption: "FORMATTED_VALUE",
     });
     const weekTab = norm(weekRes.data.values?.[0]?.[0]) || "WEEK 1";
+    const canonicalWeekLabel = normalizeWeekLabel(weekTab);
 
     // Confirm the row exists
     const rowNum = Number(rowIndex);
@@ -1405,7 +1603,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // ---- Lists sheet upsert (optional, can be updated later) ----
+    // ---- Lists sheet upsert (optional) ----
     let didListsUpdate = false;
     if (awayListStr || homeListStr) {
       try {
@@ -1550,7 +1748,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // ---- MySQL sync from Sheets (incremental) ----
+    // ---- MySQL sync from Sheets (incremental) + XWS glyphs for this game ----
     try {
       const conn = await getMySqlConn();
       try {
@@ -1581,8 +1779,13 @@ export async function POST(req: Request) {
         // 7) overall_standings (full refresh)
         await syncOverallStandings(sheets, spreadsheetId, conn);
 
-        // 8) lists (full refresh)
+        // 8) lists (full refresh of URLs)
         await syncLists(sheets, spreadsheetId, conn);
+
+        // 9) For this specific game, resolve XWS + glyph letters into S8.lists
+        if (gameNo) {
+          await syncSingleListXwsAndLetters(conn, canonicalWeekLabel, gameNo);
+        }
       } finally {
         await conn.end();
       }

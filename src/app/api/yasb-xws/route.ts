@@ -1,5 +1,14 @@
-// src/app/api/yasb-xws/route.ts
 import { NextRequest, NextResponse } from "next/server";
+
+export type XwsPilot = {
+  ship: string;
+};
+
+export type XwsResponse = {
+  pilots?: XwsPilot[];
+  // keep it open for any extra fields returned by upstream
+  [key: string]: any;
+};
 
 function buildPatternAnalyzerUrl(yasbUrl: string): string | null {
   if (!yasbUrl.startsWith("https://yasb.app")) return null;
@@ -58,7 +67,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as XwsResponse;
     return NextResponse.json(data);
   } catch (err) {
     console.error("XWS proxy error:", err);

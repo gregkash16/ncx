@@ -17,24 +17,26 @@ interface MatchRowWithDiscord extends MatchRow {
   homeDiscordTag?: string | null;
 }
 
-// Lists map for a given week (from Lists!A:D)
+// Lists map for a given week (from MySQL S8.lists)
 type ListsForWeek = Record<
   string,
   {
     awayList?: string;
     homeList?: string;
+    awayLetters?: string;
+    homeLetters?: string;
   }
 >;
 
 type Props = {
-  data: MatchRow[]; // we accept MatchRow[]; extra fields are read via the extended interface above
+  data: MatchRow[];
   weekLabel?: string;
   activeWeek?: string;
   scheduleWeek?: string;
   scheduleMap?: ScheduleMap;
   indStats?: IndRow[];
   factionMap?: FactionMap;
-  listsForWeek?: ListsForWeek; // per-game list URLs (YASB or LBN)
+  listsForWeek?: ListsForWeek;
 };
 
 function parseIntSafe(v: string | number | undefined | null): number {
@@ -98,37 +100,36 @@ function factionIconSrc(faction?: string) {
 
 // --- Team color mapping for thumbnails ---------------------------------
 
-// Map CANONICAL TEAM NAME (uppercased, trimmed) -> base hex color
 const TEAM_COLOR_MAP: Record<string, string> = {
-  BERSERKERS: "#8b5a2b", // Brown
-  DEGENERATES: "#16a34a", // Green
-  FIREBIRDS: "#ea580c", // Orange
-  FOXES: "#a855f7", // Purple
-  "GALACTIC WARDENS": "#16a34a", // Green
-  HAVOC: "#eab308", // Yellow
-  HEADHUNTERS: "#020617", // Black-ish
-  HOTSHOTS: "#facc99", // Tan
-  "JAGGED AXE": "#f97316", // Orange
-  KDB: "#14b8a6", // Teal
-  MAWLERS: "#14b8a6", // Teal
-  MEATBAGS: "#dc2626", // Red
-  "MEGA MILK UNION": "#38bdf8", // Light Blue
-  MISFITS: "#ea580c", // Orange
-  "MON CALA SC": "#5eead4", // Seafoam Green
-  "NERF HERDERS": "#16a34a", // Green
-  "ORDER 66": "#2563eb", // Blue
-  "OUTER RIM HEROES": "#2563eb", // Blue
-  PUDDLEJUMPERS: "#22c55e", // Green
-  "PUDDLE JUMPERS": "#22c55e", // (safety alias)
-  PUNISHERS: "#ef4444", // Red
-  "RAVE CRAB CHAMPIONS": "#fb923c", // Neon Orange-ish
-  STARKILLERS: "#d97706", // Burnt Yellow
-  "VOODOO KREWE": "#1d4ed8", // Blue
-  WOLFPACK: "#ec4899", // Pink
+  BERSERKERS: "#8b5a2b",
+  DEGENERATES: "#16a34a",
+  FIREBIRDS: "#ea580c",
+  FOXES: "#a855f7",
+  "GALACTIC WARDENS": "#16a34a",
+  HAVOC: "#eab308",
+  HEADHUNTERS: "#020617",
+  HOTSHOTS: "#facc99",
+  "JAGGED AXE": "#f97316",
+  KDB: "#14b8a6",
+  MAWLERS: "#14b8a6",
+  MEATBAGS: "#dc2626",
+  "MEGA MILK UNION": "#38bdf8",
+  MISFITS: "#ea580c",
+  "MON CALA SC": "#5eead4",
+  "NERF HERDERS": "#16a34a",
+  "ORDER 66": "#2563eb",
+  "OUTER RIM HEROES": "#2563eb",
+  PUDDLEJUMPERS: "#22c55e",
+  "PUDDLE JUMPERS": "#22c55e",
+  PUNISHERS: "#ef4444",
+  "RAVE CRAB CHAMPIONS": "#fb923c",
+  STARKILLERS: "#d97706",
+  "VOODOO KREWE": "#1d4ed8",
+  WOLFPACK: "#ec4899",
 };
 
 function getTeamColorHex(teamName?: string | null): string {
-  if (!teamName) return "#0f172a"; // fallback navy
+  if (!teamName) return "#0f172a";
   const key = teamName.trim().toUpperCase();
   return TEAM_COLOR_MAP[key] ?? "#0f172a";
 }
@@ -216,9 +217,9 @@ type ThumbnailContext = {
   awayFactionIcon?: string;
   homeFactionIcon?: string;
   weekLabel?: string;
-  // NEW: list URLs so we can add ship icons to the thumbnail
-  awayListUrl?: string | null;
-  homeListUrl?: string | null;
+  // precomputed ship glyphs from MySQL
+  awayLetters?: string | null;
+  homeLetters?: string | null;
 };
 
 const SHIP_FONT_FAMILY = "XWingShips";
@@ -253,7 +254,7 @@ function loadImageSafe(src?: string | null): Promise<HTMLImageElement | null> {
     if (!src) return resolve(null);
     if (typeof window === "undefined") return resolve(null);
 
-    const img = new window.Image(); // explicitly use the DOM Image
+    const img = new window.Image();
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
@@ -281,28 +282,6 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-async function fetchShipGlyphs(
-  listUrl?: string | null
-): Promise<string | null> {
-  if (!listUrl) return null;
-  if (typeof window === "undefined") return null;
-
-  const apiUrl = buildLocalProxyUrl(listUrl);
-  if (!apiUrl) return null;
-
-  try {
-    const res = await fetch(apiUrl, { cache: "no-store" });
-    if (!res.ok) return null;
-
-    const data = (await res.json()) as XwsResponse;
-    const iconString = shipsToGlyphs(data.pilots ?? []);
-    return iconString || null;
-  } catch (err) {
-    console.warn("fetchShipGlyphs error:", err);
-    return null;
-  }
-}
-
 // OPTION A: TEAM-COLOR GRADIENT STYLE
 async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   if (typeof window === "undefined") return;
@@ -314,8 +293,8 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
     awayFactionIcon,
     homeFactionIcon,
     weekLabel,
-    awayListUrl,
-    homeListUrl,
+    awayLetters,
+    homeLetters,
   } = ctxData;
 
   const canvas = document.createElement("canvas");
@@ -341,23 +320,19 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const awayColorHex = getTeamColorHex(awayTeam);
   const homeColorHex = getTeamColorHex(homeTeam);
 
-  const [
-    awayLogoImg,
-    homeLogoImg,
-    awayFactionImg,
-    homeFactionImg,
-    mainLogoImg,
-    awayShipGlyphs,
-    homeShipGlyphs,
-  ] = await Promise.all([
-    loadImageSafe(awayLogoPath),
-    loadImageSafe(homeLogoPath),
-    loadImageSafe(awayFactionIcon),
-    loadImageSafe(homeFactionIcon),
-    loadImageSafe(mainLogoPath),
-    fetchShipGlyphs(awayListUrl),
-    fetchShipGlyphs(homeListUrl),
-  ]);
+  const [awayLogoImg, homeLogoImg, awayFactionImg, homeFactionImg, mainLogoImg] =
+    await Promise.all([
+      loadImageSafe(awayLogoPath),
+      loadImageSafe(homeLogoPath),
+      loadImageSafe(awayFactionIcon),
+      loadImageSafe(homeFactionIcon),
+      loadImageSafe(mainLogoPath),
+    ]);
+
+  const awayShipGlyphs =
+    (awayLetters ?? "").trim().length > 0 ? (awayLetters as string) : null;
+  const homeShipGlyphs =
+    (homeLetters ?? "").trim().length > 0 ? (homeLetters as string) : null;
 
   const hasShips = Boolean(awayShipGlyphs || homeShipGlyphs);
 
@@ -365,7 +340,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
    * BACKGROUND: PURE TEAM GRADIENT
    ************************************************************/
 
-  // Big left->right gradient from away team color to home team color
   const baseGrad = ctx.createLinearGradient(0, 0, W, 0);
   baseGrad.addColorStop(0, awayColorHex);
   baseGrad.addColorStop(0.5, hexToRgba(awayColorHex, 0.5));
@@ -374,7 +348,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   ctx.fillStyle = baseGrad;
   ctx.fillRect(0, 0, W, H);
 
-  // Very light vertical darken for text contrast
   const vGrad = ctx.createLinearGradient(0, 0, 0, H);
   vGrad.addColorStop(0, "rgba(15,23,42,0.35)");
   vGrad.addColorStop(0.5, "rgba(15,23,42,0.15)");
@@ -382,7 +355,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   ctx.fillStyle = vGrad;
   ctx.fillRect(0, 0, W, H);
 
-  // Thin divider in the middle
   ctx.save();
   ctx.fillStyle = "rgba(248,250,252,0.5)";
   ctx.fillRect(W / 2 - 2, 0, 4, H);
@@ -468,14 +440,12 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
-  // Player names
   ctx.fillStyle = "#ffffff";
   ctx.font =
     "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   ctx.fillText(awayName, leftX, hasShips ? midY - 40 : midY - 20);
   ctx.fillText(homeName, rightX, hasShips ? midY - 40 : midY - 20);
 
-  // Ship glyph rows
   if (hasShips) {
     ctx.save();
     ctx.fillStyle = "#f9fafb";
@@ -495,7 +465,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
     ctx.restore();
   }
 
-  // Team names
   ctx.fillStyle = "#e5e7eb";
   ctx.font =
     "600 42px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -511,7 +480,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const cardRadius = 40;
   const cardY = midY + 110;
 
-  // Away logo card
   if (awayLogoImg) {
     const cardX = leftX - cardW / 2;
 
@@ -541,7 +509,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
     ctx.drawImage(awayLogoImg, logoX, logoY, w, h);
   }
 
-  // Home logo card
   if (homeLogoImg) {
     const cardX = rightX - cardW / 2;
 
@@ -596,208 +563,27 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
 }
 
 /************************************************************
- *  Ship icon map + local proxy helpers (YASB + LaunchBayNext)
+ *  ListIcons – uses precomputed letters (away_letters/home_letters)
  ************************************************************/
-const SHIP_ICON_MAP: Record<string, string> = {
-  aggressorassaultfighter: "i",
-  alphaclassstarwing: "&",
-  arc170starfighter: "c",
-  asf01bwing: "b",
-  attackshuttle: "g",
-  auzituckgunship: "@",
-  belbullab22starfighter: "[",
-  btanr2ywing: "{",
-  btanr2wywing: "{",
-  btla4ywing: "y",
-  btlbywing: ":",
-  btls8kwing: "k",
-  clonez95headhunter: "¡",
-  cr90corvette: "2",
-  croccruiser: "5",
-  customizedyt1300lightfreighter: "W",
-  droidtrifighter: "+",
-  delta7aethersprite: "\\",
-  delta7baethersprite: "\\",
-  escapecraft: "X",
-  eta2actis: "-",
-  ewing: "e",
-  fangfighter: "M",
-  fireball: "0",
-  firesprayclasspatrolcraft: "f",
-  g1astarfighter: "n",
-  gauntletfighter: "|",
-  gozanticlasscruiser: "4",
-  gr75mediumtransport: "1",
-  hmpdroidgunship: ".",
-  hwk290lightfreighter: "h",
-  hyenaclassdroidbomber: "=",
-  jumpmaster5000: "p",
-  kihraxzfighter: "r",
-  laatigunship: "/",
-  lambdaclasst4ashuttle: "l",
-  lancerclasspursuitcraft: "L",
-  m12lkimogilafighter: "K",
-  m3ainterceptor: "s",
-  mg100starfortress: "Z",
-  modifiedtielnfighter: "C",
-  modifiedyt1300lightfreighter: "m",
-  nabooroyaln1starfighter: "<",
-  nantexclassstarfighter: ";",
-  nimbusclassvwing: ",",
-  quadrijettransferspacetug: "q",
-  raiderclasscorvette: "3",
-  resistancetransport: ">",
-  resistancetransportpod: "?",
-  rogueclassstarfighter: "~",
-  rz1awing: "a",
-  rz2awing: "E",
-  scavengedyt1300: "Y",
-  scurrgh6bomber: "H",
-  sheathipedeclassshuttle: "%",
-  sithinfiltrator: "]",
-  st70assaultship: "}",
-  starviperclassattackplatform: "v",
-  syliureclasshyperspacering: "*",
-  t65xwing: "x",
-  t70xwing: "w",
-  tieadvancedv1: "R",
-  tieadvancedx1: "A",
-  tieagaggressor: "`",
-  tiebainterceptor: "j",
-  tiecapunisher: "N",
-  tieddefender: "D",
-  tiefofighter: "O",
-  tieininterceptor: "I",
-  tielnfighter: "F",
-  tiephphantom: "P",
-  tierbheavy: "J",
-  tiereaper: "V",
-  tiesabomber: "B",
-  tiesebomber: "!",
-  tiesffighter: "S",
-  tieskstriker: "T",
-  tievnsilencer: "$",
-  tiewiwhispermodifiedinterceptor: "#",
-  tridentclassassaultship: "6",
-  upsilonclasscommandshuttle: "U",
-  ut60duwing: "u",
-  v19torrentstarfighter: "^",
-  vcx100lightfreighter: "G",
-  vt49decimator: "d",
-  vultureclassdroidfighter: "_",
-  xiclasslightshuttle: "Q",
-  yt2400lightfreighter: "o",
-  yv666lightfreighter: "t",
-  z95af4headhunter: "z",
-};
-
-type XwsPilot = {
-  ship: string;
-};
-
-type XwsResponse = {
-  pilots: XwsPilot[];
-};
-
-/**
- * Build URL to your proxy route (/api/yasb-xws) for:
- * - YASB: passes full URL as ?yasb=...
- * - LaunchBayNext: pulls the "lbx=" segment and passes it as ?lbx=...
- */
-function buildLocalProxyUrl(listUrl: string): string | null {
-  // YASB
-  if (listUrl.startsWith("https://yasb.app")) {
-    return `/api/yasb-xws?yasb=${encodeURIComponent(listUrl)}`;
-  }
-
-  // LaunchBayNext
-  if (listUrl.startsWith("https://launchbaynext.app")) {
-    const idx = listUrl.indexOf("lbx=");
-    if (idx === -1) return null;
-
-    let value = listUrl.slice(idx + "lbx=".length);
-    const ampIdx = value.indexOf("&");
-    if (ampIdx !== -1) {
-      value = value.slice(0, ampIdx);
-    }
-
-    return `/api/yasb-xws?lbx=${encodeURIComponent(value)}`;
-  }
-
-  return null;
-}
-
-function shipsToGlyphs(pilots: XwsPilot[]): string {
-  return pilots.map((p) => SHIP_ICON_MAP[p.ship] ?? "·").join("");
-}
 
 type ListIconsProps = {
-  label: string; // "Away list" or "Home list"
-  listUrl?: string | null; // YASB or LBN URL
-  side: "away" | "home"; // controls alignment layout
+  label: string;
+  listUrl?: string | null;
+  side: "away" | "home";
+  letters?: string | null;
 };
 
-const ListIcons: React.FC<ListIconsProps> = ({ label, listUrl, side }) => {
-  const [glyphs, setGlyphs] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!listUrl) {
-      setGlyphs(null);
-      setError(null);
-      return;
-    }
-
-    const apiUrl = buildLocalProxyUrl(listUrl);
-    if (!apiUrl) {
-      setGlyphs(null);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const run = async () => {
-      try {
-        const res = await fetch(apiUrl, { cache: "no-store" }).catch((err) => {
-          console.warn("XWS proxy fetch failed:", err);
-          return null;
-        });
-
-        if (!res || !res.ok) {
-          if (!cancelled) {
-            setGlyphs(null);
-            setError("!");
-          }
-          return;
-        }
-
-        const data = (await res.json()) as XwsResponse;
-        const iconString = shipsToGlyphs(data.pilots ?? []);
-
-        if (!cancelled) {
-          setGlyphs(iconString);
-          setError(null);
-        }
-      } catch (e) {
-        console.error("Error fetching XWS via proxy:", e);
-        if (!cancelled) {
-          setGlyphs(null);
-          setError("!");
-        }
-      }
-    };
-
-    void run();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [listUrl]);
-
+const ListIcons: React.FC<ListIconsProps> = ({
+  label,
+  listUrl,
+  side,
+  letters,
+}) => {
   if (!listUrl) return null;
 
-  // Icon block (big glyphs, same height as 48x48 faction icon)
+  const glyphs =
+    (letters ?? "").trim().length > 0 ? (letters as string) : null;
+
   const iconBlock = glyphs ? (
     <div
       className="
@@ -810,12 +596,8 @@ const ListIcons: React.FC<ListIconsProps> = ({ label, listUrl, side }) => {
     >
       {glyphs}
     </div>
-  ) : !glyphs && !error ? (
-    <div className="h-12 flex items-center text-zinc-500 text-xs">…</div>
   ) : (
-    <div className="h-12 flex items-center font-mono text-xs text-red-400">
-      !
-    </div>
+    <div className="h-12 flex items-center text-zinc-500 text-xs">…</div>
   );
 
   const linkBlock = (
@@ -832,8 +614,6 @@ const ListIcons: React.FC<ListIconsProps> = ({ label, listUrl, side }) => {
     </a>
   );
 
-  // For AWAY (left column): list link towards center, icons towards outer side
-  // For HOME (right column): list link towards center, icons towards outer side
   const content =
     side === "away" ? (
       <>
@@ -870,9 +650,8 @@ export default function MatchupsPanel({
 }: Props) {
   const searchParams = useSearchParams();
   const urlQRaw = (searchParams.get("q") ?? "").trim();
-  const selectedWeekRaw = (searchParams.get("w") ?? "").trim(); // e.g. "WEEK 3"
+  const selectedWeekRaw = (searchParams.get("w") ?? "").trim();
 
-  // Parse week numbers so we can render the week-strip
   const activeNum = useMemo(
     () => parseWeekNum(activeWeek ?? null),
     [activeWeek]
@@ -882,18 +661,15 @@ export default function MatchupsPanel({
     [selectedWeekRaw]
   );
 
-  // Past weeks to render as pills = 1..active
   const weeksPills = useMemo(() => {
     if (!activeNum || activeNum <= 0) return [] as string[];
     return Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1));
   }, [activeNum]);
 
-  // Clean the incoming data
   const cleaned = useMemo(() => {
     return (data || []).filter((m) => /^\d+$/.test((m.game || "").trim()));
   }, [data]);
 
-  // Derive a single-team filter from URL ?q=
   const urlSelectedTeam = useMemo(() => {
     if (!urlQRaw) return "";
     return pickTeamFilter(urlQRaw, cleaned);
@@ -903,10 +679,8 @@ export default function MatchupsPanel({
   const [onlyCompleted, setOnlyCompleted] = useState(false);
   const [onlyScheduled, setOnlyScheduled] = useState(false);
 
-  // track which game is generating (for button disabled state)
   const [generatingGame, setGeneratingGame] = useState<string | null>(null);
 
-  // Keep input synced if the URL changes (clicking a different series or week)
   useEffect(() => {
     setQuery(urlSelectedTeam);
   }, [urlSelectedTeam]);
@@ -916,16 +690,13 @@ export default function MatchupsPanel({
     [query, cleaned]
   );
 
-  // Precompute lookups
   const indById = useMemo(() => statsMapFromIndRows(indStats), [indStats]);
 
-  // Filtering + ordering
   const filtered = useMemo(() => {
     const q = (query || "").toLowerCase().trim();
     let rows = !q
       ? cleaned
       : cleaned.filter((m) => {
-          // 🔎 NEW: include factions in the text search using factionMap
           const awayFactionName =
             m.awayId && factionMap ? factionMap[m.awayId] : undefined;
           const homeFactionName =
@@ -965,7 +736,7 @@ export default function MatchupsPanel({
           ? 1
           : 0;
 
-      if (aInSel !== bInSel) return bInSel - aInSel; // selected team first
+      if (aInSel !== bInSel) return bInSel - aInSel;
       return gameNum(a.game) - gameNum(b.game);
     });
 
@@ -976,13 +747,11 @@ export default function MatchupsPanel({
     Boolean(weekLabel && scheduleWeek) &&
     weekLabel!.trim() === scheduleWeek!.trim();
 
-  // Styles for the week-strip buttons (match HomeTabs vibe)
   const btnBase =
     "group relative overflow-hidden rounded-xl border bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
   const gradient =
     "pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100";
 
-  // Colors (winner = GREEN, loser = RED)
   const GREEN = "34,197,94";
   const RED = "239,68,68";
   const TIE = "99,102,241";
@@ -997,7 +766,6 @@ export default function MatchupsPanel({
         ) : null}
       </h2>
 
-      {/* Week selector strip (Current = active, gold; others are past weeks) */}
       {activeNum && activeNum > 0 && (
         <div className="flex flex-wrap justify-center gap-2 mb-5">
           {weeksPills.map((wk) => {
@@ -1104,7 +872,6 @@ export default function MatchupsPanel({
               `,
             };
 
-            // Optional stream-schedule badge
             const sched =
               scheduleEnabled && scheduleMap?.[row.game]
                 ? ` — ${scheduleMap[row.game].day.toUpperCase()}, ${scheduleMap[
@@ -1112,7 +879,6 @@ export default function MatchupsPanel({
                   ].slot.toUpperCase()}`
                 : "";
 
-            // Season summaries (from IndStats)
             const awaySeason = row.awayId
               ? indById.get(row.awayId)
               : undefined;
@@ -1120,11 +886,13 @@ export default function MatchupsPanel({
               ? indById.get(row.homeId)
               : undefined;
 
-            // Faction icons (from factionMap + /public/factions)
-            const awayFactionIcon = factionIconSrc(factionMap?.[row.awayId]);
-            const homeFactionIcon = factionIconSrc(factionMap?.[row.homeId]);
+            const awayFactionIcon = factionMap?.[row.awayId]
+              ? factionIconSrc(factionMap[row.awayId])
+              : "";
+            const homeFactionIcon = factionMap?.[row.homeId]
+              ? factionIconSrc(factionMap[row.homeId])
+              : "";
 
-            // Optional tooltip helpers if you store handles like name#1234
             const awayTooltip = row.awayDiscordTag
               ? `@${row.awayDiscordTag}`
               : "Open DM";
@@ -1132,9 +900,10 @@ export default function MatchupsPanel({
               ? `@${row.homeDiscordTag}`
               : "Open DM";
 
-            // List URLs (YASB or LBN) for this game
             const awayListUrl = listsForWeek?.[row.game]?.awayList || null;
             const homeListUrl = listsForWeek?.[row.game]?.homeList || null;
+            const awayLetters = listsForWeek?.[row.game]?.awayLetters || null;
+            const homeLetters = listsForWeek?.[row.game]?.homeLetters || null;
 
             const handleClickThumbnail = async () => {
               try {
@@ -1146,8 +915,8 @@ export default function MatchupsPanel({
                   awayFactionIcon,
                   homeFactionIcon,
                   weekLabel,
-                  awayListUrl, // <- important
-                  homeListUrl, // <- important
+                  awayLetters,
+                  homeLetters,
                 });
               } finally {
                 setGeneratingGame((current) =>
@@ -1307,7 +1076,7 @@ export default function MatchupsPanel({
                   </div>
                 </div>
 
-                {/* Lists (YASB or LBN) + big ship icons ABOVE the stats rail */}
+                {/* Lists + precomputed ship glyphs */}
                 {(awayListUrl || homeListUrl) && (
                   <div className="relative z-10 mt-4 flex items-center justify-between gap-6">
                     <div className="flex-1 flex justify-start">
@@ -1315,6 +1084,7 @@ export default function MatchupsPanel({
                         <ListIcons
                           label="Away list"
                           listUrl={awayListUrl}
+                          letters={awayLetters}
                           side="away"
                         />
                       )}
@@ -1324,6 +1094,7 @@ export default function MatchupsPanel({
                         <ListIcons
                           label="Home list"
                           listUrl={homeListUrl}
+                          letters={homeLetters}
                           side="home"
                         />
                       )}
