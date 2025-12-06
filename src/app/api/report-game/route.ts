@@ -1095,12 +1095,18 @@ async function syncLists(
   });
   const rows = (rowsRes.data.values ?? []) as string[][];
 
-  await conn.execute("DELETE FROM lists");
+  // ⛔️ NO MORE: await conn.execute("DELETE FROM lists");
 
   const sql = `
     INSERT INTO lists (
-      week_label, game, away_list, home_list
+      week_label,
+      game,
+      away_list,
+      home_list
     ) VALUES (?,?,?,?)
+    ON DUPLICATE KEY UPDATE
+      away_list = VALUES(away_list),
+      home_list = VALUES(home_list)
   `;
 
   for (const r0 of rows) {
@@ -1113,9 +1119,11 @@ async function syncLists(
     if (!weekRaw || !game) continue;
 
     const weekLabel = normalizeWeekLabel(weekRaw);
+
     await conn.execute(sql, [weekLabel, game, awayList, homeList]);
   }
 }
+
 
 /* --------------------------- GET /report-game ------------------------- */
 export async function GET() {
