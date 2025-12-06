@@ -219,13 +219,13 @@ export type TeamAdvStats = {
 /* ----------------------------- FACTION ICONS ----------------------------- */
 
 const FACTION_FILE: Record<string, string> = {
-  REBELS: "Rebels.png",
-  EMPIRE: "Empire.png",
-  REPUBLIC: "Republic.png",
-  CIS: "CIS.png",
-  RESISTANCE: "Resistance.png",
-  "FIRST ORDER": "First Order.png",
-  SCUM: "Scum.png",
+  REBELS: "Rebels.webp",
+  EMPIRE: "Empire.webp",
+  REPUBLIC: "Republic.webp",
+  CIS: "CIS.webp",
+  RESISTANCE: "Resistance.webp",
+  "FIRST ORDER": "First Order.webp",
+  SCUM: "Scum.webp",
 };
 
 function factionIconSrc(faction?: string | null) {
