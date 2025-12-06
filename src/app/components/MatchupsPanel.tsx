@@ -98,35 +98,33 @@ function factionIconSrc(faction?: string) {
 
 // --- Team color mapping for thumbnails ---------------------------------
 
-// --- Team color mapping for thumbnails ---------------------------------
-
 // Map CANONICAL TEAM NAME (uppercased, trimmed) -> base hex color
 const TEAM_COLOR_MAP: Record<string, string> = {
-  "BERSERKERS": "#8b5a2b",           // Brown
-  "DEGENERATES": "#16a34a",          // Green
-  "FIREBIRDS": "#ea580c",            // Orange
-  "FOXES": "#a855f7",                // Purple
-  "GALACTIC WARDENS": "#16a34a",     // Green
-  "HAVOC": "#eab308",                // Yellow
-  "HEADHUNTERS": "#020617",          // Black-ish
-  "HOTSHOTS": "#facc99",             // Tan
-  "JAGGED AXE": "#f97316",           // Orange
-  "KDB": "#14b8a6",                  // Teal
-  "MAWLERS": "#14b8a6",              // Teal
-  "MEATBAGS": "#dc2626",             // Red
-  "MEGA MILK UNION": "#38bdf8",      // Light Blue
-  "MISFITS": "#ea580c",              // Orange
-  "MON CALA SC": "#5eead4",          // Seafoam Green
-  "NERF HERDERS": "#16a34a",         // Green
-  "ORDER 66": "#2563eb",             // Blue
-  "OUTER RIM HEROES": "#2563eb",     // Blue
-  "PUDDLEJUMPERS": "#22c55e",        // Green
-  "PUDDLE JUMPERS": "#22c55e",       // (safety alias)
-  "PUNISHERS": "#ef4444",            // Red
-  "RAVE CRAB CHAMPIONS": "#fb923c",  // Neon Orange-ish
-  "STARKILLERS": "#d97706",          // Burnt Yellow
-  "VOODOO KREWE": "#1d4ed8",         // Blue
-  "WOLFPACK": "#ec4899",             // Pink
+  BERSERKERS: "#8b5a2b", // Brown
+  DEGENERATES: "#16a34a", // Green
+  FIREBIRDS: "#ea580c", // Orange
+  FOXES: "#a855f7", // Purple
+  "GALACTIC WARDENS": "#16a34a", // Green
+  HAVOC: "#eab308", // Yellow
+  HEADHUNTERS: "#020617", // Black-ish
+  HOTSHOTS: "#facc99", // Tan
+  "JAGGED AXE": "#f97316", // Orange
+  KDB: "#14b8a6", // Teal
+  MAWLERS: "#14b8a6", // Teal
+  MEATBAGS: "#dc2626", // Red
+  "MEGA MILK UNION": "#38bdf8", // Light Blue
+  MISFITS: "#ea580c", // Orange
+  "MON CALA SC": "#5eead4", // Seafoam Green
+  "NERF HERDERS": "#16a34a", // Green
+  "ORDER 66": "#2563eb", // Blue
+  "OUTER RIM HEROES": "#2563eb", // Blue
+  PUDDLEJUMPERS: "#22c55e", // Green
+  "PUDDLE JUMPERS": "#22c55e", // (safety alias)
+  PUNISHERS: "#ef4444", // Red
+  "RAVE CRAB CHAMPIONS": "#fb923c", // Neon Orange-ish
+  STARKILLERS: "#d97706", // Burnt Yellow
+  "VOODOO KREWE": "#1d4ed8", // Blue
+  WOLFPACK: "#ec4899", // Pink
 };
 
 function getTeamColorHex(teamName?: string | null): string {
@@ -238,7 +236,7 @@ function ensureShipFontLoaded(): Promise<void> {
     try {
       const font = new FontFace(
         SHIP_FONT_FAMILY,
-        'url(/fonts/x-wing-miniatures-ships.ttf)'
+        "url(/fonts/x-wing-miniatures-ships.ttf)"
       );
       const loaded = await font.load();
       (document as any).fonts.add(loaded);
@@ -305,7 +303,6 @@ async function fetchShipGlyphs(
   }
 }
 
-// OPTION A: TEAM-COLOR GRADIENT STYLE
 // OPTION A: TEAM-COLOR GRADIENT STYLE
 async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   if (typeof window === "undefined") return;
@@ -597,7 +594,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   const filename = `game${row.game} - ${fileAway} v ${fileHome}.jpg`;
   downloadBlob(blob, filename);
 }
-
 
 /************************************************************
  *  Ship icon map + local proxy helpers (YASB + LaunchBayNext)
@@ -928,8 +924,14 @@ export default function MatchupsPanel({
     const q = (query || "").toLowerCase().trim();
     let rows = !q
       ? cleaned
-      : cleaned.filter((m) =>
-          [
+      : cleaned.filter((m) => {
+          // 🔎 NEW: include factions in the text search using factionMap
+          const awayFactionName =
+            m.awayId && factionMap ? factionMap[m.awayId] : undefined;
+          const homeFactionName =
+            m.homeId && factionMap ? factionMap[m.homeId] : undefined;
+
+          return [
             m.awayId,
             m.homeId,
             m.awayName,
@@ -937,10 +939,12 @@ export default function MatchupsPanel({
             m.awayTeam,
             m.homeTeam,
             m.scenario,
+            awayFactionName,
+            homeFactionName,
           ]
             .filter(Boolean)
-            .some((v) => String(v).toLowerCase().includes(q))
-        );
+            .some((v) => String(v).toLowerCase().includes(q));
+        });
 
     rows = rows.filter((m) => {
       const isCompleted = Boolean((m.scenario || "").trim());
@@ -966,7 +970,7 @@ export default function MatchupsPanel({
     });
 
     return rows;
-  }, [cleaned, query, onlyCompleted, onlyScheduled, selectedTeam]);
+  }, [cleaned, query, onlyCompleted, onlyScheduled, selectedTeam, factionMap]);
 
   const scheduleEnabled =
     Boolean(weekLabel && scheduleWeek) &&
@@ -1040,7 +1044,7 @@ export default function MatchupsPanel({
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-6">
         <input
           type="text"
-          placeholder="Filter by NCXID, Name, Team, or Scenario..."
+          placeholder="Filter by NCXID, Name, Team, Faction, or Scenario..."
           className="w-full sm:flex-1 rounded-lg bg-zinc-800 border border-zinc-700 text-sm px-4 py-2 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -1127,11 +1131,11 @@ export default function MatchupsPanel({
             const homeTooltip = row.homeDiscordTag
               ? `@${row.homeDiscordTag}`
               : "Open DM";
-            
+
             // List URLs (YASB or LBN) for this game
             const awayListUrl = listsForWeek?.[row.game]?.awayList || null;
             const homeListUrl = listsForWeek?.[row.game]?.homeList || null;
-            
+
             const handleClickThumbnail = async () => {
               try {
                 setGeneratingGame(row.game);
@@ -1142,8 +1146,8 @@ export default function MatchupsPanel({
                   awayFactionIcon,
                   homeFactionIcon,
                   weekLabel,
-                  awayListUrl,  // <- important
-                  homeListUrl,  // <- important
+                  awayListUrl, // <- important
+                  homeListUrl, // <- important
                 });
               } finally {
                 setGeneratingGame((current) =>
