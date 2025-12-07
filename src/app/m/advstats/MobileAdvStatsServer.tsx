@@ -1,9 +1,12 @@
 // src/app/m/advstats/MobileAdvStatsServer.tsx
 // Server component (no 'use client')
-// Now reads advanced stats from MySQL via fetchAdvStatsCached.
+// Now reads advanced stats + pilot usage from MySQL.
 
 import MobileAdvStats from "./MobileAdvStats";
-import { fetchAdvStatsCached } from "@/lib/googleSheets";
+import {
+  fetchAdvStatsCached,
+  fetchPilotUsageByFactionCached,
+} from "@/lib/googleSheets";
 
 type Table1Row = {
   team: string;
@@ -66,9 +69,22 @@ type Table5Row = {
   perfPlusMinus: string;
 };
 
+type PilotUsageRow = {
+  pilotId: string;
+  pilotName: string;
+  uses: number;
+  shipGlyph: string;
+};
+
+type PilotUsageByFaction = Record<string, PilotUsageRow[]>;
+
 export default async function MobileAdvStatsServer() {
-  // Pull t1–t5 from MySQL (already normalized to strings in googleSheets.ts)
-  const adv = await fetchAdvStatsCached();
+  // Pull t1–t5 and pilot-usage data in parallel
+  const [adv, pilotUsage] = await Promise.all([
+    fetchAdvStatsCached(),
+    fetchPilotUsageByFactionCached(),
+  ]);
+
   const { t1, t2, t3, t4, t5 } = adv;
 
   const table1: Table1Row[] = (t1 ?? [])
@@ -149,6 +165,7 @@ export default async function MobileAdvStatsServer() {
       table3={table3}
       table4={table4}
       table5={table5}
+      pilotUsage={pilotUsage as PilotUsageByFaction}
     />
   );
 }
