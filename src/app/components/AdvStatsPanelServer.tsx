@@ -1,13 +1,13 @@
 // src/app/components/AdvStatsPanelServer.tsx
 // Server component (no 'use client')
 import AdvStatsPanel from "./AdvStatsPanel";
-import { fetchAdvStatsCached } from "@/lib/googleSheets";
+import { fetchAdvStatsCached, fetchPilotUsageByFactionCached } from "@/lib/googleSheets";
 
 type Table1Row = {
   team: string;
   totalGames: string;
   avgWins: string;
-  avgLoss: string;     // lowest is best
+  avgLoss: string; // lowest is best
   avgPoints: string;
   avgPlms: string;
   avgGames: string;
@@ -64,14 +64,25 @@ type Table5Row = {
   perfPlusMinus: string;
 };
 
+type PilotUsageRow = {
+  pilotId: string;
+  pilotName: string;
+  uses: number;
+  shipGlyph: string;
+};
+
+type PilotUsageByFaction = Record<string, PilotUsageRow[]>;
+
+
 function s(v: unknown) {
   return (v ?? "").toString().trim();
 }
 
 export default async function AdvStatsPanelServer() {
   try {
-    // Pull all five tables from the cached helper (10 min revalidate)
+    // Pull all five tables and pilot usage
     const { t1, t2, t3, t4, t5 } = await fetchAdvStatsCached();
+    const pilotUsageByFaction: PilotUsageByFaction = await fetchPilotUsageByFactionCached();
 
     // --- Map each table into typed rows your AdvStatsPanel expects ---
     const table1: Table1Row[] = (t1 ?? [])
@@ -152,6 +163,7 @@ export default async function AdvStatsPanelServer() {
         table3={table3}
         table4={table4}
         table5={table5}
+        pilotUsageByFaction={pilotUsageByFaction}
       />
     );
   } catch (err: any) {

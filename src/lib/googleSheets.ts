@@ -538,3 +538,245 @@ export async function fetchListsForWeek(weekOverride?: string) {
 export async function fetchListsForWeekCached(weekOverride?: string) {
   return fetchListsForWeek(weekOverride);
 }
+
+/* ===========================================================================
+   PILOT USAGE BY FACTION (from lists + railway.IDs)
+   =========================================================================== */
+
+// Re-use the same font mapping as in seed-mysql:
+const SHIP_ICON_MAP: Record<string, string> = {
+  aggressorassaultfighter: "i",
+  alphaclassstarwing: "&",
+  arc170starfighter: "c",
+  asf01bwing: "b",
+  attackshuttle: "g",
+  auzituckgunship: "@",
+  belbullab22starfighter: "[",
+  btanr2ywing: "{",
+  btanr2wywing: "{",
+  btla4ywing: "y",
+  btlbywing: ":",
+  btls8kwing: "k",
+  clonez95headhunter: "¡",
+  cr90corvette: "2",
+  croccruiser: "5",
+  customizedyt1300lightfreighter: "W",
+  droidtrifighter: "+",
+  delta7aethersprite: "\\",
+  delta7baethersprite: "\\",
+  escapecraft: "X",
+  eta2actis: "-",
+  ewing: "e",
+  fangfighter: "M",
+  fireball: "0",
+  firesprayclasspatrolcraft: "f",
+  g1astarfighter: "n",
+  gauntletfighter: "|",
+  gozanticlasscruiser: "4",
+  gr75mediumtransport: "1",
+  hmpdroidgunship: ".",
+  hwk290lightfreighter: "h",
+  hyenaclassdroidbomber: "=",
+  jumpmaster5000: "p",
+  kihraxzfighter: "r",
+  laatigunship: "/",
+  lambdaclasst4ashuttle: "l",
+  lancerclasspursuitcraft: "L",
+  m12lkimogilafighter: "K",
+  m3ainterceptor: "s",
+  mg100starfortress: "Z",
+  modifiedtielnfighter: "C",
+  modifiedyt1300lightfreighter: "m",
+  nabooroyaln1starfighter: "<",
+  nantexclassstarfighter: ";",
+  nimbusclassvwing: ",",
+  quadrijettransferspacetug: "q",
+  raiderclasscorvette: "3",
+  resistancetransport: ">",
+  resistancetransportpod: "?",
+  rogueclassstarfighter: "~",
+  rz1awing: "a",
+  rz2awing: "E",
+  scavengedyt1300: "Y",
+  scurrgh6bomber: "H",
+  sheathipedeclassshuttle: "%",
+  sithinfiltrator: "]",
+  st70assaultship: "}",
+  starviperclassattackplatform: "v",
+  syliureclasshyperspacering: "*",
+  t65xwing: "x",
+  t70xwing: "w",
+  tieadvancedv1: "R",
+  tieadvancedx1: "A",
+  tieagaggressor: "`",
+  tiebainterceptor: "j",
+  tiecapunisher: "N",
+  tieddefender: "D",
+  tiefofighter: "O",
+  tieininterceptor: "I",
+  tielnfighter: "F",
+  tiephphantom: "P",
+  tierbheavy: "J",
+  tiereaper: "V",
+  tiesabomber: "B",
+  tiesebomber: "!",
+  tiesffighter: "S",
+  tieskstriker: "T",
+  tievnsilencer: "$",
+  tiewiwhispermodifiedinterceptor: "#",
+  tridentclassassaultship: "6",
+  upsilonclasscommandshuttle: "U",
+  ut60duwing: "u",
+  v19torrentstarfighter: "^",
+  vcx100lightfreighter: "G",
+  vt49decimator: "d",
+  vultureclassdroidfighter: "_",
+  xiclasslightshuttle: "Q",
+  yt2400lightfreighter: "o",
+  yv666lightfreighter: "t",
+  z95af4headhunter: "z",
+};
+
+export type PilotUsageRow = {
+  pilotId: string;
+  pilotName: string;
+  uses: number;
+  shipGlyph: string; // new: XWingShips glyph
+};
+
+export type PilotUsageByFaction = Record<string, PilotUsageRow[]>;
+
+type XwsPilot = {
+  id?: string;
+  ship?: string;
+  points?: number;
+  upgrades?: Record<string, string[]>;
+};
+
+type XwsListJson = {
+  faction?: string;
+  pilots?: XwsPilot[];
+};
+
+type FactionPilotAgg = {
+  uses: number;
+  ship?: string;
+};
+
+export async function fetchPilotUsageByFactionCached(): Promise<PilotUsageByFaction> {
+  // 1) Grab all away/home XWS blobs from lists
+  const listRows = await dbQuery<{
+    away_xws: any;
+    home_xws: any;
+  }>(
+    `
+    SELECT away_xws, home_xws
+    FROM lists
+    WHERE
+      (away_xws IS NOT NULL AND away_xws <> '')
+      OR
+      (home_xws IS NOT NULL AND home_xws <> '')
+    `
+  );
+
+  // 2) Grab mapping of xws -> human-readable name from railway.IDs
+  const pilotRows = await dbQuery<{
+    xws: string | null;
+    name: string | null;
+  }>(
+    `
+    SELECT xws, name
+    FROM railway.IDs
+    `
+  );
+
+  const nameMap = new Map<string, string>();
+  for (const r of pilotRows) {
+    const xws = norm(r.xws);
+    const name = norm(r.name);
+    if (!xws) continue;
+    nameMap.set(xws, name || xws);
+  }
+
+  // 3) Count pilot uses per faction, while remembering a sample ship
+  const counts: Record<string, Map<string, FactionPilotAgg>> = {};
+
+  function addList(jsonVal: unknown) {
+    if (jsonVal == null) return;
+
+    let parsed: XwsListJson | null = null;
+
+    if (typeof jsonVal === "string") {
+      const raw = jsonVal.trim();
+      if (!raw) return;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        // bad JSON in DB, skip
+        return;
+      }
+    } else if (typeof jsonVal === "object") {
+      // MySQL JSON column may already be parsed
+      parsed = jsonVal as XwsListJson;
+    } else {
+      return;
+    }
+
+    if (!parsed) return;
+
+    const faction = String(parsed.faction ?? "").toLowerCase();
+    if (!faction || !Array.isArray(parsed.pilots)) return;
+
+    if (!counts[faction]) counts[faction] = new Map();
+
+    for (const pilot of parsed.pilots) {
+      const pid = (pilot.id ?? "").trim();
+      if (!pid) continue;
+
+      const map = counts[faction];
+      const existing = map.get(pid) ?? { uses: 0, ship: undefined };
+
+      existing.uses += 1;
+      // If we don't yet have a ship recorded and this pilot has one, keep it
+      if (!existing.ship && pilot.ship) {
+        existing.ship = pilot.ship;
+      }
+
+      map.set(pid, existing);
+    }
+  }
+
+  for (const row of listRows) {
+    addList(row.away_xws);
+    addList(row.home_xws);
+  }
+
+  // 4) Turn into a nice sortable structure for the UI
+  const result: PilotUsageByFaction = {};
+
+  for (const [faction, map] of Object.entries(counts)) {
+    const arr: PilotUsageRow[] = Array.from(map.entries()).map(
+      ([pilotId, agg]) => {
+        const pilotName = nameMap.get(pilotId) ?? pilotId;
+        const shipKey = (agg.ship ?? "").toLowerCase().trim();
+        const shipGlyph = shipKey ? SHIP_ICON_MAP[shipKey] ?? "·" : "·";
+
+        return {
+          pilotId,
+          pilotName,
+          uses: agg.uses,
+          shipGlyph,
+        };
+      }
+    );
+
+    arr.sort((a, b) => {
+      if (b.uses !== a.uses) return b.uses - a.uses;
+      return a.pilotName.localeCompare(b.pilotName);
+    });
+
+    result[faction] = arr;
+  }
+
+  return result;
+}

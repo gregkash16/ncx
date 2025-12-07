@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
+
 type Table1Row = {
   team: string;
   totalGames: string;
   avgWins: string;
-  avgLoss: string;     // lowest is best
+  avgLoss: string; // lowest is best
   avgPoints: string;
   avgPlms: string;
   avgGames: string;
@@ -61,19 +63,74 @@ type Table5Row = {
   perfPlusMinus: string;
 };
 
+type PilotUsageRow = {
+  pilotId: string;
+  pilotName: string;
+  uses: number;
+  shipGlyph: string;
+};
+
+
+type PilotUsageByFaction = Record<string, PilotUsageRow[]>;
+
 export default function AdvStatsPanel({
   table1,
   table2,
   table3,
   table4,
   table5,
+  pilotUsageByFaction,
 }: {
   table1: Table1Row[];
   table2: Table2Row[];
   table3: Table3Row[];
   table4: Table4Row[];
   table5: Table5Row[];
+  pilotUsageByFaction: PilotUsageByFaction;
 }) {
+  // Canonical order for factions we expect
+  const factionOrder = [
+    "galacticrepublic",
+    "separatistalliance",
+    "rebelalliance",
+    "galacticempire",
+    "resistance",
+    "firstorder",
+    "scumandvillainy",
+  ];
+
+  const factionLabelMap: Record<string, string> = {
+    galacticrepublic: "Republic",
+    separatistalliance: "CIS",
+    rebelalliance: "Rebels",
+    galacticempire: "Empire",
+    resistance: "Resistance",
+    firstorder: "First Order",
+    scumandvillainy: "Scum",
+  };
+
+  const allFactions = Object.keys(pilotUsageByFaction ?? {});
+
+  // Sort factions so known ones are first, unknown ones (if any) follow
+  const sortedFactions = [
+    ...factionOrder.filter((f) => allFactions.includes(f)),
+    ...allFactions.filter((f) => !factionOrder.includes(f)),
+  ];
+
+  // This is the user's chosen faction (may be null/invalid)
+  const [selectedFaction, setSelectedFaction] = useState<string | null>(null);
+
+  // Resolve which faction is actually active right now:
+  // - If user-selected faction is valid, use it
+  // - Otherwise fall back to the first available faction
+  const activeFaction =
+    (selectedFaction && sortedFactions.includes(selectedFaction)
+      ? selectedFaction
+      : sortedFactions[0]) || "";
+
+  const currentRows: PilotUsageRow[] =
+    (activeFaction && pilotUsageByFaction?.[activeFaction]) || [];
+
   return (
     <div className="space-y-8">
       {/* TABLE 1 */}
@@ -90,7 +147,9 @@ export default function AdvStatsPanel({
         </div>
 
         <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-cyan-400 mb-3">Scenario × Factions</h3>
+          <h3 className="text-lg font-semibold text-cyan-400 mb-3">
+            Scenario × Factions
+          </h3>
           <Table3 rows={table3} />
         </div>
 
@@ -103,6 +162,36 @@ export default function AdvStatsPanel({
           <h3 className="text-lg font-semibold text-cyan-400 mb-3">Faction Performance</h3>
           <Table5 rows={table5} />
         </div>
+      </section>
+
+      {/* NEW: Pilot usage by faction */}
+            {/* NEW: Pilot usage by faction */}
+      <section className="w-full lg:w-1/2 mx-auto rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
+          <h3 className="text-lg font-semibold text-cyan-400">Pilot Usage by Faction</h3>
+          <div className="flex flex-wrap gap-2 text-xs">
+            {sortedFactions.length === 0 && (
+              <span className="text-zinc-400">No pilot usage data yet.</span>
+            )}
+            {sortedFactions.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setSelectedFaction(f)}
+                className={cx(
+                  "px-3 py-1.5 rounded-full border transition",
+                  activeFaction === f
+                    ? "border-cyan-400 bg-cyan-500/10 text-cyan-200"
+                    : "border-zinc-700 bg-zinc-800/60 text-zinc-300 hover:border-cyan-400/60"
+                )}
+              >
+                {factionLabelMap[f] ?? f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <PilotUsageTable rows={currentRows} />
       </section>
     </div>
   );
@@ -134,7 +223,11 @@ function Td({
     <td
       className={cx(
         "px-3 py-2 text-sm",
-        align === "left" ? "text-left" : align === "center" ? "text-center" : "text-right",
+        align === "left"
+          ? "text-left"
+          : align === "center"
+          ? "text-center"
+          : "text-right",
         "text-zinc-200",
         highlight && "border border-amber-400/70 bg-amber-500/10 rounded"
       )}
@@ -149,12 +242,23 @@ function Td({
 function Table1({ rows }: { rows: Table1Row[] }) {
   // compute leaders (max for all, except avgLoss = min)
   const numericCols = [
-    "totalGames","avgWins","avgLoss","avgPoints","avgPlms","avgGames",
-    "avgWinPct","avgPpg","avgEfficiency","avgWar","avgH2h","avgPotato","avgSos",
+    "totalGames",
+    "avgWins",
+    "avgLoss",
+    "avgPoints",
+    "avgPlms",
+    "avgGames",
+    "avgWinPct",
+    "avgPpg",
+    "avgEfficiency",
+    "avgWar",
+    "avgH2h",
+    "avgPotato",
+    "avgSos",
   ] as const;
 
-  const maxima = new Map<string, number>();  // for most columns
-  const minima = new Map<string, number>();  // specifically for avgLoss
+  const maxima = new Map<string, number>(); // for most columns
+  const minima = new Map<string, number>(); // specifically for avgLoss
 
   for (const key of numericCols) {
     const nums = rows
@@ -190,19 +294,47 @@ function Table1({ rows }: { rows: Table1Row[] }) {
           {rows.map((r, i) => (
             <tr key={`${r.team}-${i}`} className="odd:bg-zinc-900/30">
               <Td align="left">{r.team}</Td>
-              <Td highlight={toNum(r.totalGames) === maxima.get("totalGames")}>{r.totalGames}</Td>
-              <Td highlight={toNum(r.avgWins) === maxima.get("avgWins")}>{r.avgWins}</Td>
-              <Td highlight={toNum(r.avgLoss) === minima.get("avgLoss")}>{r.avgLoss}</Td>
-              <Td highlight={toNum(r.avgPoints) === maxima.get("avgPoints")}>{r.avgPoints}</Td>
-              <Td highlight={toNum(r.avgPlms) === maxima.get("avgPlms")}>{r.avgPlms}</Td>
-              <Td highlight={toNum(r.avgGames) === maxima.get("avgGames")}>{r.avgGames}</Td>
-              <Td highlight={toNum(r.avgWinPct) === maxima.get("avgWinPct")}>{r.avgWinPct}</Td>
-              <Td highlight={toNum(r.avgPpg) === maxima.get("avgPpg")}>{r.avgPpg}</Td>
-              <Td highlight={toNum(r.avgEfficiency) === maxima.get("avgEfficiency")}>{r.avgEfficiency}</Td>
-              <Td highlight={toNum(r.avgWar) === maxima.get("avgWar")}>{r.avgWar}</Td>
-              <Td highlight={toNum(r.avgH2h) === maxima.get("avgH2h")}>{r.avgH2h}</Td>
-              <Td highlight={toNum(r.avgPotato) === maxima.get("avgPotato")}>{r.avgPotato}</Td>
-              <Td highlight={toNum(r.avgSos) === maxima.get("avgSos")}>{r.avgSos}</Td>
+              <Td highlight={toNum(r.totalGames) === maxima.get("totalGames")}>
+                {r.totalGames}
+              </Td>
+              <Td highlight={toNum(r.avgWins) === maxima.get("avgWins")}>
+                {r.avgWins}
+              </Td>
+              <Td highlight={toNum(r.avgLoss) === minima.get("avgLoss")}>
+                {r.avgLoss}
+              </Td>
+              <Td highlight={toNum(r.avgPoints) === maxima.get("avgPoints")}>
+                {r.avgPoints}
+              </Td>
+              <Td highlight={toNum(r.avgPlms) === maxima.get("avgPlms")}>
+                {r.avgPlms}
+              </Td>
+              <Td highlight={toNum(r.avgGames) === maxima.get("avgGames")}>
+                {r.avgGames}
+              </Td>
+              <Td highlight={toNum(r.avgWinPct) === maxima.get("avgWinPct")}>
+                {r.avgWinPct}
+              </Td>
+              <Td highlight={toNum(r.avgPpg) === maxima.get("avgPpg")}>
+                {r.avgPpg}
+              </Td>
+              <Td
+                highlight={toNum(r.avgEfficiency) === maxima.get("avgEfficiency")}
+              >
+                {r.avgEfficiency}
+              </Td>
+              <Td highlight={toNum(r.avgWar) === maxima.get("avgWar")}>
+                {r.avgWar}
+              </Td>
+              <Td highlight={toNum(r.avgH2h) === maxima.get("avgH2h")}>
+                {r.avgH2h}
+              </Td>
+              <Td highlight={toNum(r.avgPotato) === maxima.get("avgPotato")}>
+                {r.avgPotato}
+              </Td>
+              <Td highlight={toNum(r.avgSos) === maxima.get("avgSos")}>
+                {r.avgSos}
+              </Td>
             </tr>
           ))}
         </tbody>
@@ -253,14 +385,26 @@ function Table2({ rows }: { rows: Table2Row[] }) {
 /* ------------------------ Table 3 ------------------------ */
 
 function Table3({ rows }: { rows: Table3Row[] }) {
-  const heads = ["Scenario","Republic","CIS","Rebels","Empire","Resistance","First Order","Scum"] as const;
+  const heads = [
+    "Scenario",
+    "Republic",
+    "CIS",
+    "Rebels",
+    "Empire",
+    "Resistance",
+    "First Order",
+    "Scum",
+  ] as const;
   return (
     <div className="overflow-x-auto rounded-xl border border-zinc-800">
       <table className="w-full table-auto">
         <thead className="sticky top-0 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 text-xs uppercase text-zinc-300">
           <tr>
             {heads.map((h) => (
-              <th key={h} className={h==="Scenario" ? "px-3 py-2 text-left" : "px-3 py-2"}>
+              <th
+                key={h}
+                className={h === "Scenario" ? "px-3 py-2 text-left" : "px-3 py-2"}
+              >
                 {h}
               </th>
             ))}
@@ -288,14 +432,26 @@ function Table3({ rows }: { rows: Table3Row[] }) {
 /* ------------------------ Table 4 ------------------------ */
 
 function Table4({ rows }: { rows: Table4Row[] }) {
-  const heads = ["Faction Vs","Republic","CIS","Rebels","Empire","Resistance","First Order","Scum"] as const;
+  const heads = [
+    "Faction Vs",
+    "Republic",
+    "CIS",
+    "Rebels",
+    "Empire",
+    "Resistance",
+    "First Order",
+    "Scum",
+  ] as const;
   return (
     <div className="overflow-x-auto rounded-xl border border-zinc-800">
       <table className="w-full table-auto">
         <thead className="sticky top-0 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 text-xs uppercase text-zinc-300">
           <tr>
             {heads.map((h) => (
-              <th key={h} className={h==="Faction Vs" ? "px-3 py-2 text-left" : "px-3 py-2"}>
+              <th
+                key={h}
+                className={h === "Faction Vs" ? "px-3 py-2 text-left" : "px-3 py-2"}
+              >
                 {h}
               </th>
             ))}
@@ -351,6 +507,82 @@ function Table5({ rows }: { rows: Table5Row[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* ------------------------ Pilot Usage Table ------------------------ */
+
+function PilotUsageTable({ rows }: { rows: PilotUsageRow[] }) {
+  // For bar graph scale
+  const maxUses = rows.length
+    ? Math.max(...rows.map((r) => r.uses ?? 0))
+    : 0;
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-zinc-800">
+      <div className="max-h-[520px] overflow-y-auto pr-2">
+      <table className="min-w-full text-sm">
+
+        <thead className="sticky top-0 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 text-xs uppercase text-zinc-300">
+          <tr>
+            <th className="px-3 py-2 text-left">Pilot</th>
+            <th className="px-3 py-2 text-right">Uses</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-800">
+          {rows.length === 0 && (
+            <tr>
+              <td
+                colSpan={2}
+                className="px-3 py-4 text-sm text-zinc-400 text-center"
+              >
+                No lists recorded for this faction yet.
+              </td>
+            </tr>
+          )}
+
+          {rows.map((r, i) => {
+            const ratio =
+              maxUses > 0 ? Math.max(0.05, r.uses / maxUses) : 0; // min bar width
+
+            return (
+              <tr
+                key={`${r.pilotId}-${i}`}
+                className="odd:bg-zinc-900/30"
+              >
+                {/* Pilot name + ship glyph */}
+                <Td align="left">
+                  <div className="flex items-center gap-3">
+                    {r.shipGlyph && (
+                      <span className="ship-icons text-xl leading-none">
+                        {r.shipGlyph}
+                      </span>
+                    )}
+                    <span>{r.pilotName}</span>
+                  </div>
+                </Td>
+
+                {/* Uses with horizontal bar graph */}
+                <Td align="right">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-2 rounded-full bg-cyan-500/80"
+                        style={{ width: `${ratio * 100}%` }}
+                      />
+                    </div>
+                    <span className="tabular-nums text-sm text-zinc-100 min-w-[2ch] text-right">
+                      {r.uses}
+                    </span>
+                  </div>
+                </Td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      </div>
     </div>
   );
 }
