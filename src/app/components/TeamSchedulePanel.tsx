@@ -184,6 +184,9 @@ export type TeamRosterPlayer = {
   discordId: string | null;
   discordTag: string | null;
 
+  // NEW: optional captain flag
+  isCaptain?: boolean;
+
   // All of these are strings in page.tsx’s buildTeamRoster
   wins?: string;
   losses?: string;
@@ -198,6 +201,7 @@ export type TeamRosterPlayer = {
   potato?: string;
   sos?: string;
 };
+
 
 export type TeamAdvStats = {
   team: string;
@@ -357,7 +361,10 @@ export default async function TeamSchedulePanel({
               <div className="space-y-2">
                 {roster.map((p) => {
                   const factionIcon = factionIconSrc(p.faction);
-                  const tooltip = p.discordTag || "Open DM";
+                  const isCaptain = p.isCaptain === true;
+
+                  const tooltip =
+                    p.discordTag || (isCaptain ? "Team Captain" : "Open DM");
 
                   return (
                     <div
@@ -391,13 +398,17 @@ export default async function TeamSchedulePanel({
                             titleSuffix={tooltip}
                             className="font-semibold text-cyan-200 hover:text-cyan-100"
                           />
+                          {isCaptain && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/60 bg-yellow-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-yellow-100">
+                              ★ Captain
+                            </span>
+                          )}
                         </div>
 
                         <div className="mt-1 text-xs text-zinc-400 flex flex-wrap gap-x-3 gap-y-1">
                           {p.faction && (
                             <span>
-                              Faction:{" "}
-                              <span className="text-zinc-200">{p.faction}</span>
+                              Faction: <span className="text-zinc-200">{p.faction}</span>
                             </span>
                           )}
                           {p.wins && p.losses && (
@@ -420,16 +431,12 @@ export default async function TeamSchedulePanel({
                           )}
                           {p.efficiency && (
                             <span>
-                              Eff:{" "}
-                              <span className="text-zinc-200">
-                                {p.efficiency}
-                              </span>
+                              Eff: <span className="text-zinc-200">{p.efficiency}</span>
                             </span>
                           )}
                           {p.potato && (
                             <span>
-                              Potato:{" "}
-                              <span className="text-zinc-200">{p.potato}</span>
+                              Potato: <span className="text-zinc-200">{p.potato}</span>
                             </span>
                           )}
                         </div>
@@ -443,6 +450,7 @@ export default async function TeamSchedulePanel({
                     </div>
                   );
                 })}
+
               </div>
             </section>
           )}

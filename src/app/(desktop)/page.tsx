@@ -102,12 +102,19 @@ function buildTeamRoster(
     const discordId = ncxid ? ncxToDiscord[ncxid] ?? null : null;
     const faction = String(row.faction ?? "").trim() || null;
 
+    // 🔸 NEW: derive captain flag from pick
+    const pickNum = Number(row.pick ?? 0);
+    const isCaptain = pickNum === 0;
+
     const player: TeamRosterPlayer = {
       ncxid,
       name: pickedName,
       faction,
       discordId,
       discordTag: null,
+
+      // NEW
+      isCaptain,
 
       // Individual stats (all as strings for display)
       wins: row.wins != null ? String(row.wins) : undefined,
@@ -129,6 +136,7 @@ function buildTeamRoster(
 
   return roster;
 }
+
 
 /** Map a raw AdvStats Table1 row (array) into a TeamAdvStats object. */
 function mapAdvTable1Row(raw: any[]): TeamAdvStats {
