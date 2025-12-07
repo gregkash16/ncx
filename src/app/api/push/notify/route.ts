@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   const msg = JSON.stringify({
     title: payload.title ?? 'NCX',
     body: payload.body ?? 'Update',
-    url: payload.url ?? '/',
+    url: payload.url ?? '/m/current',
   });
 
   const { rows } = await sql`SELECT endpoint, p256dh, auth FROM push_subscriptions`;
