@@ -277,29 +277,39 @@ function isTeamClinched(team: TeamPlayoffWindow, all: TeamPlayoffWindow[]): bool
   return threats <= 15;
 }
 
-function isTeamEliminated(team: TeamPlayoffWindow, all: TeamPlayoffWindow[]): boolean {
-  const bestWins = team.maxWins;
-  const bestGW = team.maxGW;
+function canTeamStillMakeTop16(
+  team: TeamPlayoffWindow,
+  all: TeamPlayoffWindow[]
+): boolean {
+  // Build a "best-case for THIS team, worst-case for everyone else" table
+  const snapshot = all.map((t) => {
+    const isTarget = t.team === team.team;
 
-  let guaranteedAhead = 0;
+    const wins = isTarget ? t.maxWins : t.minWins;
+    const gw   = isTarget ? t.maxGW   : t.minGW;
 
-  for (const other of all) {
-    if (other.team === team.team) continue;
+    return {
+      team: t.team,
+      wins,
+      gw,
+    };
+  });
 
-    const otherWorstWins = other.minWins;
-    const otherWorstGW = other.minGW;
+  // Sort by wins desc, then game wins desc
+  snapshot.sort((a, b) => {
+    if (a.wins !== b.wins) return b.wins - a.wins;
+    return b.gw - a.gw;
+  });
 
-    if (
-      otherWorstWins > bestWins ||
-      (otherWorstWins === bestWins && otherWorstGW > bestGW)
-    ) {
-      guaranteedAhead++;
-      if (guaranteedAhead >= 16) return true;
-    }
-  }
-
-  return false;
+  const rank = snapshot.findIndex((s) => s.team === team.team) + 1;
+  // If their best-case rank is 16 or better, they are NOT eliminated
+  return rank <= 16;
 }
+
+function isTeamEliminatedSimple(team: TeamPlayoffWindow, all: TeamPlayoffWindow[]): boolean {
+  return !canTeamStillMakeTop16(team, all);
+}
+
 
 function StreakPill({
   dir,
@@ -371,6 +381,53 @@ export default async function StandingsPanel() {
   }
 
   // 3) Playoff flags
+
+  function canTeamStillMakeTop16(
+  team: TeamPlayoffWindow,
+  all: TeamPlayoffWindow[]
+): boolean {
+  // Best case for THIS team, worst case for everyone else
+  const snapshot = all.map((t) => {
+    const isTarget = t.team === team.team;
+
+    const wins = isTarget ? t.maxWins : t.minWins;
+    const gw   = isTarget ? t.maxGW   : t.minGW;
+
+    return { team: t.team, wins, gw };
+  });
+
+  snapshot.sort((a, b) => {
+    if (a.wins !== b.wins) return b.wins - a.wins;
+    return b.gw - a.gw;
+  });
+
+  const rank = snapshot.findIndex((s) => s.team === team.team) + 1;
+  return rank <= 16; // can still finish 16th or better
+}
+
+function hasTeamClinchedTop16(
+  team: TeamPlayoffWindow,
+  all: TeamPlayoffWindow[]
+): boolean {
+  // Worst case for THIS team, best case for everyone else
+  const snapshot = all.map((t) => {
+    const isTarget = t.team === team.team;
+
+    const wins = isTarget ? t.minWins : t.maxWins;
+    const gw   = isTarget ? t.minGW   : t.maxGW;
+
+    return { team: t.team, wins, gw };
+  });
+
+  snapshot.sort((a, b) => {
+    if (a.wins !== b.wins) return b.wins - a.wins;
+    return b.gw - a.gw;
+  });
+
+  const rank = snapshot.findIndex((s) => s.team === team.team) + 1;
+  return rank <= 16; // even in worst case, still 16th or better
+}
+
   let playoffFlags: Record<string, { clinched: boolean; eliminated: boolean }> = {};
 
   try {
@@ -385,7 +442,7 @@ export default async function StandingsPanel() {
       const maxWins = wins + remaining;
 
       const minGW = gameWins;
-      const maxGW = gameWins + remaining * 4;
+      const maxGW = gameWins + remaining * 7;
 
       return {
         team: row.team,
@@ -401,10 +458,14 @@ export default async function StandingsPanel() {
 
     playoffFlags = {};
     for (const t of teams) {
-      const clinched = isTeamClinched(t, teams);
-      const eliminated = !clinched && isTeamEliminated(t, teams);
+      const clinched = hasTeamClinchedTop16(t, teams);
+      const canStillMake = canTeamStillMakeTop16(t, teams);
+      const eliminated = !clinched && !canStillMake;
+
       playoffFlags[t.team] = { clinched, eliminated };
     }
+
+
   } catch (e) {
     console.error("❌ playoff math ERROR:", e);
     playoffFlags = {};
