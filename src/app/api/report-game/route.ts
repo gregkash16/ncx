@@ -1744,7 +1744,7 @@ export async function POST(req: Request) {
       try {
         const title = `Game ${gameNo}`;
         const bodyText = `${awayName} - ${awayTeam} ${a} — ${h} ${homeTeam} - ${homeName}`;
-        const url = `/matchups?game=${encodeURIComponent(gameNo)}`;
+        const url = "/m/current"
 
         pushed = await sendPushForTeams([awayTeam, homeTeam], {
           title,
