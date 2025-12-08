@@ -28,25 +28,28 @@ self.addEventListener("push", (event) => {
 });
 
 // 🔧 single, URL-aware click handler
+// public/sw.js
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const target = (event.notification.data && event.notification.data.url) || "/";
+  const raw = (event.notification.data && event.notification.data.url) || "/";
+  const target = new URL(raw, self.location.origin).href; // ✅ always absolute
+
+  console.log("[SW click] opening:", target);
 
   event.waitUntil((async () => {
     const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
 
-    // If a client is already at that URL, just focus it
     for (const c of allClients) {
-      if (c.url && c.url.endsWith(target) && "focus" in c) {
+      if (c.url === target && "focus" in c) {
         return c.focus();
       }
     }
 
-    // Otherwise, open a new window/tab to the target
     return clients.openWindow(target);
   })());
 });
+
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
