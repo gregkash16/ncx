@@ -3,6 +3,11 @@
 
 import { useState } from "react";
 
+type ListAverages = {
+  averageShipCount: number | null;
+  averagePilotInit: number | null;
+};
+
 type Table1Row = {
   team: string;
   totalGames: string;
@@ -80,6 +85,7 @@ export default function MobileAdvStats({
   table4,
   table5,
   pilotUsage,
+  listAverages,
 }: {
   table1: Table1Row[];
   table2: Table2Row[];
@@ -87,10 +93,20 @@ export default function MobileAdvStats({
   table4: Table4Row[];
   table5: Table5Row[];
   pilotUsage: PilotUsageByFaction;
+  listAverages: ListAverages;
 }) {
   const [tab, setTab] = useState<"t1" | "t2" | "t3" | "t4" | "t5" | "pilots">(
     "t1"
   );
+
+  const avgShip =
+    listAverages?.averageShipCount != null
+      ? listAverages.averageShipCount.toFixed(1)
+      : undefined;
+  const avgInit =
+    listAverages?.averagePilotInit != null
+      ? listAverages.averagePilotInit.toFixed(1)
+      : undefined;
 
   return (
     <section className="w-full">
@@ -99,7 +115,7 @@ export default function MobileAdvStats({
           Advanced Stats
         </h2>
 
-        {/* Segmented control: one table at a time */}
+        {/* Tabs */}
         <div className="grid grid-cols-6 gap-1 rounded-xl border border-neutral-800 bg-neutral-950 p-1">
           {[
             { id: "t1", label: "Teams" },
@@ -130,7 +146,24 @@ export default function MobileAdvStats({
           {tab === "t3" && <Table3Cards rows={table3} />}
           {tab === "t4" && <Table4Cards rows={table4} />}
           {tab === "t5" && <Table5Cards rows={table5} />}
-          {tab === "pilots" && <MobilePilotUsage pilotUsage={pilotUsage} />}
+
+          {tab === "pilots" && (
+            <div className="space-y-3">
+              {/* NEW: List averages box inside pilots tab */}
+              <div className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-2">
+                <div className="mb-1 text-[11px] uppercase tracking-wide text-neutral-400">
+                  List Averages
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <Stat k="Avg Ship Count" v={avgShip} />
+                  <Stat k="Avg Pilot Init" v={avgInit} />
+                </div>
+              </div>
+
+              {/* Then pilot usage list */}
+              <MobilePilotUsage pilotUsage={pilotUsage} />
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -158,7 +191,6 @@ function Empty() {
   );
 }
 
-/* Small helper for faction label mapping (same idea as desktop) */
 function factionDisplayLabel(key: string): string {
   const map: Record<string, string> = {
     rebelalliance: "Rebels",
@@ -174,9 +206,8 @@ function factionDisplayLabel(key: string): string {
   return k.charAt(0).toUpperCase() + k.slice(1);
 }
 
-/* ------------------- Cards renderers (no horizontal scroll) ------------------- */
+/* ------------------- Cards ------------------- */
 
-/* Table 1: Team Averages -> card per team */
 function Table1Cards({ rows }: { rows: Table1Row[] }) {
   if (!rows?.length) return <Empty />;
   return (
@@ -214,7 +245,6 @@ function Table1Cards({ rows }: { rows: Table1Row[] }) {
   );
 }
 
-/* Table 2: Scenario Averages -> card per scenario */
 function Table2Cards({ rows }: { rows: Table2Row[] }) {
   if (!rows?.length) return <Empty />;
   return (
@@ -243,7 +273,6 @@ function Table2Cards({ rows }: { rows: Table2Row[] }) {
   );
 }
 
-/* Table 3: Scenario × Factions -> per scenario, chips per faction */
 function Table3Cards({ rows }: { rows: Table3Row[] }) {
   if (!rows?.length) return <Empty />;
   const order: Array<keyof Table3Row> = [
@@ -264,6 +293,7 @@ function Table3Cards({ rows }: { rows: Table3Row[] }) {
     firstOrder: "First Order",
     scum: "Scum",
   };
+
   return (
     <ul className="space-y-2">
       {rows.map((r, i) => (
@@ -295,7 +325,6 @@ function Table3Cards({ rows }: { rows: Table3Row[] }) {
   );
 }
 
-/* Table 4: Faction vs Faction -> per row, chips for each opponent faction */
 function Table4Cards({ rows }: { rows: Table4Row[] }) {
   if (!rows?.length) return <Empty />;
   const order: Array<keyof Table4Row> = [
@@ -316,6 +345,7 @@ function Table4Cards({ rows }: { rows: Table4Row[] }) {
     firstOrder: "First Order",
     scum: "Scum",
   };
+
   return (
     <ul className="space-y-2">
       {rows.map((r, i) => (
@@ -347,7 +377,6 @@ function Table4Cards({ rows }: { rows: Table4Row[] }) {
   );
 }
 
-/* Table 5: Faction Performance -> card per faction */
 function Table5Cards({ rows }: { rows: Table5Row[] }) {
   if (!rows?.length) return <Empty />;
   return (
@@ -374,7 +403,7 @@ function Table5Cards({ rows }: { rows: Table5Row[] }) {
   );
 }
 
-/* ------------------- Mobile Pilot Usage (new tab) ------------------- */
+/* ------------------- Mobile Pilot Usage ------------------- */
 
 function MobilePilotUsage({
   pilotUsage,
@@ -413,7 +442,7 @@ function MobilePilotUsage({
         })}
       </div>
 
-      {/* list with internal scroll, ~15 rows tall max */}
+      {/* list with internal scroll */}
       <div className="max-h-[420px] overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950/60">
         {rows.length === 0 ? (
           <div className="py-4 text-center text-sm text-neutral-400">

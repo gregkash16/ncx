@@ -1,3 +1,4 @@
+// src/app/components/AdvStatsPanel.tsx
 "use client";
 
 import { useState } from "react";
@@ -70,8 +71,12 @@ type PilotUsageRow = {
   shipGlyph: string;
 };
 
-
 type PilotUsageByFaction = Record<string, PilotUsageRow[]>;
+
+type ListAverages = {
+  averageShipCount: number | null;
+  averagePilotInit: number | null;
+};
 
 export default function AdvStatsPanel({
   table1,
@@ -80,6 +85,7 @@ export default function AdvStatsPanel({
   table4,
   table5,
   pilotUsageByFaction,
+  listAverages,
 }: {
   table1: Table1Row[];
   table2: Table2Row[];
@@ -87,6 +93,7 @@ export default function AdvStatsPanel({
   table4: Table4Row[];
   table5: Table5Row[];
   pilotUsageByFaction: PilotUsageByFaction;
+  listAverages: ListAverages;
 }) {
   // Canonical order for factions we expect
   const factionOrder = [
@@ -117,12 +124,8 @@ export default function AdvStatsPanel({
     ...allFactions.filter((f) => !factionOrder.includes(f)),
   ];
 
-  // This is the user's chosen faction (may be null/invalid)
   const [selectedFaction, setSelectedFaction] = useState<string | null>(null);
 
-  // Resolve which faction is actually active right now:
-  // - If user-selected faction is valid, use it
-  // - Otherwise fall back to the first available faction
   const activeFaction =
     (selectedFaction && sortedFactions.includes(selectedFaction)
       ? selectedFaction
@@ -131,18 +134,32 @@ export default function AdvStatsPanel({
   const currentRows: PilotUsageRow[] =
     (activeFaction && pilotUsageByFaction?.[activeFaction]) || [];
 
+  const hasShip = listAverages?.averageShipCount != null;
+  const hasInit = listAverages?.averagePilotInit != null;
+
+  const avgShip = hasShip
+    ? listAverages.averageShipCount!.toFixed(1)
+    : "—";
+  const avgInit = hasInit
+    ? listAverages.averagePilotInit!.toFixed(1)
+    : "—";
+
   return (
     <div className="space-y-8">
       {/* TABLE 1 */}
       <section className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-        <h3 className="text-lg font-semibold text-cyan-400 mb-3">Team Averages</h3>
+        <h3 className="text-lg font-semibold text-cyan-400 mb-3">
+          Team Averages
+        </h3>
         <Table1 rows={table1} />
       </section>
 
       {/* TABLES 2–5: responsive grid; will stack on small screens */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-cyan-400 mb-3">Scenario Averages</h3>
+          <h3 className="text-lg font-semibold text-cyan-400 mb-3">
+            Scenario Averages
+          </h3>
           <Table2 rows={table2} />
         </div>
 
@@ -154,24 +171,31 @@ export default function AdvStatsPanel({
         </div>
 
         <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-cyan-400 mb-3">Faction vs Faction</h3>
+          <h3 className="text-lg font-semibold text-cyan-400 mb-3">
+            Faction vs Faction
+          </h3>
           <Table4 rows={table4} />
         </div>
 
         <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-cyan-400 mb-3">Faction Performance</h3>
+          <h3 className="text-lg font-semibold text-cyan-400 mb-3">
+            Faction Performance
+          </h3>
           <Table5 rows={table5} />
         </div>
       </section>
 
-      {/* NEW: Pilot usage by faction */}
-            {/* NEW: Pilot usage by faction */}
+      {/* Pilot usage by faction + List averages */}
       <section className="w-full lg:w-1/2 mx-auto rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
-          <h3 className="text-lg font-semibold text-cyan-400">Pilot Usage by Faction</h3>
+          <h3 className="text-lg font-semibold text-cyan-400">
+            Pilot Usage by Faction
+          </h3>
           <div className="flex flex-wrap gap-2 text-xs">
             {sortedFactions.length === 0 && (
-              <span className="text-zinc-400">No pilot usage data yet.</span>
+              <span className="text-zinc-400">
+                No pilot usage data yet.
+              </span>
             )}
             {sortedFactions.map((f) => (
               <button
@@ -190,6 +214,33 @@ export default function AdvStatsPanel({
             ))}
           </div>
         </div>
+
+        {/* NEW: List Averages box (desktop) */}
+        {(hasShip || hasInit) && (
+          <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+            <div className="mb-2 text-[11px] uppercase tracking-wide text-zinc-400">
+              List Averages
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg bg-zinc-900/70 px-3 py-2">
+                <div className="text-[11px] uppercase tracking-wide text-zinc-400">
+                  Avg Ship Count
+                </div>
+                <div className="mt-1 font-semibold tabular-nums text-zinc-100">
+                  {avgShip}
+                </div>
+              </div>
+              <div className="rounded-lg bg-zinc-900/70 px-3 py-2">
+                <div className="text-[11px] uppercase tracking-wide text-zinc-400">
+                  Avg Pilot Init
+                </div>
+                <div className="mt-1 font-semibold tabular-nums text-zinc-100">
+                  {avgInit}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <PilotUsageTable rows={currentRows} />
       </section>
@@ -239,8 +290,9 @@ function Td({
 
 /* ------------------------ Table 1 ------------------------ */
 
+// (rest of the tables unchanged – this is just your existing code)
+
 function Table1({ rows }: { rows: Table1Row[] }) {
-  // compute leaders (max for all, except avgLoss = min)
   const numericCols = [
     "totalGames",
     "avgWins",
@@ -257,8 +309,8 @@ function Table1({ rows }: { rows: Table1Row[] }) {
     "avgSos",
   ] as const;
 
-  const maxima = new Map<string, number>(); // for most columns
-  const minima = new Map<string, number>(); // specifically for avgLoss
+  const maxima = new Map<string, number>();
+  const minima = new Map<string, number>();
 
   for (const key of numericCols) {
     const nums = rows
@@ -319,7 +371,9 @@ function Table1({ rows }: { rows: Table1Row[] }) {
                 {r.avgPpg}
               </Td>
               <Td
-                highlight={toNum(r.avgEfficiency) === maxima.get("avgEfficiency")}
+                highlight={
+                  toNum(r.avgEfficiency) === maxima.get("avgEfficiency")
+                }
               >
                 {r.avgEfficiency}
               </Td>
@@ -343,6 +397,7 @@ function Table1({ rows }: { rows: Table1Row[] }) {
   );
 }
 
+/* Table2, Table3, Table4, Table5, PilotUsageTable remain exactly as you pasted */
 /* ------------------------ Table 2 ------------------------ */
 
 function Table2({ rows }: { rows: Table2Row[] }) {

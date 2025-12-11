@@ -175,7 +175,7 @@ const SHIP_ICON_MAP: Record<string, string> = {
   z95af4headhunter: "z",
 };
 
-type XwsPilot = { ship: string };
+type XwsPilot = { ship: string; id?: string };
 type XwsResponse = { pilots?: XwsPilot[] };
 
 function shipsToGlyphs(pilots: XwsPilot[] = []): string {
@@ -224,6 +224,50 @@ async function fetchXwsFromListUrl(listUrl: string): Promise<XwsResponse | null>
   } catch {
     return null;
   }
+}
+
+type InitLookup = Map<string, number>;
+
+function computeCountAndAverageInit(
+  xwsJson: string | null,
+  initByXws: InitLookup
+): { count: number | null; avgInit: number | null } {
+  if (!xwsJson) return { count: null, avgInit: null };
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(xwsJson);
+  } catch {
+    return { count: null, avgInit: null };
+  }
+
+  const pilots: XwsPilot[] = Array.isArray(parsed?.pilots)
+    ? parsed.pilots
+    : [];
+
+  if (pilots.length === 0) {
+    return { count: 0, avgInit: null };
+  }
+
+  let sum = 0;
+  let matched = 0;
+
+  for (const p of pilots) {
+    const xwsId = p.id;
+    if (!xwsId) continue;
+    const init = initByXws.get(xwsId);
+    if (init == null) continue;
+    sum += Number(init);
+    matched++;
+  }
+
+  const avg =
+    matched > 0 ? Number((sum / matched).toFixed(1)) : null;
+
+  return {
+    count: pilots.length,
+    avgInit: avg,
+  };
 }
 
 // =============== GOOGLE SHEETS CLIENT ===============
@@ -838,6 +882,19 @@ async function loadOverallStandings(sheets: any, conn: mysql.Connection) {
 }
 
 async function loadLists(sheets: any, conn: mysql.Connection) {
+  // Preload xws -> init map from railway.IDs (ids 0001–0726)
+  const [idRows] = await conn.query<any[]>(
+    "SELECT xws, init FROM railway.IDs WHERE id >= '0001' AND id <= '0726'"
+  );
+
+  const initByXws: InitLookup = new Map();
+  for (const row of idRows) {
+    const key = row.xws as string | null;
+    const initVal = row.init;
+    if (!key || initVal == null) continue;
+    initByXws.set(String(key), Number(initVal));
+  }
+
   const rows = await getSheetValues(
     sheets,
     NCX_LEAGUE_SHEET_ID,
@@ -855,8 +912,12 @@ async function loadLists(sheets: any, conn: mysql.Connection) {
       away_xws,
       home_xws,
       away_letters,
-      home_letters
-    ) VALUES (?,?,?,?,?,?,?,?)
+      home_letters,
+      home_count,
+      away_count,
+      home_average_init,
+      away_average_init
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
   `;
 
   for (const r0 of rows) {
@@ -875,6 +936,7 @@ async function loadLists(sheets: any, conn: mysql.Connection) {
     let awayLetters: string | null = null;
     let homeLetters: string | null = null;
 
+    // Build XWS + letters for away
     if (awayList) {
       const xws = await fetchXwsFromListUrl(awayList);
       if (xws) {
@@ -884,6 +946,7 @@ async function loadLists(sheets: any, conn: mysql.Connection) {
       }
     }
 
+    // Build XWS + letters for home
     if (homeList) {
       const xws = await fetchXwsFromListUrl(homeList);
       if (xws) {
@@ -892,6 +955,17 @@ async function loadLists(sheets: any, conn: mysql.Connection) {
         homeLetters = glyphs || null;
       }
     }
+
+    // If home_xws / away_xws are null, all derived fields stay null
+    const {
+      count: awayCount,
+      avgInit: awayAvgInit,
+    } = computeCountAndAverageInit(awayXwsJson, initByXws);
+
+    const {
+      count: homeCount,
+      avgInit: homeAvgInit,
+    } = computeCountAndAverageInit(homeXwsJson, initByXws);
 
     await conn.execute(sql, [
       weekLabel,
@@ -902,6 +976,10 @@ async function loadLists(sheets: any, conn: mysql.Connection) {
       homeXwsJson,
       awayLetters,
       homeLetters,
+      homeCount,
+      awayCount,
+      homeAvgInit,
+      awayAvgInit,
     ]);
   }
 }

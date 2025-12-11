@@ -1,7 +1,11 @@
 // src/app/components/AdvStatsPanelServer.tsx
 // Server component (no 'use client')
 import AdvStatsPanel from "./AdvStatsPanel";
-import { fetchAdvStatsCached, fetchPilotUsageByFactionCached } from "@/lib/googleSheets";
+import {
+  fetchAdvStatsCached,
+  fetchPilotUsageByFactionCached,
+  fetchListAveragesCached,
+} from "@/lib/googleSheets";
 
 type Table1Row = {
   team: string;
@@ -73,6 +77,10 @@ type PilotUsageRow = {
 
 type PilotUsageByFaction = Record<string, PilotUsageRow[]>;
 
+type ListAverages = {
+  averageShipCount: number | null;
+  averagePilotInit: number | null;
+};
 
 function s(v: unknown) {
   return (v ?? "").toString().trim();
@@ -80,9 +88,14 @@ function s(v: unknown) {
 
 export default async function AdvStatsPanelServer() {
   try {
-    // Pull all five tables and pilot usage
-    const { t1, t2, t3, t4, t5 } = await fetchAdvStatsCached();
-    const pilotUsageByFaction: PilotUsageByFaction = await fetchPilotUsageByFactionCached();
+    // Pull all five tables + pilot usage + list averages in parallel
+    const [adv, pilotUsageByFaction, listAverages] = await Promise.all([
+      fetchAdvStatsCached(),
+      fetchPilotUsageByFactionCached(),
+      fetchListAveragesCached(),
+    ]);
+
+    const { t1, t2, t3, t4, t5 } = adv;
 
     // --- Map each table into typed rows your AdvStatsPanel expects ---
     const table1: Table1Row[] = (t1 ?? [])
@@ -163,7 +176,8 @@ export default async function AdvStatsPanelServer() {
         table3={table3}
         table4={table4}
         table5={table5}
-        pilotUsageByFaction={pilotUsageByFaction}
+        pilotUsageByFaction={pilotUsageByFaction as PilotUsageByFaction}
+        listAverages={listAverages as ListAverages}
       />
     );
   } catch (err: any) {

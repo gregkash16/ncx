@@ -486,6 +486,10 @@ export type ListRow = {
   homeList: string;
   awayLetters: string;
   homeLetters: string;
+  awayCount?: number;
+  homeCount?: number;
+  awayAverageInit?: number;
+  homeAverageInit?: number;
 };
 
 export type ListsMapForWeek = Record<
@@ -495,8 +499,13 @@ export type ListsMapForWeek = Record<
     homeList?: string;
     awayLetters?: string;
     homeLetters?: string;
+    awayCount?: number;
+    homeCount?: number;
+    awayAverageInit?: number;
+    homeAverageInit?: number;
   }
 >;
+
 
 export async function fetchListsForWeek(weekOverride?: string) {
   const activeWeek = await getCurrentWeekFromDB();
@@ -505,32 +514,55 @@ export async function fetchListsForWeek(weekOverride?: string) {
   );
 
   const rows = await dbQuery<any>(
-    `
-    SELECT week_label, game, away_list, home_list, away_letters, home_letters
-    FROM lists
-    WHERE week_label = ?
-    `,
-    [targetWeek]
-  );
+  `
+  SELECT
+    week_label,
+    game,
+    away_list,
+    home_list,
+    away_letters,
+    home_letters,
+    away_count,
+    home_count,
+    away_average_init,
+    home_average_init
+  FROM lists
+  WHERE week_label = ?
+  `,
+  [targetWeek]
+);
 
   const map: ListsMapForWeek = {};
 
   for (const r of rows) {
-    const game = norm(r.game);
-    if (!game) continue;
+  const game = norm(r.game);
+  if (!game) continue;
 
-    const awayList = norm(r.away_list);
-    const homeList = norm(r.home_list);
-    const awayLetters = norm(r.away_letters);
-    const homeLetters = norm(r.home_letters);
+  const awayList = norm(r.away_list);
+  const homeList = norm(r.home_list);
+  const awayLetters = norm(r.away_letters);
+  const homeLetters = norm(r.home_letters);
 
-    map[game] = {
-      awayList: awayList || undefined,
-      homeList: homeList || undefined,
-      awayLetters: awayLetters || undefined,
-      homeLetters: homeLetters || undefined,
-    };
-  }
+  const awayCount =
+    r.away_count != null ? Number(r.away_count) : undefined;
+  const homeCount =
+    r.home_count != null ? Number(r.home_count) : undefined;
+  const awayAverageInit =
+    r.away_average_init != null ? Number(r.away_average_init) : undefined;
+  const homeAverageInit =
+    r.home_average_init != null ? Number(r.home_average_init) : undefined;
+
+  map[game] = {
+    awayList: awayList || undefined,
+    homeList: homeList || undefined,
+    awayLetters: awayLetters || undefined,
+    homeLetters: homeLetters || undefined,
+    awayCount,
+    homeCount,
+    awayAverageInit,
+    homeAverageInit,
+  };
+}
 
   return { weekTab: targetWeek, listsMap: map };
 }
@@ -779,4 +811,63 @@ export async function fetchPilotUsageByFactionCached(): Promise<PilotUsageByFact
   }
 
   return result;
+}
+
+/* ===========================================================================
+   LIST AVERAGES (ship count + pilot initiative)
+   =========================================================================== */
+
+export type ListAverages = {
+  averageShipCount: number | null;
+  averagePilotInit: number | null;
+};
+
+export async function fetchListAveragesCached(): Promise<ListAverages> {
+  const rows = await dbQuery<{
+    home_count: number | null;
+    away_count: number | null;
+    home_average_init: number | null;
+    away_average_init: number | null;
+  }>(
+    `
+    SELECT
+      home_count,
+      away_count,
+      home_average_init,
+      away_average_init
+    FROM lists
+    `
+  );
+
+  let shipSum = 0;
+  let shipN = 0;
+  let initSum = 0;
+  let initN = 0;
+
+  for (const r of rows) {
+    if (r.home_count != null) {
+      shipSum += Number(r.home_count);
+      shipN += 1;
+    }
+    if (r.away_count != null) {
+      shipSum += Number(r.away_count);
+      shipN += 1;
+    }
+
+    if (r.home_average_init != null) {
+      initSum += Number(r.home_average_init);
+      initN += 1;
+    }
+    if (r.away_average_init != null) {
+      initSum += Number(r.away_average_init);
+      initN += 1;
+    }
+  }
+
+  const averageShipCount =
+    shipN > 0 ? Number((shipSum / shipN).toFixed(1)) : null;
+  const averagePilotInit =
+    initN > 0 ? Number((initSum / initN).toFixed(1)) : null;
+
+  return { averageShipCount, averagePilotInit };
 }

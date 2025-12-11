@@ -6,7 +6,13 @@ import MobileAdvStats from "./MobileAdvStats";
 import {
   fetchAdvStatsCached,
   fetchPilotUsageByFactionCached,
+  fetchListAveragesCached,
 } from "@/lib/googleSheets";
+
+type ListAverages = {
+  averageShipCount: number | null;
+  averagePilotInit: number | null;
+};
 
 type Table1Row = {
   team: string;
@@ -80,9 +86,10 @@ type PilotUsageByFaction = Record<string, PilotUsageRow[]>;
 
 export default async function MobileAdvStatsServer() {
   // Pull t1–t5 and pilot-usage data in parallel
-  const [adv, pilotUsage] = await Promise.all([
+  const [adv, pilotUsage, listAverages] = await Promise.all([
     fetchAdvStatsCached(),
     fetchPilotUsageByFactionCached(),
+    fetchListAveragesCached(),
   ]);
 
   const { t1, t2, t3, t4, t5 } = adv;
@@ -166,6 +173,8 @@ export default async function MobileAdvStatsServer() {
       table4={table4}
       table5={table5}
       pilotUsage={pilotUsage as PilotUsageByFaction}
+      listAverages={listAverages as ListAverages}
     />
   );
 }
+

@@ -276,12 +276,49 @@ function resolveRole(
 
 type XwsPilot = {
   ship: string;
+  id?: string; // xws id, e.g. "anakinskywalker-delta7baethersprite"
 };
 
 type XwsResponse = {
   pilots?: XwsPilot[];
   [key: string]: any;
 };
+
+type InitLookup = Map<string, number>;
+
+function computeCountAndAverageInitFromXws(
+  xws: XwsResponse | null,
+  initByXws: InitLookup
+): { count: number | null; avgInit: number | null } {
+  if (!xws || !Array.isArray(xws.pilots)) {
+    return { count: null, avgInit: null };
+  }
+
+  const pilots = xws.pilots;
+  if (pilots.length === 0) {
+    return { count: 0, avgInit: null };
+  }
+
+  let sum = 0;
+  let matched = 0;
+
+  for (const p of pilots) {
+    const xwsId = p.id;
+    if (!xwsId) continue;
+    const init = initByXws.get(xwsId);
+    if (init == null) continue;
+    sum += Number(init);
+    matched++;
+  }
+
+  const avg =
+    matched > 0 ? Number((sum / matched).toFixed(1)) : null;
+
+  return {
+    count: pilots.length,
+    avgInit: avg,
+  };
+}
 
 const SHIP_ICON_MAP: Record<string, string> = {
   aggressorassaultfighter: "i",
@@ -425,26 +462,49 @@ async function syncSingleListXwsAndLetters(
   game: string
 ) {
   // Read current row from lists table
-  const [rows] = await conn.execute(
+  const [rows] = (await conn.execute(
     "SELECT away_list, home_list FROM lists WHERE week_label = ? AND game = ?",
     [weekLabel, game]
-  ) as any[];
+  )) as any;
 
   if (!rows || rows.length === 0) return;
 
-  const awayListUrl = (rows[0].away_list ?? "").trim();
-  const homeListUrl = (rows[0].home_list ?? "").trim();
+  const row = rows[0];
+  const awayListUrl = String(row.away_list ?? "").trim();
+  const homeListUrl = String(row.home_list ?? "").trim();
+
+  // Build xws -> init map from railway.IDs (0001–0726)
+  const [idRows] = (await conn.execute(
+    "SELECT xws, init FROM railway.IDs WHERE id >= '0001' AND id <= '0726'"
+  )) as any;
+
+  const initByXws: InitLookup = new Map();
+  for (const r of idRows) {
+    const key = r.xws as string | null;
+    const initVal = r.init;
+    if (!key || initVal == null) continue;
+    initByXws.set(String(key), Number(initVal));
+  }
 
   let awayXwsJson: string | null = null;
   let awayLetters: string | null = null;
   let homeXwsJson: string | null = null;
   let homeLetters: string | null = null;
 
+  let awayCount: number | null = null;
+  let awayAvgInit: number | null = null;
+  let homeCount: number | null = null;
+  let homeAvgInit: number | null = null;
+
   if (awayListUrl && isValidListLink(awayListUrl)) {
     const xws = await fetchXwsFromListUrlServer(awayListUrl);
     if (xws) {
       awayXwsJson = JSON.stringify(xws);
       awayLetters = shipsToGlyphs(xws.pilots ?? []) ?? null;
+
+      const res = computeCountAndAverageInitFromXws(xws, initByXws);
+      awayCount = res.count;
+      awayAvgInit = res.avgInit;
     }
   }
 
@@ -453,9 +513,14 @@ async function syncSingleListXwsAndLetters(
     if (xws) {
       homeXwsJson = JSON.stringify(xws);
       homeLetters = shipsToGlyphs(xws.pilots ?? []) ?? null;
+
+      const res = computeCountAndAverageInitFromXws(xws, initByXws);
+      homeCount = res.count;
+      homeAvgInit = res.avgInit;
     }
   }
 
+  // If no valid list/XWS, leave count/avg as null (your requirement)
   await conn.execute(
     `
     UPDATE lists
@@ -463,10 +528,25 @@ async function syncSingleListXwsAndLetters(
       away_xws = ?,
       away_letters = ?,
       home_xws = ?,
-      home_letters = ?
+      home_letters = ?,
+      away_count = ?,
+      home_count = ?,
+      away_average_init = ?,
+      home_average_init = ?
     WHERE week_label = ? AND game = ?
   `,
-    [awayXwsJson, awayLetters, homeXwsJson, homeLetters, weekLabel, game]
+    [
+      awayXwsJson,
+      awayLetters,
+      homeXwsJson,
+      homeLetters,
+      awayCount,
+      homeCount,
+      awayAvgInit,
+      homeAvgInit,
+      weekLabel,
+      game,
+    ]
   );
 }
 
