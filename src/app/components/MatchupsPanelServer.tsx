@@ -1,19 +1,23 @@
 // src/app/components/MatchupsPanelServer.tsx
 // Server component: fetches MySQL matchups for the selected week,
-// then renders your existing client MatchupsPanel.
+// then renders your client MatchupsPanel.
 
 import MatchupsPanel from "./MatchupsPanel";
-import { getMatchupsForWeek, getActiveWeekFromDb, normalizeWeekLabel } from "@/lib/matchupsDb";
-import { fetchIndStatsDataCached } from "@/lib/googleSheets"; // you already used this in IndStatsPanelServer
-import type { IndRow, FactionMap } from "@/lib/googleSheets";
+import {
+  fetchIndStatsDataCached,
+  fetchFactionMapCached,
+  fetchStreamScheduleCached,
+  fetchListsForWeekCached,
+} from "@/lib/googleSheets";
 
-// If you already have a helper that builds the faction map (NCXID -> faction),
-// you can import it instead of this placeholder.
-async function getFactionMapFromSheets(): Promise<FactionMap> {
-  // If you already have a helper for this, replace this entire function with that.
-  // Otherwise, you can keep using whatever you had in page.tsx before.
-  return {} as FactionMap;
-}
+// Use your existing helpers (you referenced these already)
+import {
+  getMatchupsForWeek,
+  getActiveWeekFromDb,
+  normalizeWeekLabel,
+} from "@/lib/matchupsDb";
+
+import type { IndRow, FactionMap } from "@/lib/googleSheets";
 
 type MatchupsPanelServerProps = {
   /** Raw week param from the URL (?w=WEEK 6) */
@@ -23,7 +27,7 @@ type MatchupsPanelServerProps = {
 export default async function MatchupsPanelServer({
   weekParam,
 }: MatchupsPanelServerProps) {
-  // 1) Figure out active week from DB
+  // 1) Active week from DB
   const activeWeek = await getActiveWeekFromDb(); // e.g. "WEEK 7"
 
   // 2) Decide which week to show
@@ -31,32 +35,36 @@ export default async function MatchupsPanelServer({
     weekParam && weekParam.trim() ? weekParam : activeWeek
   );
 
-  // 3) Load matchups for that week from MySQL
+  // 3) Matchups from MySQL
   const matchData = await getMatchupsForWeek(selectedWeek);
 
-  // 4) Still reuse Ind Stats from Sheets (for now)
+  // 4) Ind stats / faction map (MySQL via your transitional layer)
   const indStats: IndRow[] = (await fetchIndStatsDataCached()) ?? [];
+  const factionMap: FactionMap = (await fetchFactionMapCached()) ?? {};
 
-  // 5) Faction map (NCXID -> faction). If you already build this in page.tsx,
-  //    you can pass it in as a prop instead of fetching here.
-  const factionMap: FactionMap = await getFactionMapFromSheets();
+  // 5) Stream schedule (optional)
+  const stream = await fetchStreamScheduleCached().catch(() => null);
+  const scheduleWeek = stream?.scheduleWeek;
+  const scheduleMap = stream?.scheduleMap;
 
-  // 6) If you have stream schedule / lists for week in MySQL, you can
-  //    import analogous helpers and build these here.
-  const scheduleWeek = activeWeek; // or selectedWeek, depending on your logic
-  const scheduleMap = undefined;   // TODO: plug in if you have a schedule table
-  const listsForWeek = undefined;  // TODO: plug in if you have a lists table
+  // 6) Lists for week (optional)
+  const lists = await fetchListsForWeekCached(selectedWeek).catch(() => null);
+  const listsForWeek = lists?.listsMap;
+
+  // 7) Kill-switch for capsules
+  const enableCapsules = process.env.NEXT_PUBLIC_MATCH_CAPSULES === "1";
 
   return (
     <MatchupsPanel
       data={matchData}
-      weekLabel={selectedWeek}   // “currently showing” label
-      activeWeek={activeWeek}   // “gold pill = current week”
+      weekLabel={selectedWeek}
+      activeWeek={activeWeek}
       scheduleWeek={scheduleWeek}
       scheduleMap={scheduleMap}
       indStats={indStats}
       factionMap={factionMap}
       listsForWeek={listsForWeek}
+      enableCapsules={enableCapsules}
     />
   );
 }

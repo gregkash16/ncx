@@ -49,6 +49,9 @@ function normalizeDiscordId(v: unknown): string {
     .replace(/\D/g, "");
 }
 
+const enableCapsules = process.env.NEXT_PUBLIC_MATCH_CAPSULES === "1";
+const enableCapsulesAI = process.env.NEXT_PUBLIC_MATCH_CAPSULES_AI === "1";
+
 /**
  * Given ?team=<slug> and the IndStats rows, try to recover the
  * canonical team display name (e.g. "KDB", "NERF HERDERS").
@@ -137,7 +140,6 @@ function buildTeamRoster(
   return roster;
 }
 
-
 /** Map a raw AdvStats Table1 row (array) into a TeamAdvStats object. */
 function mapAdvTable1Row(raw: any[]): TeamAdvStats {
   const s = (v: unknown) => (v ?? "").toString().trim();
@@ -202,6 +204,9 @@ export default async function HomePage({
     }
   }
 
+  // ✅ Option A: feature flag lives here (server component), and we pass it down.
+  const enableCapsules = process.env.NEXT_PUBLIC_MATCH_CAPSULES === "1";
+
   // 1) Get the true active week + default matches + stats
   const [
     { weekTab: activeWeek, matches: activeMatches },
@@ -252,10 +257,7 @@ export default async function HomePage({
   })) as unknown as MatchRow[];
 
   // --- Build roster for the Team tab (if teamParam is present) ---
-  const teamNameFromStats = resolveTeamNameFromParam(
-    teamParam,
-    indStats ?? []
-  );
+  const teamNameFromStats = resolveTeamNameFromParam(teamParam, indStats ?? []);
   const teamRoster = buildTeamRoster(
     teamNameFromStats,
     indStats ?? [],
@@ -303,10 +305,7 @@ export default async function HomePage({
           <HomeTabs
             hideButtons
             homePanel={
-              <HomeLanding
-                message={message}
-                factionMap={factionMap ?? undefined}
-              />
+              <HomeLanding message={message} factionMap={factionMap ?? undefined} />
             }
             currentWeekPanel={
               <CurrentWeekCard
@@ -315,6 +314,7 @@ export default async function HomePage({
                 selectedWeek={selectedWeek}
               />
             }
+            
             matchupsPanel={
               <MatchupsPanel
                 key="matchups"
@@ -326,12 +326,14 @@ export default async function HomePage({
                 indStats={indStats ?? []}
                 factionMap={factionMap}
                 listsForWeek={listsMap}
+                enableCapsules={enableCapsules}
+                enableCapsulesAI={enableCapsulesAI}
+                capsuleTone="neutral" // or "buster"
               />
             }
+
             standingsPanel={<StandingsPanel key="standings" />}
-            indStatsPanel={
-              <IndStatsPanel key="indstats" data={indStats ?? []} />
-            }
+            indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
             advStatsPanel={<AdvStatsPanelServer key="advstats" />}
             playersPanel={<PlayersPanelServer key="players" />}
             reportPanel={<ReportPanel key="report" />}

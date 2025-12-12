@@ -25,6 +25,10 @@ type ListsForWeek = Record<
     homeList?: string;
     awayLetters?: string;
     homeLetters?: string;
+    awayCount?: number;
+    homeCount?: number;
+    awayAverageInit?: number;
+    homeAverageInit?: number;
   }
 >;
 
@@ -37,6 +41,11 @@ type Props = {
   indStats?: IndRow[];
   factionMap?: FactionMap;
   listsForWeek?: ListsForWeek;
+
+  // Feature flags
+  enableCapsules?: boolean;
+  enableCapsulesAI?: boolean;
+  capsuleTone?: "neutral" | "buster";
 };
 
 function parseIntSafe(v: string | number | undefined | null): number {
@@ -627,11 +636,16 @@ const ListIcons: React.FC<ListIconsProps> = ({
       </>
     );
 
-  return (
-    <div className="inline-flex items-center gap-2 min-w-[140px]">
-      {content}
-    </div>
-  );
+  return <div className="inline-flex items-center gap-2 min-w-[140px]">{content}</div>;
+};
+
+/************************************************************
+ *  AI capsule client state
+ ************************************************************/
+type CapsuleState = {
+  text?: string;
+  loading?: boolean;
+  error?: string;
 };
 
 /************************************************************
@@ -647,6 +661,9 @@ export default function MatchupsPanel({
   indStats,
   factionMap,
   listsForWeek,
+  enableCapsules = false,
+  enableCapsulesAI = false,
+  capsuleTone = "neutral",
 }: Props) {
   const searchParams = useSearchParams();
   const urlQRaw = (searchParams.get("q") ?? "").trim();
@@ -680,6 +697,12 @@ export default function MatchupsPanel({
   const [onlyScheduled, setOnlyScheduled] = useState(false);
 
   const [generatingGame, setGeneratingGame] = useState<string | null>(null);
+
+  // Capsule open/close per game
+  const [openCapsule, setOpenCapsule] = useState<Record<string, boolean>>({});
+
+  // AI capsule state per game
+  const [aiCapsules, setAiCapsules] = useState<Record<string, CapsuleState>>({});
 
   useEffect(() => {
     setQuery(urlSelectedTeam);
@@ -755,6 +778,60 @@ export default function MatchupsPanel({
   const GREEN = "34,197,94";
   const RED = "239,68,68";
   const TIE = "99,102,241";
+
+  async function handleGenerateAICapsule(args: {
+  row: MatchRowWithDiscord;
+  awaySeason?: IndRow;
+  homeSeason?: IndRow;
+  listMeta?: {
+    awayCount?: number | null;
+    homeCount?: number | null;
+    awayAverageInit?: number | null;
+    homeAverageInit?: number | null;
+    awayListSubmitted?: boolean | null;
+    homeListSubmitted?: boolean | null;
+  } | null;
+}) {
+  const game = args.row.game;
+
+  setAiCapsules((prev) => ({
+    ...prev,
+    [game]: { ...(prev[game] ?? {}), loading: true, error: undefined },
+  }));
+
+  try {
+    const res = await fetch("/api/match-capsule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        weekLabel,
+        row: args.row,
+        awaySeason: args.awaySeason ?? null,
+        homeSeason: args.homeSeason ?? null,
+        listMeta: args.listMeta ?? null,
+        tone: capsuleTone,
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "Request failed");
+
+    setAiCapsules((prev) => ({
+      ...prev,
+      [game]: { text: String(json?.text ?? "").trim(), loading: false },
+    }));
+  } catch (e: any) {
+    setAiCapsules((prev) => ({
+      ...prev,
+      [game]: {
+        ...(prev[game] ?? {}),
+        loading: false,
+        error: e?.message || "Failed",
+      },
+    }));
+  }
+}
+
 
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
@@ -847,9 +924,11 @@ export default function MatchupsPanel({
         <div className="space-y-6">
           {filtered.map((rawRow, i) => {
             const row = rawRow as MatchRowWithDiscord;
+
             const awayScore = parseIntSafe(row.awayPts);
             const homeScore = parseIntSafe(row.homePts);
             const isDone = Boolean((row.scenario || "").trim());
+
             const winner =
               awayScore > homeScore
                 ? "away"
@@ -879,12 +958,8 @@ export default function MatchupsPanel({
                   ].slot.toUpperCase()}`
                 : "";
 
-            const awaySeason = row.awayId
-              ? indById.get(row.awayId)
-              : undefined;
-            const homeSeason = row.homeId
-              ? indById.get(row.homeId)
-              : undefined;
+            const awaySeason = row.awayId ? indById.get(row.awayId) : undefined;
+            const homeSeason = row.homeId ? indById.get(row.homeId) : undefined;
 
             const awayFactionIcon = factionMap?.[row.awayId]
               ? factionIconSrc(factionMap[row.awayId])
@@ -900,10 +975,14 @@ export default function MatchupsPanel({
               ? `@${row.homeDiscordTag}`
               : "Open DM";
 
-            const awayListUrl = listsForWeek?.[row.game]?.awayList || null;
-            const homeListUrl = listsForWeek?.[row.game]?.homeList || null;
-            const awayLetters = listsForWeek?.[row.game]?.awayLetters || null;
-            const homeLetters = listsForWeek?.[row.game]?.homeLetters || null;
+            const weekList = listsForWeek?.[row.game];
+            const awayListUrl = weekList?.awayList || null;
+            const homeListUrl = weekList?.homeList || null;
+            const awayLetters = weekList?.awayLetters || null;
+            const homeLetters = weekList?.homeLetters || null;
+
+            const isOpen = Boolean(openCapsule[row.game]);
+            const aiState = aiCapsules[row.game] || {};
 
             const handleClickThumbnail = async () => {
               try {
@@ -946,8 +1025,24 @@ export default function MatchupsPanel({
                   </span>
                 </div>
 
-                {/* Create thumbnail button */}
-                <div className="absolute -top-3 -right-3">
+                {/* Buttons (Capsule + Create thumbnail) */}
+                <div className="absolute -top-3 -right-3 flex items-center gap-2">
+                  {enableCapsules && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenCapsule((p) => ({
+                          ...p,
+                          [row.game]: !p[row.game],
+                        }))
+                      }
+                      className="inline-flex items-center rounded-lg bg-zinc-800 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md hover:bg-zinc-700"
+                    >
+                      {isOpen ? "Hide capsule" : "Capsule"}
+                    </button>
+                  )}
+
+
                   <button
                     type="button"
                     onClick={handleClickThumbnail}
@@ -1154,6 +1249,81 @@ export default function MatchupsPanel({
                     </div>
                   </div>
                 </div>
+
+                {/* Capsule block */}
+                {enableCapsules && isOpen && (
+                  <div className="relative z-10 mt-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+                    {!isDone ? (
+                      <div className="text-sm text-zinc-400 italic">
+                        Capsule unavailable — this game has not been reported yet.
+                      </div>
+                    ) : (
+                      <>
+                        
+                        {enableCapsulesAI && (
+                          <div className="mt-4 pt-3 border-t border-zinc-800">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-[11px] uppercase tracking-wide text-zinc-400">
+                                AI Capsule (beta)
+                              </div>
+
+                              <button
+                                type="button"
+                                disabled={aiState.loading}
+                                onClick={() =>
+                                  handleGenerateAICapsule({
+                                    row,
+                                    awaySeason,
+                                    homeSeason,
+                                    listMeta: weekList
+                                      ? {
+                                          awayCount: weekList.awayCount ?? null,
+                                          homeCount: weekList.homeCount ?? null,
+                                          awayAverageInit: weekList.awayAverageInit ?? null,
+                                          homeAverageInit: weekList.homeAverageInit ?? null,
+                                          awayListSubmitted: Boolean(weekList.awayList),
+                                          homeListSubmitted: Boolean(weekList.homeList),
+                                        }
+                                      : null,
+                                  })
+                                }
+
+                                className="inline-flex items-center rounded-lg bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                {aiState.loading
+                                  ? "Generating…"
+                                  : aiState.text
+                                  ? "Regenerate"
+                                  : "Generate"}
+                              </button>
+                            </div>
+
+                            {aiState.error && (
+                              <div className="mt-2 text-xs text-red-300">
+                                {aiState.error}
+                              </div>
+                            )}
+
+                            {aiState.text && (
+                              <div className="mt-2 text-sm text-zinc-200">
+                                {aiState.text}
+                              </div>
+                            )}
+
+                            {!aiState.text &&
+                              !aiState.loading &&
+                              !aiState.error && (
+                                <div className="mt-2 text-xs text-zinc-500 italic">
+                                  Click Generate to create a 2–3 sentence recap
+                                  from the data shown here.
+                                </div>
+                              )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
