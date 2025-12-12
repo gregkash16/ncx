@@ -98,20 +98,19 @@ function normalizeWeekTab(label?: string | null) {
  */
 function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
   type SeriesAgg = {
-    teamA: string;
-    teamB: string;
-    winsA: number;
-    winsB: number;
+    leftTeam: string;   // away (left)
+    rightTeam: string;  // home (right)
+    leftWins: number;
+    rightWins: number;
   };
 
   const map = new Map<string, SeriesAgg>();
 
   for (const m of matches) {
-    const rawAway = (m.awayTeam ?? "").trim();
-    const rawHome = (m.homeTeam ?? "").trim();
-    if (!rawAway || !rawHome) continue;
+    const away = (m.awayTeam ?? "").trim();
+    const home = (m.homeTeam ?? "").trim();
+    if (!away || !home) continue;
 
-    // Determine series number (already computed in MatchRow, but fall back if missing)
     const gameNum = toInt(m.game);
     const seriesNo =
       typeof m.seriesNo === "number" && m.seriesNo > 0
@@ -121,44 +120,37 @@ function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
         : 0;
     if (!seriesNo) continue;
 
-    // Sort teams to get a stable "left/right" order
-    const [teamA, teamB] =
-      rawAway.localeCompare(rawHome) <= 0
-        ? [rawAway, rawHome]
-        : [rawHome, rawAway];
-
-    const key = `${seriesNo}|${teamA}|${teamB}`;
+    // Key ignores orientation so all games in the same pairing collapse together,
+    // but we set orientation once (first time we see the series).
+    const a = away.localeCompare(home) <= 0 ? away : home;
+    const b = away.localeCompare(home) <= 0 ? home : away;
+    const key = `${seriesNo}|${a}|${b}`;
 
     let agg = map.get(key);
     if (!agg) {
-      agg = { teamA, teamB, winsA: 0, winsB: 0 };
+      // Establish left/right from the first matchup we see for this series:
+      agg = { leftTeam: away, rightTeam: home, leftWins: 0, rightWins: 0 };
       map.set(key, agg);
     }
 
-    // Try to award a win if scores are filled
     const awayPts = Number(String(m.awayPts ?? "").trim() || "NaN");
     const homePts = Number(String(m.homePts ?? "").trim() || "NaN");
-    const awayValid = Number.isFinite(awayPts);
-    const homeValid = Number.isFinite(homePts);
+    if (Number.isFinite(awayPts) && Number.isFinite(homePts) && awayPts !== homePts) {
+      const winner = awayPts > homePts ? away : home;
 
-    if (awayValid && homeValid && awayPts !== homePts) {
-      const winnerName = awayPts > homePts ? rawAway : rawHome;
-      if (winnerName === agg.teamA) agg.winsA += 1;
-      else if (winnerName === agg.teamB) agg.winsB += 1;
+      // Award win to whichever side (left/right) that winner is on.
+      if (winner === agg.leftTeam) agg.leftWins += 1;
+      else if (winner === agg.rightTeam) agg.rightWins += 1;
+      // (If data ever has swapped home/away between games, this will just ignore unknowns.)
     }
   }
 
-  const series: SeriesRow[] = [];
-  for (const agg of map.values()) {
-    series.push({
-      awayTeam: agg.teamA,
-      awayWins: agg.winsA,
-      homeTeam: agg.teamB,
-      homeWins: agg.winsB,
-    });
-  }
-
-  return series;
+  return Array.from(map.values()).map((agg) => ({
+    awayTeam: agg.leftTeam,
+    awayWins: agg.leftWins,
+    homeTeam: agg.rightTeam,
+    homeWins: agg.rightWins,
+  }));
 }
 
 export default async function CurrentWeekCard({
