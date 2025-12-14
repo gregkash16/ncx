@@ -17,6 +17,26 @@ interface MatchRowWithDiscord extends MatchRow {
   homeDiscordTag?: string | null;
 }
 
+// Scouting Pill Stuff
+type ScenarioRow = {
+  scenario: string;
+  games: number;
+  wins: number;
+  losses: number;
+  winPct: number;
+  avgMov: number;
+};
+
+type ScoutPayload = {
+  ncxid: string;
+  minGames: number;
+  totals: { games: number };
+  bestScenario: { scenario: string; games: number; wins: number; winPct: number; avgMov: number } | null;
+  worstScenario: { scenario: string; games: number; wins: number; winPct: number; avgMov: number } | null;
+  scenarios: ScenarioRow[];
+  topPilots: Array<{ pilotId: string; pilotName: string; uses: number; shipGlyph: string }>;
+};
+
 // Lists map for a given week (from MySQL S8.lists)
 type ListsForWeek = Record<
   string,
@@ -55,6 +75,12 @@ function parseIntSafe(v: string | number | undefined | null): number {
 function gameNum(g: string): number {
   const m = (g || "").match(/^\d+/);
   return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
+}
+
+function normalizeNcxId(v?: string | null): string | null {
+  if (!v) return null;
+  const s = v.trim().toUpperCase().replace(/\s+/g, "");
+  return s.startsWith("NCX") ? s : null;
 }
 
 /** Choose ONE team from q by checking against actual team names. */
@@ -669,6 +695,10 @@ export default function MatchupsPanel({
   const urlQRaw = (searchParams.get("q") ?? "").trim();
   const selectedWeekRaw = (searchParams.get("w") ?? "").trim();
 
+  const [openScout, setOpenScout] = useState<string | null>(null);
+  const [scoutById, setScoutById] = useState<Record<string, { loading?: boolean; error?: string; data?: ScoutPayload }>>({});
+  const [openScoutName, setOpenScoutName] = useState<string>(""); 
+
   const activeNum = useMemo(
     () => parseWeekNum(activeWeek ?? null),
     [activeWeek]
@@ -703,6 +733,21 @@ export default function MatchupsPanel({
 
   // AI capsule state per game
   const [aiCapsules, setAiCapsules] = useState<Record<string, CapsuleState>>({});
+
+  async function loadScout(ncxid: string) {
+    setScoutById((p) => ({ ...p, [ncxid]: { ...(p[ncxid] ?? {}), loading: true, error: undefined } }));
+
+    try {
+      const res = await fetch(`/api/scout?ncxid=${encodeURIComponent(ncxid)}&minGames=2`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Failed");
+
+      setScoutById((p) => ({ ...p, [ncxid]: { loading: false, data: json } }));
+    } catch (e: any) {
+      setScoutById((p) => ({ ...p, [ncxid]: { loading: false, error: e?.message || "Failed" } }));
+    }
+  }
+
 
   useEffect(() => {
     setQuery(urlSelectedTeam);
@@ -1138,18 +1183,54 @@ export default function MatchupsPanel({
                       className="text-pink-400 font-semibold"
                     />
                     {row.awayId ? (
-                      <span className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const id = normalizeNcxId(row.awayId);
+                          if (!id) return;
+
+                          const name = (row.awayName || "").trim();
+
+                          setOpenScout((cur) => (cur === id ? null : id));
+                          setOpenScoutName(name);
+
+                          if (!scoutById[id]?.data && !scoutById[id]?.loading) loadScout(id);
+                        }}
+
+
+                        className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono hover:border-pink-500/60 hover:bg-zinc-800 transition"
+                        title="Open scouting report"
+                      >
                         {row.awayId}
-                      </span>
+                      </button>
                     ) : null}
+
                   </div>
 
                   <div className="flex items-center gap-3 justify-end">
                     {row.homeId ? (
-                      <span className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono">
+                      <button
+                        type="button"
+                        onClick={() => {
+                        const id = normalizeNcxId(row.homeId);
+                        if (!id) return;
+
+                        const name = (row.homeName || "").trim();
+
+                        setOpenScout((cur) => (cur === id ? null : id));
+                        setOpenScoutName(name);
+
+                        if (!scoutById[id]?.data && !scoutById[id]?.loading) loadScout(id);
+                      }}
+
+
+                        className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono hover:border-pink-500/60 hover:bg-zinc-800 transition"
+                        title="Open scouting report"
+                      >
                         {row.homeId}
-                      </span>
+                      </button>
                     ) : null}
+
                     <PlayerDMLink
                       name={row.homeName || "—"}
                       discordId={row.homeDiscordId}
@@ -1249,6 +1330,87 @@ export default function MatchupsPanel({
                     </div>
                   </div>
                 </div>
+
+                {openScout && (openScout === row.awayId || openScout === row.homeId) && (
+                <div className="relative z-10 mt-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+                  {(() => {
+                    const id = openScout;
+                    const st = scoutById[id] ?? {};
+                    if (st.loading) return <div className="text-sm text-zinc-400 italic">Loading scouting…</div>;
+                    if (st.error) return <div className="text-sm text-red-300">{st.error}</div>;
+                    if (!st.data) return null;
+
+                    const d = st.data;
+
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[11px] uppercase tracking-wide text-zinc-400">
+                            SCOUTING - {openScoutName || "Unknown"} {d.ncxid}
+                          </div>
+
+                          <div className="text-xs text-zinc-500">
+                            min games for best/weakest: {d.minGames}
+                          </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                          <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-3">
+                            <div className="text-zinc-400 text-xs uppercase">Best Scenario</div>
+                            {d.bestScenario ? (
+                              <div className="mt-1">
+                                <div className="font-semibold text-zinc-100">{d.bestScenario.scenario}</div>
+                                <div className="text-zinc-300 text-xs">
+                                  {d.bestScenario.wins}-{d.bestScenario.games - d.bestScenario.wins} • {d.bestScenario.winPct}% • avg MOV {d.bestScenario.avgMov}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-1 text-zinc-500 italic">Not enough data</div>
+                            )}
+                          </div>
+
+                          <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-3">
+                            <div className="text-zinc-400 text-xs uppercase">Weakest Scenario</div>
+                            {d.worstScenario ? (
+                              <div className="mt-1">
+                                <div className="font-semibold text-zinc-100">{d.worstScenario.scenario}</div>
+                                <div className="text-zinc-300 text-xs">
+                                  {d.worstScenario.wins}-{d.worstScenario.games - d.worstScenario.wins} • {d.worstScenario.winPct}% • avg MOV {d.worstScenario.avgMov}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-1 text-zinc-500 italic">Not enough data</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {d.topPilots?.length > 0 && (
+                          <div className="rounded-lg bg-zinc-900/40 border border-zinc-800 p-3">
+                            <div className="text-zinc-400 text-xs uppercase mb-2">
+                              Top 3 most used pilots (from submitted lists)
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              {(d.topPilots ?? []).slice(0, 3).map((p) => (
+                                <div
+                                  key={p.pilotId}
+                                  className="inline-flex items-center gap-2 rounded-full bg-zinc-800/70 border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200"
+                                  title={p.pilotName}
+                                >
+                                  <span className="text-lg leading-none">{p.shipGlyph}</span>
+                                  <span className="max-w-[220px] truncate">{p.pilotName}</span>
+                                  <span className="text-zinc-400">×{p.uses}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
 
                 {/* Capsule block */}
                 {enableCapsules && isOpen && (
