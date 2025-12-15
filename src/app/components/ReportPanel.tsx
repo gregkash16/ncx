@@ -10,6 +10,13 @@ type TabKey = "current" | "matchups" | "standings" | "report" | "indstats";
 
 type Role = "player" | "captain" | "admin";
 
+type SubRow = {
+  ncxid: string;
+  first: string;
+  last: string;
+  discordId: string;
+};
+
 type GameRow = {
   rowIndex: number;
   game: string;
@@ -36,7 +43,7 @@ type GameRow = {
   isMyGame: boolean;
   canEditAwayId: boolean;
   canEditHomeId: boolean;
-  /** New: stored from Lists sheet */
+  /** Stored from Lists */
   awayList?: string;
   homeList?: string;
 };
@@ -90,13 +97,38 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
   const [awayId, setAwayId] = useState<string>("");
   const [homeId, setHomeId] = useState<string>("");
 
-  // New: list URLs
+  // List URLs
   const [awayList, setAwayList] = useState<string>("");
   const [homeList, setHomeList] = useState<string>("");
 
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string>("");
+
+  // ✅ Subs UI state (MUST be inside component)
+  const [showSubs, setShowSubs] = useState(false);
+  const [subsLoading, setSubsLoading] = useState(false);
+  const [subs, setSubs] = useState<SubRow[]>([]);
+  const [subsError, setSubsError] = useState<string>("");
+
+  async function loadSubsOnce() {
+    if (subs.length > 0) return;
+    setSubsLoading(true);
+    setSubsError("");
+    try {
+      const res = await fetch("/api/subs", { method: "GET" });
+      const json = await res.json();
+      if (!res.ok || !json?.ok) {
+        setSubsError(json?.reason ?? "Failed to load subs.");
+        return;
+      }
+      setSubs(Array.isArray(json.subs) ? json.subs : []);
+    } catch {
+      setSubsError("Failed to load subs.");
+    } finally {
+      setSubsLoading(false);
+    }
+  }
 
   // Load current user's manageable matchups
   useEffect(() => {
@@ -179,12 +211,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
   }, [selectedGame, awayList, homeList]);
 
   const listError = useMemo(() => {
-    if (awayList && !isValidListLink(awayList)) {
-      return "Should be a YASB or LBN Link";
-    }
-    if (homeList && !isValidListLink(homeList)) {
-      return "Should be a YASB or LBN Link";
-    }
+    if (awayList && !isValidListLink(awayList)) return "Should be a YASB or LBN Link";
+    if (homeList && !isValidListLink(homeList)) return "Should be a YASB or LBN Link";
     return "";
   }, [awayList, homeList]);
 
@@ -230,7 +258,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
         // Always send these; server decides whether you're allowed to change them
         newAwayId: awayId,
         newHomeId: homeId,
-        // New: list URLs (optional)
+        // List URLs (optional)
         awayList,
         homeList,
       };
@@ -298,7 +326,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
     if (!slug) return null;
     return (
       <Image
-        src={`/logos/${slug}.webp`} // ✅ absolute path under /public/logos
+        src={`/logos/${slug}.webp`}
         alt={`${name} logo`}
         width={24}
         height={24}
@@ -368,21 +396,109 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           </h2>
           <span className="mt-1 text-xs text-zinc-400">
             Role:{" "}
-            <span className="font-medium text-zinc-200 capitalize">
-              {role}
-            </span>
+            <span className="font-medium text-zinc-200 capitalize">{role}</span>
           </span>
         </div>
-        <span
-          className={`text-xs px-3 py-1 rounded-full border ${
-            alreadyFilled
-              ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-300"
-              : "border-purple-400/50 bg-purple-500/10 text-purple-300"
-          }`}
-        >
-          Game #{game}
-        </span>
+
+        <div className="flex items-center gap-2">
+          {(role === "admin" || role === "captain") && (
+            <button
+              onClick={async () => {
+                const next = !showSubs;
+                setShowSubs(next);
+                if (next) await loadSubsOnce();
+              }}
+              className="text-xs px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-900/60 text-zinc-200 hover:border-pink-400/50"
+              type="button"
+            >
+              {showSubs ? "Retract Subs" : "Show Subs"}
+            </button>
+          )}
+
+          <span
+            className={`text-xs px-3 py-1 rounded-full border ${
+              alreadyFilled
+                ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-300"
+                : "border-purple-400/50 bg-purple-500/10 text-purple-300"
+            }`}
+          >
+            Game #{game}
+          </span>
+        </div>
       </div>
+
+      {/* Subs drawer (admin/captain only) */}
+      {(role === "admin" || role === "captain") && showSubs && (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold text-zinc-200">
+              Subs ({subs.length})
+            </div>
+            <button
+              onClick={() => setShowSubs(false)}
+              className="text-xs px-2 py-1 rounded border border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-pink-400/50"
+              type="button"
+            >
+              Retract
+            </button>
+          </div>
+
+          {subsLoading && <div className="text-sm text-zinc-400">Loading…</div>}
+          {subsError && <div className="text-sm text-red-400">{subsError}</div>}
+
+          {!subsLoading && !subsError && subs.length > 0 && (
+            <div className="max-h-64 overflow-auto rounded-lg border border-zinc-800">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-zinc-950 text-zinc-300">
+                  <tr>
+                    <th className="text-left px-3 py-2">NCXID</th>
+                    <th className="text-left px-3 py-2">First</th>
+                    <th className="text-left px-3 py-2">Last</th>
+                    <th className="text-left px-3 py-2">Discord</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {subs.map((s) => (
+                    <tr
+                      key={`${s.ncxid}-${s.discordId}`}
+                      className="border-t border-zinc-800"
+                    >
+                      <td className="px-3 py-2 text-zinc-200">
+                        {String(s.ncxid ?? "")}
+                      </td>
+                      <td className="px-3 py-2 text-zinc-200">
+                        {String(s.first ?? "")}
+                      </td>
+                      <td className="px-3 py-2 text-zinc-200">
+                        {String(s.last ?? "")}
+                      </td>
+                      <td className="px-3 py-2">
+                        {s.discordId ? (
+                          <a
+                            href={`discord://-/users/${encodeURIComponent(String(s.discordId))}`}
+                            className="inline-flex items-center justify-center rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100 hover:border-pink-400/60"
+                            title="Open Discord DM"
+                          >
+                            DM
+                          </a>
+                        ) : (
+                          <span className="text-zinc-500">—</span>
+                        )}
+                      </td>
+
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!subsLoading && !subsError && subs.length === 0 && (
+            <div className="text-sm text-zinc-400">No subs found.</div>
+          )}
+        </div>
+      )}
 
       {/* Game selector (dropdown instead of a pile of buttons) */}
       {data.games.length > 1 && (
@@ -396,15 +512,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
             className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-pink-400/60"
           >
             {data.games.map((g, idx) => {
-              const labelParts = [
-                `G${g.game}:`,
-                g.away.team || "—",
-                "vs",
-                g.home.team || "—",
-              ];
-              const label =
-                labelParts.join(" ") +
-                (g.isMyGame ? " • MY GAME" : "");
+              const labelParts = [`G${g.game}:`, g.away.team || "—", "vs", g.home.team || "—"];
+              const label = labelParts.join(" ") + (g.isMyGame ? " • MY GAME" : "");
               return (
                 <option key={`${g.rowIndex}-${g.game}`} value={idx}>
                   {label}
@@ -413,8 +522,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
             })}
           </select>
           <p className="text-xs text-zinc-500">
-            Admins and captains can switch between all games they&apos;re
-            allowed to manage.
+            Admins and captains can switch between all games they&apos;re allowed to manage.
           </p>
         </div>
       )}
@@ -429,9 +537,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           </div>
           <div className="mt-1 text-sm text-zinc-400 flex flex-col gap-1">
             <div>
-              <span className="font-medium text-white">
-                {away.name || "—"}
-              </span>
+              <span className="font-medium text-white">{away.name || "—"}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-zinc-400">NCX ID:</span>
@@ -455,8 +561,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
             <span className="text-zinc-200">
               {away.wins || 0}-{away.losses || 0}
             </span>{" "}
-            • PL/MS:{" "}
-            <span className="text-zinc-200">{away.plms || "-"}</span>
+            • PL/MS: <span className="text-zinc-200">{away.plms || "-"}</span>
           </div>
         </div>
 
@@ -469,9 +574,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           </div>
           <div className="mt-1 text-sm text-zinc-400 flex flex-col gap-1">
             <div>
-              <span className="font-medium text-white">
-                {home.name || "—"}
-              </span>
+              <span className="font-medium text-white">{home.name || "—"}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-zinc-400">NCX ID:</span>
@@ -495,8 +598,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
             <span className="text-zinc-200">
               {home.wins || 0}-{home.losses || 0}
             </span>{" "}
-            • PL/MS:{" "}
-            <span className="text-zinc-200">{home.plms || "-"}</span>
+            • PL/MS: <span className="text-zinc-200">{home.plms || "-"}</span>
           </div>
         </div>
       </div>
@@ -544,7 +646,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
         </label>
       </div>
 
-      {/* New: List URLs */}
+      {/* List URLs */}
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="block">
           <span className="text-sm text-zinc-400">Away List (optional)</span>
@@ -556,9 +658,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
             className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:border-pink-400/60"
           />
           {awayList && !isValidListLink(awayList) && (
-            <p className="mt-1 text-xs text-red-400">
-              Should be a YASB or LBN Link
-            </p>
+            <p className="mt-1 text-xs text-red-400">Should be a YASB or LBN Link</p>
           )}
         </label>
 
@@ -572,9 +672,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
             className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:border-pink-400/60"
           />
           {homeList && !isValidListLink(homeList) && (
-            <p className="mt-1 text-xs text-red-400">
-              Should be a YASB or LBN Link
-            </p>
+            <p className="mt-1 text-xs text-red-400">Should be a YASB or LBN Link</p>
           )}
         </label>
       </div>
@@ -600,6 +698,11 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
         </button>
         {notice && <span className="text-sm text-zinc-300">{notice}</span>}
       </div>
+
+      {/* subtle validation hint */}
+      {listError && (
+        <div className="text-xs text-red-400">{listError}</div>
+      )}
     </div>
   );
 }

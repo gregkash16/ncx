@@ -871,3 +871,31 @@ export async function fetchListAveragesCached(): Promise<ListAverages> {
 
   return { averageShipCount, averagePilotInit };
 }
+
+export type SubWithDiscord = {
+  ncxid: string;
+  first: string;
+  last: string;
+  discordId: string;
+};
+
+export async function fetchSubsWithDiscordCached(): Promise<SubWithDiscord[]> {
+  const rows = await dbQuery<any>(`
+    SELECT
+      s.NCXID AS ncxid,
+      dm.first_name AS first,
+      dm.last_name AS last,
+      CAST(dm.discord_id AS CHAR) AS discordId
+    FROM Subs s
+    LEFT JOIN discord_map dm
+      ON dm.ncxid = s.NCXID
+    ORDER BY s.NCXID ASC
+  `);
+
+  return rows.map((r: any) => ({
+    ncxid: norm(r.ncxid),
+    first: norm(r.first),
+    last: norm(r.last),
+    discordId: norm(r.discordId),
+  }));
+}

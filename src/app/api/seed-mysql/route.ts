@@ -20,6 +20,27 @@ const WEEK_TABS = Array.from({ length: 10 }, (_, i) => `WEEK ${i + 1}`);
 
 // =============== HELPERS ===============
 
+async function getSheetTitleByGid(
+  sheets: any,
+  spreadsheetId: string,
+  gid: number
+): Promise<string> {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets(properties(sheetId,title))",
+  });
+
+  const match = (meta.data.sheets ?? []).find(
+    (s: any) => Number(s?.properties?.sheetId) === Number(gid)
+  );
+
+  const title = match?.properties?.title;
+  if (!title) {
+    throw new Error(`Could not find sheet tab for gid=${gid}`);
+  }
+  return String(title);
+}
+
 function norm(v: any): string {
   return v != null ? String(v).trim() : "";
 }
@@ -331,6 +352,30 @@ async function getMySqlConn() {
 
 // =============== LOADERS ===============
 
+const SUBS_GID = 1218415702;
+
+async function loadSubs(sheets: any, conn: mysql.Connection) {
+  const tabName = await getSheetTitleByGid(sheets, NCX_LEAGUE_SHEET_ID, SUBS_GID);
+
+  // A2:A (variable length)
+  const rows = await getSheetValues(sheets, NCX_LEAGUE_SHEET_ID, `${tabName}!A2:A`);
+
+  // wipe + insert
+  await conn.execute("DELETE FROM `Subs`");
+
+  const sql = "INSERT INTO `Subs` (`NCXID`) VALUES (?)";
+
+  let inserted = 0;
+  for (const r0 of rows) {
+    const ncxid = norm(r0?.[0]);
+    if (!ncxid) continue;
+    await conn.execute(sql, [ncxid]);
+    inserted++;
+  }
+
+  return { tabName, inserted };
+}
+
 async function loadCurrentWeek(sheets: any, conn: mysql.Connection) {
   const rows = await getSheetValues(sheets, NCX_LEAGUE_SHEET_ID, "SCHEDULE!U2:U2");
   const value = rows[0]?.[0] ?? "WEEK 1";
@@ -572,7 +617,8 @@ async function loadDiscordMap(sheets: any, conn: mysql.Connection) {
     ) VALUES (?,?,?,?,?)
   `;
 
-  const seen = new Set<number>();
+  // IMPORTANT: dedupe as STRING, not number
+  const seen = new Set<string>();
 
   for (const r0 of rows) {
     const r = [...r0, "", "", "", ""].slice(0, 4);
@@ -581,15 +627,18 @@ async function loadDiscordMap(sheets: any, conn: mysql.Connection) {
     const last = norm(r[2]);
     const raw = norm(r[3]);
 
+    // Extract digits only, keep as string
     const discIdStr = raw.replace(/[^\d]/g, "");
     if (!discIdStr) continue;
 
-    const discId = Number(discIdStr);
-    if (!Number.isFinite(discId)) continue;
-    if (seen.has(discId)) continue;
-    seen.add(discId);
+    // basic sanity: Discord IDs are usually 17–20 digits
+    if (discIdStr.length < 15) continue;
 
-    await conn.execute(sql, [discId, ncxid, first, last, raw]);
+    if (seen.has(discIdStr)) continue;
+    seen.add(discIdStr);
+
+    // Write as string (MySQL can store as VARCHAR or BIGINT, but pass string)
+    await conn.execute(sql, [discIdStr, ncxid, first, last, raw]);
   }
 }
 
@@ -1001,6 +1050,7 @@ export async function GET(req: NextRequest) {
 
     try {
       results.current_week = await loadCurrentWeek(sheets, conn);
+      results.subs = await loadSubs(sheets, conn);
       await loadWeeklyMatchups(sheets, conn);
       await loadIndividualStats(sheets, conn);
       await loadStreamSchedule(sheets, conn);
