@@ -717,6 +717,14 @@ export default function MatchupsPanel({
     return (data || []).filter((m) => /^\d+$/.test((m.game || "").trim()));
   }, [data]);
 
+    const completedCount = useMemo(() => {
+    return cleaned.filter((m) => Boolean((m.scenario || "").trim())).length;
+  }, [cleaned]);
+
+  const scheduledCount = useMemo(() => {
+    return cleaned.filter((m) => !Boolean((m.scenario || "").trim())).length;
+  }, [cleaned]);
+
   const urlSelectedTeam = useMemo(() => {
     if (!urlQRaw) return "";
     return pickTeamFilter(urlQRaw, cleaned);
@@ -948,7 +956,7 @@ export default function MatchupsPanel({
               if (e.target.checked) setOnlyScheduled(false);
             }}
           />
-          Completed only
+          Completed ({completedCount})
         </label>
         <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
           <input
@@ -959,7 +967,7 @@ export default function MatchupsPanel({
               if (e.target.checked) setOnlyCompleted(false);
             }}
           />
-          Scheduled only
+          Scheduled ({scheduledCount})
         </label>
       </div>
 
