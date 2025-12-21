@@ -31,10 +31,27 @@ type ScoutPayload = {
   ncxid: string;
   minGames: number;
   totals: { games: number };
-  bestScenario: { scenario: string; games: number; wins: number; winPct: number; avgMov: number } | null;
-  worstScenario: { scenario: string; games: number; wins: number; winPct: number; avgMov: number } | null;
+  bestScenario: {
+    scenario: string;
+    games: number;
+    wins: number;
+    winPct: number;
+    avgMov: number;
+  } | null;
+  worstScenario: {
+    scenario: string;
+    games: number;
+    wins: number;
+    winPct: number;
+    avgMov: number;
+  } | null;
   scenarios: ScenarioRow[];
-  topPilots: Array<{ pilotId: string; pilotName: string; uses: number; shipGlyph: string }>;
+  topPilots: Array<{
+    pilotId: string;
+    pilotName: string;
+    uses: number;
+    shipGlyph: string;
+  }>;
 };
 
 // Lists map for a given week (from MySQL S8.lists)
@@ -323,14 +340,8 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
 
   await ensureShipFontLoaded();
 
-  const {
-    row,
-    awayFactionIcon,
-    homeFactionIcon,
-    weekLabel,
-    awayLetters,
-    homeLetters,
-  } = ctxData;
+  const { row, awayFactionIcon, homeFactionIcon, weekLabel, awayLetters, homeLetters } =
+    ctxData;
 
   const canvas = document.createElement("canvas");
   canvas.width = THUMB_WIDTH;
@@ -374,7 +385,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   /************************************************************
    * BACKGROUND: PURE TEAM GRADIENT
    ************************************************************/
-
   const baseGrad = ctx.createLinearGradient(0, 0, W, 0);
   baseGrad.addColorStop(0, awayColorHex);
   baseGrad.addColorStop(0.5, hexToRgba(awayColorHex, 0.5));
@@ -398,7 +408,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   /************************************************************
    * TOP TEXT
    ************************************************************/
-
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
@@ -417,7 +426,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   /************************************************************
    * CENTER LOGO
    ************************************************************/
-
   if (mainLogoImg) {
     const maxW = 380;
     const maxH = 380;
@@ -448,7 +456,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   /************************************************************
    * FACTION ICONS
    ************************************************************/
-
   if (awayFactionImg) {
     ctx.drawImage(
       awayFactionImg,
@@ -471,7 +478,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   /************************************************************
    * NAMES / SHIPS / TEAMS
    ************************************************************/
-
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
@@ -509,7 +515,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   /************************************************************
    * NORMALIZED LOGO CARDS
    ************************************************************/
-
   const cardW = 260;
   const cardH = 260;
   const cardRadius = 40;
@@ -576,7 +581,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
   /************************************************************
    * GAME LABEL + DOWNLOAD
    ************************************************************/
-
   ctx.fillStyle = "#ffffff";
   ctx.font = "700 34px system-ui";
   ctx.fillText(`GAME ${row.game}`, W / 2, H - 70);
@@ -600,7 +604,6 @@ async function generateMatchThumbnail(ctxData: ThumbnailContext) {
 /************************************************************
  *  ListIcons – uses precomputed letters (away_letters/home_letters)
  ************************************************************/
-
 type ListIconsProps = {
   label: string;
   listUrl?: string | null;
@@ -616,8 +619,7 @@ const ListIcons: React.FC<ListIconsProps> = ({
 }) => {
   if (!listUrl) return null;
 
-  const glyphs =
-    (letters ?? "").trim().length > 0 ? (letters as string) : null;
+  const glyphs = (letters ?? "").trim().length > 0 ? (letters as string) : null;
 
   const iconBlock = glyphs ? (
     <div
@@ -662,7 +664,11 @@ const ListIcons: React.FC<ListIconsProps> = ({
       </>
     );
 
-  return <div className="inline-flex items-center gap-2 min-w-[140px]">{content}</div>;
+  return (
+    <div className="inline-flex items-center gap-2 min-w-[140px]">
+      {content}
+    </div>
+  );
 };
 
 /************************************************************
@@ -677,7 +683,6 @@ type CapsuleState = {
 /************************************************************
  *  Component
  ************************************************************/
-
 export default function MatchupsPanel({
   data,
   weekLabel,
@@ -696,13 +701,12 @@ export default function MatchupsPanel({
   const selectedWeekRaw = (searchParams.get("w") ?? "").trim();
 
   const [openScout, setOpenScout] = useState<string | null>(null);
-  const [scoutById, setScoutById] = useState<Record<string, { loading?: boolean; error?: string; data?: ScoutPayload }>>({});
-  const [openScoutName, setOpenScoutName] = useState<string>(""); 
+  const [scoutById, setScoutById] = useState<
+    Record<string, { loading?: boolean; error?: string; data?: ScoutPayload }>
+  >({});
+  const [openScoutName, setOpenScoutName] = useState<string>("");
 
-  const activeNum = useMemo(
-    () => parseWeekNum(activeWeek ?? null),
-    [activeWeek]
-  );
+  const activeNum = useMemo(() => parseWeekNum(activeWeek ?? null), [activeWeek]);
   const selectedNum = useMemo(
     () => parseWeekNum(selectedWeekRaw || null),
     [selectedWeekRaw]
@@ -717,18 +721,11 @@ export default function MatchupsPanel({
     return (data || []).filter((m) => /^\d+$/.test((m.game || "").trim()));
   }, [data]);
 
-    const completedCount = useMemo(() => {
-    return cleaned.filter((m) => Boolean((m.scenario || "").trim())).length;
-  }, [cleaned]);
-
-  const scheduledCount = useMemo(() => {
-    return cleaned.filter((m) => !Boolean((m.scenario || "").trim())).length;
-  }, [cleaned]);
-
   const urlSelectedTeam = useMemo(() => {
     if (!urlQRaw) return "";
     return pickTeamFilter(urlQRaw, cleaned);
   }, [urlQRaw, cleaned]);
+
   const [query, setQuery] = useState(urlSelectedTeam);
 
   const [onlyCompleted, setOnlyCompleted] = useState(false);
@@ -743,33 +740,43 @@ export default function MatchupsPanel({
   const [aiCapsules, setAiCapsules] = useState<Record<string, CapsuleState>>({});
 
   async function loadScout(ncxid: string) {
-    setScoutById((p) => ({ ...p, [ncxid]: { ...(p[ncxid] ?? {}), loading: true, error: undefined } }));
+    setScoutById((p) => ({
+      ...p,
+      [ncxid]: { ...(p[ncxid] ?? {}), loading: true, error: undefined },
+    }));
 
     try {
-      const res = await fetch(`/api/scout?ncxid=${encodeURIComponent(ncxid)}&minGames=2`);
+      const res = await fetch(
+        `/api/scout?ncxid=${encodeURIComponent(ncxid)}&minGames=2`
+      );
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Failed");
 
       setScoutById((p) => ({ ...p, [ncxid]: { loading: false, data: json } }));
     } catch (e: any) {
-      setScoutById((p) => ({ ...p, [ncxid]: { loading: false, error: e?.message || "Failed" } }));
+      setScoutById((p) => ({
+        ...p,
+        [ncxid]: { loading: false, error: e?.message || "Failed" },
+      }));
     }
   }
-
 
   useEffect(() => {
     setQuery(urlSelectedTeam);
   }, [urlSelectedTeam]);
 
-  const selectedTeam = useMemo(
-    () => pickTeamFilter(query, cleaned),
-    [query, cleaned]
-  );
+  const selectedTeam = useMemo(() => pickTeamFilter(query, cleaned), [query, cleaned]);
 
   const indById = useMemo(() => statsMapFromIndRows(indStats), [indStats]);
 
-  const filtered = useMemo(() => {
+  /**
+   * ✅ Counts should follow the CURRENT search filter.
+   * So we compute a baseFiltered (query filter only, no completion toggles)
+   * and derive completed/scheduled counts from that.
+   */
+  const baseFiltered = useMemo(() => {
     const q = (query || "").toLowerCase().trim();
+
     let rows = !q
       ? cleaned
       : cleaned.filter((m) => {
@@ -793,14 +800,8 @@ export default function MatchupsPanel({
             .some((v) => String(v).toLowerCase().includes(q));
         });
 
-    rows = rows.filter((m) => {
-      const isCompleted = Boolean((m.scenario || "").trim());
-      if (onlyCompleted && !isCompleted) return false;
-      if (onlyScheduled && isCompleted) return false;
-      return true;
-    });
-
-    rows.sort((a, b) => {
+    // same sort behavior as main list
+    rows = [...rows].sort((a, b) => {
       const aInSel =
         selectedTeam &&
         (a.awayTeam === selectedTeam || a.homeTeam === selectedTeam)
@@ -817,11 +818,32 @@ export default function MatchupsPanel({
     });
 
     return rows;
-  }, [cleaned, query, onlyCompleted, onlyScheduled, selectedTeam, factionMap]);
+  }, [cleaned, query, selectedTeam, factionMap]);
+
+  const completedCount = useMemo(() => {
+    return baseFiltered.filter((m) => Boolean((m.scenario || "").trim())).length;
+  }, [baseFiltered]);
+
+  const scheduledCount = useMemo(() => {
+    return baseFiltered.filter((m) => !Boolean((m.scenario || "").trim())).length;
+  }, [baseFiltered]);
+
+  const filtered = useMemo(() => {
+    // Start from baseFiltered so we don't duplicate the query logic
+    let rows = baseFiltered;
+
+    rows = rows.filter((m) => {
+      const isCompleted = Boolean((m.scenario || "").trim());
+      if (onlyCompleted && !isCompleted) return false;
+      if (onlyScheduled && isCompleted) return false;
+      return true;
+    });
+
+    return rows;
+  }, [baseFiltered, onlyCompleted, onlyScheduled]);
 
   const scheduleEnabled =
-    Boolean(weekLabel && scheduleWeek) &&
-    weekLabel!.trim() === scheduleWeek!.trim();
+    Boolean(weekLabel && scheduleWeek) && weekLabel!.trim() === scheduleWeek!.trim();
 
   const btnBase =
     "group relative overflow-hidden rounded-xl border bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
@@ -833,58 +855,57 @@ export default function MatchupsPanel({
   const TIE = "99,102,241";
 
   async function handleGenerateAICapsule(args: {
-  row: MatchRowWithDiscord;
-  awaySeason?: IndRow;
-  homeSeason?: IndRow;
-  listMeta?: {
-    awayCount?: number | null;
-    homeCount?: number | null;
-    awayAverageInit?: number | null;
-    homeAverageInit?: number | null;
-    awayListSubmitted?: boolean | null;
-    homeListSubmitted?: boolean | null;
-  } | null;
-}) {
-  const game = args.row.game;
-
-  setAiCapsules((prev) => ({
-    ...prev,
-    [game]: { ...(prev[game] ?? {}), loading: true, error: undefined },
-  }));
-
-  try {
-    const res = await fetch("/api/match-capsule", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        weekLabel,
-        row: args.row,
-        awaySeason: args.awaySeason ?? null,
-        homeSeason: args.homeSeason ?? null,
-        listMeta: args.listMeta ?? null,
-        tone: capsuleTone,
-      }),
-    });
-
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || "Request failed");
+    row: MatchRowWithDiscord;
+    awaySeason?: IndRow;
+    homeSeason?: IndRow;
+    listMeta?: {
+      awayCount?: number | null;
+      homeCount?: number | null;
+      awayAverageInit?: number | null;
+      homeAverageInit?: number | null;
+      awayListSubmitted?: boolean | null;
+      homeListSubmitted?: boolean | null;
+    } | null;
+  }) {
+    const game = args.row.game;
 
     setAiCapsules((prev) => ({
       ...prev,
-      [game]: { text: String(json?.text ?? "").trim(), loading: false },
+      [game]: { ...(prev[game] ?? {}), loading: true, error: undefined },
     }));
-  } catch (e: any) {
-    setAiCapsules((prev) => ({
-      ...prev,
-      [game]: {
-        ...(prev[game] ?? {}),
-        loading: false,
-        error: e?.message || "Failed",
-      },
-    }));
+
+    try {
+      const res = await fetch("/api/match-capsule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weekLabel,
+          row: args.row,
+          awaySeason: args.awaySeason ?? null,
+          homeSeason: args.homeSeason ?? null,
+          listMeta: args.listMeta ?? null,
+          tone: capsuleTone,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Request failed");
+
+      setAiCapsules((prev) => ({
+        ...prev,
+        [game]: { text: String(json?.text ?? "").trim(), loading: false },
+      }));
+    } catch (e: any) {
+      setAiCapsules((prev) => ({
+        ...prev,
+        [game]: {
+          ...(prev[game] ?? {}),
+          loading: false,
+          error: e?.message || "Failed",
+        },
+      }));
+    }
   }
-}
-
 
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
@@ -899,15 +920,12 @@ export default function MatchupsPanel({
       {activeNum && activeNum > 0 && (
         <div className="flex flex-wrap justify-center gap-2 mb-5">
           {weeksPills.map((wk) => {
-            const isActive =
-              wk.toUpperCase() === (activeWeek || "").toUpperCase();
+            const isActive = wk.toUpperCase() === (activeWeek || "").toUpperCase();
             const selected =
               (!selectedWeekRaw && isActive) ||
               wk.toUpperCase() === (selectedWeekRaw || "").toUpperCase();
 
-            const href = isActive
-              ? "?tab=matchups"
-              : `?tab=matchups&w=${encodeURIComponent(wk)}`;
+            const href = isActive ? "?tab=matchups" : `?tab=matchups&w=${encodeURIComponent(wk)}`;
 
             return (
               <a
@@ -983,19 +1001,13 @@ export default function MatchupsPanel({
             const isDone = Boolean((row.scenario || "").trim());
 
             const winner =
-              awayScore > homeScore
-                ? "away"
-                : homeScore > awayScore
-                ? "home"
-                : "tie";
+              awayScore > homeScore ? "away" : homeScore > awayScore ? "home" : "tie";
 
             const awayLogo = `/logos/${teamSlug(row.awayTeam)}.webp`;
             const homeLogo = `/logos/${teamSlug(row.homeTeam)}.webp`;
 
-            const leftColor =
-              winner === "away" ? GREEN : winner === "home" ? RED : TIE;
-            const rightColor =
-              winner === "home" ? GREEN : winner === "away" ? RED : TIE;
+            const leftColor = winner === "away" ? GREEN : winner === "home" ? RED : TIE;
+            const rightColor = winner === "home" ? GREEN : winner === "away" ? RED : TIE;
 
             const gradientStyle: React.CSSProperties = {
               backgroundImage: `
@@ -1006,9 +1018,7 @@ export default function MatchupsPanel({
 
             const sched =
               scheduleEnabled && scheduleMap?.[row.game]
-                ? ` — ${scheduleMap[row.game].day.toUpperCase()}, ${scheduleMap[
-                    row.game
-                  ].slot.toUpperCase()}`
+                ? ` — ${scheduleMap[row.game].day.toUpperCase()}, ${scheduleMap[row.game].slot.toUpperCase()}`
                 : "";
 
             const awaySeason = row.awayId ? indById.get(row.awayId) : undefined;
@@ -1021,12 +1031,8 @@ export default function MatchupsPanel({
               ? factionIconSrc(factionMap[row.homeId])
               : "";
 
-            const awayTooltip = row.awayDiscordTag
-              ? `@${row.awayDiscordTag}`
-              : "Open DM";
-            const homeTooltip = row.homeDiscordTag
-              ? `@${row.homeDiscordTag}`
-              : "Open DM";
+            const awayTooltip = row.awayDiscordTag ? `@${row.awayDiscordTag}` : "Open DM";
+            const homeTooltip = row.homeDiscordTag ? `@${row.homeDiscordTag}` : "Open DM";
 
             const weekList = listsForWeek?.[row.game];
             const awayListUrl = weekList?.awayList || null;
@@ -1051,9 +1057,7 @@ export default function MatchupsPanel({
                   homeLetters,
                 });
               } finally {
-                setGeneratingGame((current) =>
-                  current === row.game ? null : current
-                );
+                setGeneratingGame((current) => (current === row.game ? null : current));
               }
             };
 
@@ -1095,16 +1099,13 @@ export default function MatchupsPanel({
                     </button>
                   )}
 
-
                   <button
                     type="button"
                     onClick={handleClickThumbnail}
                     disabled={generatingGame === row.game}
                     className="inline-flex items-center rounded-lg bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {generatingGame === row.game
-                      ? "Generating…"
-                      : "Create thumbnail"}
+                    {generatingGame === row.game ? "Generating…" : "Create thumbnail"}
                   </button>
                 </div>
 
@@ -1124,9 +1125,7 @@ export default function MatchupsPanel({
                     />
                     <span
                       className={`truncate ${
-                        awayScore > homeScore
-                          ? "text-pink-400 font-bold"
-                          : "text-zinc-300"
+                        awayScore > homeScore ? "text-pink-400 font-bold" : "text-zinc-300"
                       }`}
                     >
                       {row.awayTeam || "TBD"}
@@ -1149,9 +1148,7 @@ export default function MatchupsPanel({
                   <div className="flex items-center gap-3 justify-end w-1/3 min-w-0">
                     <span
                       className={`truncate text-right ${
-                        homeScore > awayScore
-                          ? "text-cyan-400 font-bold"
-                          : "text-zinc-300"
+                        homeScore > awayScore ? "text-cyan-400 font-bold" : "text-zinc-300"
                       }`}
                     >
                       {row.homeTeam || "TBD"}
@@ -1187,7 +1184,7 @@ export default function MatchupsPanel({
                     <PlayerDMLink
                       name={row.awayName || "—"}
                       discordId={row.awayDiscordId}
-                      titleSuffix={awayTooltip}
+                      titleSuffix={row.awayDiscordTag ? `@${row.awayDiscordTag}` : "Open DM"}
                       className="text-pink-400 font-semibold"
                     />
                     {row.awayId ? (
@@ -1198,21 +1195,17 @@ export default function MatchupsPanel({
                           if (!id) return;
 
                           const name = (row.awayName || "").trim();
-
                           setOpenScout((cur) => (cur === id ? null : id));
                           setOpenScoutName(name);
 
                           if (!scoutById[id]?.data && !scoutById[id]?.loading) loadScout(id);
                         }}
-
-
                         className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono hover:border-pink-500/60 hover:bg-zinc-800 transition"
                         title="Open scouting report"
                       >
                         {row.awayId}
                       </button>
                     ) : null}
-
                   </div>
 
                   <div className="flex items-center gap-3 justify-end">
@@ -1220,19 +1213,16 @@ export default function MatchupsPanel({
                       <button
                         type="button"
                         onClick={() => {
-                        const id = normalizeNcxId(row.homeId);
-                        if (!id) return;
+                          const id = normalizeNcxId(row.homeId);
+                          if (!id) return;
 
-                        const name = (row.homeName || "").trim();
+                          const name = (row.homeName || "").trim();
+                          setOpenScout((cur) => (cur === id ? null : id));
+                          setOpenScoutName(name);
 
-                        setOpenScout((cur) => (cur === id ? null : id));
-                        setOpenScoutName(name);
-
-                        if (!scoutById[id]?.data && !scoutById[id]?.loading) loadScout(id);
-                      }}
-
-
-                        className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono hover:border-pink-500/60 hover:bg-zinc-800 transition"
+                          if (!scoutById[id]?.data && !scoutById[id]?.loading) loadScout(id);
+                        }}
+                        className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono hover:border-cyan-500/60 hover:bg-zinc-800 transition"
                         title="Open scouting report"
                       >
                         {row.homeId}
@@ -1242,7 +1232,7 @@ export default function MatchupsPanel({
                     <PlayerDMLink
                       name={row.homeName || "—"}
                       discordId={row.homeDiscordId}
-                      titleSuffix={homeTooltip}
+                      titleSuffix={row.homeDiscordTag ? `@${row.homeDiscordTag}` : "Open DM"}
                       className="text-cyan-400 font-semibold text-right"
                     />
                     {homeFactionIcon && (
@@ -1265,22 +1255,12 @@ export default function MatchupsPanel({
                   <div className="relative z-10 mt-4 flex items-center justify-between gap-6">
                     <div className="flex-1 flex justify-start">
                       {awayListUrl && (
-                        <ListIcons
-                          label="Away list"
-                          listUrl={awayListUrl}
-                          letters={awayLetters}
-                          side="away"
-                        />
+                        <ListIcons label="Away list" listUrl={awayListUrl} letters={awayLetters} side="away" />
                       )}
                     </div>
                     <div className="flex-1 flex justify-end">
                       {homeListUrl && (
-                        <ListIcons
-                          label="Home list"
-                          listUrl={homeListUrl}
-                          letters={homeLetters}
-                          side="home"
-                        />
+                        <ListIcons label="Home list" listUrl={homeListUrl} letters={homeLetters} side="home" />
                       )}
                     </div>
                   </div>
@@ -1292,24 +1272,13 @@ export default function MatchupsPanel({
                     <div>
                       Record:{" "}
                       <span className="text-zinc-100">
-                        {awaySeason
-                          ? `${awaySeason.wins}-${awaySeason.losses}`
-                          : "—"}
+                        {awaySeason ? `${awaySeason.wins}-${awaySeason.losses}` : "—"}
                       </span>
                     </div>
                     <div>
-                      Win%:{" "}
-                      <span className="text-zinc-100">
-                        {awaySeason?.winPct ?? "—"}
-                      </span>
-                      {" • "}SoS:{" "}
-                      <span className="text-zinc-100">
-                        {awaySeason?.sos ?? "—"}
-                      </span>
-                      {" • "}Potato:{" "}
-                      <span className="text-zinc-100">
-                        {awaySeason?.potato ?? "—"}
-                      </span>
+                      Win%: <span className="text-zinc-100">{awaySeason?.winPct ?? "—"}</span>
+                      {" • "}SoS: <span className="text-zinc-100">{awaySeason?.sos ?? "—"}</span>
+                      {" • "}Potato: <span className="text-zinc-100">{awaySeason?.potato ?? "—"}</span>
                     </div>
                   </div>
 
@@ -1317,108 +1286,97 @@ export default function MatchupsPanel({
                     <div>
                       Record:{" "}
                       <span className="text-zinc-100">
-                        {homeSeason
-                          ? `${homeSeason.wins}-${homeSeason.losses}`
-                          : "—"}
+                        {homeSeason ? `${homeSeason.wins}-${homeSeason.losses}` : "—"}
                       </span>
                     </div>
                     <div>
-                      Win%:{" "}
-                      <span className="text-zinc-100">
-                        {homeSeason?.winPct ?? "—"}
-                      </span>
-                      {" • "}SoS:{" "}
-                      <span className="text-zinc-100">
-                        {homeSeason?.sos ?? "—"}
-                      </span>
-                      {" • "}Potato:{" "}
-                      <span className="text-zinc-100">
-                        {homeSeason?.potato ?? "—"}
-                      </span>
+                      Win%: <span className="text-zinc-100">{homeSeason?.winPct ?? "—"}</span>
+                      {" • "}SoS: <span className="text-zinc-100">{homeSeason?.sos ?? "—"}</span>
+                      {" • "}Potato: <span className="text-zinc-100">{homeSeason?.potato ?? "—"}</span>
                     </div>
                   </div>
                 </div>
 
                 {openScout && (openScout === row.awayId || openScout === row.homeId) && (
-                <div className="relative z-10 mt-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-                  {(() => {
-                    const id = openScout;
-                    const st = scoutById[id] ?? {};
-                    if (st.loading) return <div className="text-sm text-zinc-400 italic">Loading scouting…</div>;
-                    if (st.error) return <div className="text-sm text-red-300">{st.error}</div>;
-                    if (!st.data) return null;
+                  <div className="relative z-10 mt-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+                    {(() => {
+                      const id = openScout;
+                      const st = scoutById[id] ?? {};
+                      if (st.loading)
+                        return <div className="text-sm text-zinc-400 italic">Loading scouting…</div>;
+                      if (st.error) return <div className="text-sm text-red-300">{st.error}</div>;
+                      if (!st.data) return null;
 
-                    const d = st.data;
+                      const d = st.data;
 
-                    return (
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="text-[11px] uppercase tracking-wide text-zinc-400">
-                            SCOUTING - {openScoutName || "Unknown"} {d.ncxid}
-                          </div>
-
-                          <div className="text-xs text-zinc-500">
-                            min games for best/weakest: {d.minGames}
-                          </div>
-                        </div>
-
-                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
-                          <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-3">
-                            <div className="text-zinc-400 text-xs uppercase">Best Scenario</div>
-                            {d.bestScenario ? (
-                              <div className="mt-1">
-                                <div className="font-semibold text-zinc-100">{d.bestScenario.scenario}</div>
-                                <div className="text-zinc-300 text-xs">
-                                  {d.bestScenario.wins}-{d.bestScenario.games - d.bestScenario.wins} • {d.bestScenario.winPct}% • avg MOV {d.bestScenario.avgMov}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="mt-1 text-zinc-500 italic">Not enough data</div>
-                            )}
-                          </div>
-
-                          <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-3">
-                            <div className="text-zinc-400 text-xs uppercase">Weakest Scenario</div>
-                            {d.worstScenario ? (
-                              <div className="mt-1">
-                                <div className="font-semibold text-zinc-100">{d.worstScenario.scenario}</div>
-                                <div className="text-zinc-300 text-xs">
-                                  {d.worstScenario.wins}-{d.worstScenario.games - d.worstScenario.wins} • {d.worstScenario.winPct}% • avg MOV {d.worstScenario.avgMov}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="mt-1 text-zinc-500 italic">Not enough data</div>
-                            )}
-                          </div>
-                        </div>
-
-                        {d.topPilots?.length > 0 && (
-                          <div className="rounded-lg bg-zinc-900/40 border border-zinc-800 p-3">
-                            <div className="text-zinc-400 text-xs uppercase mb-2">
-                              Top 3 most used pilots (from submitted lists)
+                      return (
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-[11px] uppercase tracking-wide text-zinc-400">
+                              SCOUTING - {openScoutName || "Unknown"} {d.ncxid}
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
-                              {(d.topPilots ?? []).slice(0, 3).map((p) => (
-                                <div
-                                  key={p.pilotId}
-                                  className="inline-flex items-center gap-2 rounded-full bg-zinc-800/70 border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200"
-                                  title={p.pilotName}
-                                >
-                                  <span className="text-lg leading-none">{p.shipGlyph}</span>
-                                  <span className="max-w-[220px] truncate">{p.pilotName}</span>
-                                  <span className="text-zinc-400">×{p.uses}</span>
+                            <div className="text-xs text-zinc-500">min games for best/weakest: {d.minGames}</div>
+                          </div>
+
+                          <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                            <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-3">
+                              <div className="text-zinc-400 text-xs uppercase">Best Scenario</div>
+                              {d.bestScenario ? (
+                                <div className="mt-1">
+                                  <div className="font-semibold text-zinc-100">{d.bestScenario.scenario}</div>
+                                  <div className="text-zinc-300 text-xs">
+                                    {d.bestScenario.wins}-{d.bestScenario.games - d.bestScenario.wins} •{" "}
+                                    {d.bestScenario.winPct}% • avg MOV {d.bestScenario.avgMov}
+                                  </div>
                                 </div>
-                              ))}
+                              ) : (
+                                <div className="mt-1 text-zinc-500 italic">Not enough data</div>
+                              )}
+                            </div>
+
+                            <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-3">
+                              <div className="text-zinc-400 text-xs uppercase">Weakest Scenario</div>
+                              {d.worstScenario ? (
+                                <div className="mt-1">
+                                  <div className="font-semibold text-zinc-100">{d.worstScenario.scenario}</div>
+                                  <div className="text-zinc-300 text-xs">
+                                    {d.worstScenario.wins}-{d.worstScenario.games - d.worstScenario.wins} •{" "}
+                                    {d.worstScenario.winPct}% • avg MOV {d.worstScenario.avgMov}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-1 text-zinc-500 italic">Not enough data</div>
+                              )}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
 
+                          {d.topPilots?.length > 0 && (
+                            <div className="rounded-lg bg-zinc-900/40 border border-zinc-800 p-3">
+                              <div className="text-zinc-400 text-xs uppercase mb-2">
+                                Top 3 most used pilots (from submitted lists)
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                {(d.topPilots ?? []).slice(0, 3).map((p) => (
+                                  <div
+                                    key={p.pilotId}
+                                    className="inline-flex items-center gap-2 rounded-full bg-zinc-800/70 border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200"
+                                    title={p.pilotName}
+                                  >
+                                    <span className="text-lg leading-none">{p.shipGlyph}</span>
+                                    <span className="max-w-[220px] truncate">{p.pilotName}</span>
+                                    <span className="text-zinc-400">×{p.uses}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 {/* Capsule block */}
                 {enableCapsules && isOpen && (
@@ -1429,7 +1387,6 @@ export default function MatchupsPanel({
                       </div>
                     ) : (
                       <>
-                        
                         {enableCapsulesAI && (
                           <div className="mt-4 pt-3 border-t border-zinc-800">
                             <div className="flex items-center justify-between gap-3">
@@ -1457,37 +1414,21 @@ export default function MatchupsPanel({
                                       : null,
                                   })
                                 }
-
                                 className="inline-flex items-center rounded-lg bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed"
                               >
-                                {aiState.loading
-                                  ? "Generating…"
-                                  : aiState.text
-                                  ? "Regenerate"
-                                  : "Generate"}
+                                {aiState.loading ? "Generating…" : aiState.text ? "Regenerate" : "Generate"}
                               </button>
                             </div>
 
-                            {aiState.error && (
-                              <div className="mt-2 text-xs text-red-300">
-                                {aiState.error}
+                            {aiState.error && <div className="mt-2 text-xs text-red-300">{aiState.error}</div>}
+
+                            {aiState.text && <div className="mt-2 text-sm text-zinc-200">{aiState.text}</div>}
+
+                            {!aiState.text && !aiState.loading && !aiState.error && (
+                              <div className="mt-2 text-xs text-zinc-500 italic">
+                                Click Generate to create a 2–3 sentence recap from the data shown here.
                               </div>
                             )}
-
-                            {aiState.text && (
-                              <div className="mt-2 text-sm text-zinc-200">
-                                {aiState.text}
-                              </div>
-                            )}
-
-                            {!aiState.text &&
-                              !aiState.loading &&
-                              !aiState.error && (
-                                <div className="mt-2 text-xs text-zinc-500 italic">
-                                  Click Generate to create a 2–3 sentence recap
-                                  from the data shown here.
-                                </div>
-                              )}
                           </div>
                         )}
                       </>
