@@ -35,6 +35,8 @@ import {
   type IndRow,
 } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
+import Season9PrefsPanel from "../components/Season9PrefsPanel";
+
 
 function parseWeekNum(label: string | undefined | null): number | null {
   if (!label) return null;
@@ -51,6 +53,9 @@ function normalizeDiscordId(v: unknown): string {
 
 const enableCapsules = process.env.NEXT_PUBLIC_MATCH_CAPSULES === "1";
 const enableCapsulesAI = process.env.NEXT_PUBLIC_MATCH_CAPSULES_AI === "1";
+
+const preSeasonEnabled = process.env.PRE_SEASON === "true";
+
 
 /**
  * Given ?team=<slug> and the IndStats rows, try to recover the
@@ -76,10 +81,6 @@ function resolveTeamNameFromParam(
   return undefined;
 }
 
-/**
- * Build a roster array for a given team name using IndStats,
- * factionMap, and ncx → discord mappings.
- */
 function buildTeamRoster(
   teamName: string | undefined,
   indStats: IndRow[] | null | undefined,
@@ -105,7 +106,6 @@ function buildTeamRoster(
     const discordId = ncxid ? ncxToDiscord[ncxid] ?? null : null;
     const faction = String(row.faction ?? "").trim() || null;
 
-    // 🔸 NEW: derive captain flag from pick
     const pickNum = Number(row.pick ?? 0);
     const isCaptain = pickNum === 0;
 
@@ -115,11 +115,8 @@ function buildTeamRoster(
       faction,
       discordId,
       discordTag: null,
-
-      // NEW
       isCaptain,
 
-      // Individual stats (all as strings for display)
       wins: row.wins != null ? String(row.wins) : undefined,
       losses: row.losses != null ? String(row.losses) : undefined,
       points: row.points != null ? String(row.points) : undefined,
@@ -140,7 +137,6 @@ function buildTeamRoster(
   return roster;
 }
 
-/** Map a raw AdvStats Table1 row (array) into a TeamAdvStats object. */
 function mapAdvTable1Row(raw: any[]): TeamAdvStats {
   const s = (v: unknown) => (v ?? "").toString().trim();
   return {
@@ -161,18 +157,30 @@ function mapAdvTable1Row(raw: any[]): TeamAdvStats {
   };
 }
 
+// ✅ TEMP placeholder until you build the real component
+function PrefsPlaceholder() {
+  return (
+    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-200">
+      <h2 className="text-xl font-semibold text-cyan-300">Season 9 Signups</h2>
+      <p className="mt-2 text-sm text-zinc-300">
+        Prefs panel is wired. Now build the real Season 9 preference editor here.
+      </p>
+    </div>
+  );
+}
+
 export default async function HomePage({
   searchParams,
 }: {
-  // Next 15: searchParams is async in server components
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
 
-  // Read team param for the Team tab (slug like "kdb")
+  // ✅ gate comes from env
+  const preSeasonEnabled = process.env.PRE_SEASON === "true";
+
   const teamParam = (sp?.team as string | undefined) || undefined;
 
-  // --- Welcome banner (Discord -> NCXID lookup, cached) ---
   const session = await getServerSession(authOptions);
   let message = "Please log in with your Discord.";
 
@@ -192,22 +200,14 @@ export default async function HomePage({
           message = `Welcome ${session.user.name ?? "Pilot"}! – No NCXID Found.`;
         }
       } else {
-        message = `Welcome ${
-          session.user.name ?? "Pilot"
-        }! – No Discord ID found`;
+        message = `Welcome ${session.user.name ?? "Pilot"}! – No Discord ID found`;
       }
     } catch (err) {
       console.error("Error fetching NCX info:", err);
-      message = `Welcome ${
-        session.user.name ?? "Pilot"
-      }! – (Error fetching NCXID)`;
+      message = `Welcome ${session.user.name ?? "Pilot"}! – (Error fetching NCXID)`;
     }
   }
 
-  // ✅ Option A: feature flag lives here (server component), and we pass it down.
-  const enableCapsules = process.env.NEXT_PUBLIC_MATCH_CAPSULES === "1";
-
-  // 1) Get the true active week + default matches + stats
   const [
     { weekTab: activeWeek, matches: activeMatches },
     indStats,
@@ -215,21 +215,19 @@ export default async function HomePage({
     factionMap,
     advStatsRaw,
   ] = await Promise.all([
-    fetchMatchupsDataCached(), // active week (cached)
-    fetchIndStatsDataCached(), // ind stats (cached)
-    fetchStreamScheduleCached(), // stream schedule (cached)
-    fetchFactionMapCached(), // NCXID -> faction
-    fetchAdvStatsCached(), // advanced stats (AdvStatsPanel)
+    fetchMatchupsDataCached(),
+    fetchIndStatsDataCached(),
+    fetchStreamScheduleCached(),
+    fetchFactionMapCached(),
+    fetchAdvStatsCached(),
   ]);
 
-  // 2) Read ?w=WEEK N and enforce "only up to active"
   const requestedWeekRaw = (sp?.w as string | undefined) || undefined;
   const reqNum = parseWeekNum(requestedWeekRaw);
   const activeNum = parseWeekNum(activeWeek);
   const selectedWeek =
     reqNum && activeNum && reqNum <= activeNum ? requestedWeekRaw : undefined;
 
-  // 3) If a valid past week is requested, fetch that week’s matches (cached by week key)
   const {
     matches: matchesToUse,
     weekTab: weekLabelForPanel,
@@ -237,10 +235,8 @@ export default async function HomePage({
     ? await fetchMatchupsDataCached(selectedWeek)
     : { matches: activeMatches, weekTab: activeWeek };
 
-  // 3b) Fetch Lists for that same week (cached)
   const { listsMap } = await fetchListsForWeekCached(weekLabelForPanel);
 
-  // 4) Attach Discord IDs by NCXID (for Matchups + roster DM links)
   const discordMap = await getDiscordMapCached();
   const ncxToDiscord: Record<string, string> = {};
   for (const [discordId, payload] of Object.entries(discordMap ?? {})) {
@@ -256,7 +252,6 @@ export default async function HomePage({
     homeDiscordId: m.homeId ? ncxToDiscord[m.homeId] ?? null : null,
   })) as unknown as MatchRow[];
 
-  // --- Build roster for the Team tab (if teamParam is present) ---
   const teamNameFromStats = resolveTeamNameFromParam(teamParam, indStats ?? []);
   const teamRoster = buildTeamRoster(
     teamNameFromStats,
@@ -265,7 +260,6 @@ export default async function HomePage({
     ncxToDiscord
   );
 
-  // --- Pull this team's advanced stats row from AdvStats Table1 ---
   let teamAdvStats: TeamAdvStats | undefined;
   if (teamNameFromStats && advStatsRaw?.t1) {
     const t1 = advStatsRaw.t1 as any[];
@@ -279,7 +273,6 @@ export default async function HomePage({
 
   return (
     <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
-      {/* HERO */}
       <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-6 text-center">
         <div className="absolute inset-0 -z-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,0,150,0.25),transparent_70%)] animate-pulse" />
@@ -294,19 +287,17 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* TABS + PANELS */}
       <section className="w-full px-4 pb-24">
         <div className="w-full max-w-[110rem] mx-auto">
-          {/* Desktop tab buttons (header bar) */}
           <Suspense fallback={null}>
             <DesktopNavTabs />
           </Suspense>
 
           <HomeTabs
             hideButtons
-            homePanel={
-              <HomeLanding message={message} factionMap={factionMap ?? undefined} />
-            }
+            preSeasonEnabled={preSeasonEnabled}
+            prefsPanel={preSeasonEnabled ? <Season9PrefsPanel /> : undefined}
+            homePanel={<HomeLanding message={message} factionMap={factionMap ?? undefined} />}
             currentWeekPanel={
               <CurrentWeekCard
                 key="current-week"
@@ -314,7 +305,6 @@ export default async function HomePage({
                 selectedWeek={selectedWeek}
               />
             }
-            
             matchupsPanel={
               <MatchupsPanel
                 key="matchups"
@@ -328,10 +318,9 @@ export default async function HomePage({
                 listsForWeek={listsMap}
                 enableCapsules={enableCapsules}
                 enableCapsulesAI={enableCapsulesAI}
-                capsuleTone="neutral" // or "buster"
+                capsuleTone="neutral"
               />
             }
-
             standingsPanel={<StandingsPanel key="standings" />}
             indStatsPanel={<IndStatsPanel key="indstats" data={indStats ?? []} />}
             advStatsPanel={<AdvStatsPanelServer key="advstats" />}

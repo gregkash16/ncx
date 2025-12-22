@@ -16,6 +16,14 @@ const STREAM_SCHEDULE_SHEET_ID =
   process.env.STREAM_SCHEDULE_SHEET_ID ??
   "17sgzFPYAfVdWirop6Rf_8tNgFqqHqv3BXDJWc8dUYzQ";
 
+const PRE_SEASON =
+  String(process.env.PRE_SEASON ?? "").trim().toLowerCase() === "true";
+
+const S9_SIGN_UP_SHEET_ID =
+  process.env.S9_SIGN_UP_SHEET_ID ??
+  "1DlS10zpaOkEumIoTJLXWUS4XZfbpFG13crOtwoHr72w";
+
+
 const WEEK_TABS = Array.from({ length: 10 }, (_, i) => `WEEK ${i + 1}`);
 
 // =============== HELPERS ===============
@@ -100,6 +108,18 @@ function normalizeWeekLabel(label: string): string {
   }
   return s.toUpperCase();
 }
+
+async function getFirstSheetTitle(sheets: any, spreadsheetId: string): Promise<string> {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets(properties(title))",
+  });
+
+  const title = meta.data.sheets?.[0]?.properties?.title;
+  if (!title) throw new Error(`Could not find first sheet tab for spreadsheetId=${spreadsheetId}`);
+  return String(title);
+}
+
 
 // ===== XWS + glyph helpers for lists =====
 
@@ -1033,6 +1053,53 @@ async function loadLists(sheets: any, conn: mysql.Connection) {
   }
 }
 
+async function loadS9Signups(sheets: any, conn: mysql.Connection) {
+  // Read from the S9 signup sheet (first tab), starting at row 2 to skip headers.
+  // We only care about columns:
+  // NCXID = F (index 5)
+  // first_name = C (index 2)
+  // last_name = D (index 3)
+  // pref_one = J (index 9)
+  // pref_two = K (index 10)
+  // pref_three = L (index 11)
+
+  const tabName = await getFirstSheetTitle(sheets, S9_SIGN_UP_SHEET_ID);
+
+  // Pull enough columns to reach L; A2:L is perfect.
+  const rows = await getSheetValues(sheets, S9_SIGN_UP_SHEET_ID, `${tabName}!A2:L`);
+
+  // Wipe + insert into fully-qualified schema/table
+  await conn.execute("DELETE FROM S9.signups");
+
+  const sql = `
+    INSERT INTO S9.signups
+      (NCXID, first_name, last_name, pref_one, pref_two, pref_three)
+    VALUES (?,?,?,?,?,?)
+  `;
+
+  let inserted = 0;
+
+  for (const r0 of rows) {
+    // pad to length 12
+    const r = [...(r0 ?? []), "", "", "", "", "", "", "", "", "", "", "", ""].slice(0, 12);
+
+    const ncxid = norm(r[5]);      // F
+    const first = norm(r[2]);      // C
+    const last = norm(r[3]);       // D
+    const pref1 = norm(r[9]);      // J
+    const pref2 = norm(r[10]);     // K
+    const pref3 = norm(r[11]);     // L
+
+    // Skip empty rows
+    if (!ncxid && !first && !last && !pref1 && !pref2 && !pref3) continue;
+
+    await conn.execute(sql, [ncxid, first, last, pref1, pref2, pref3]);
+    inserted++;
+  }
+
+  return { tabName, inserted };
+}
+
 // =============== ROUTE HANDLER ===============
 
 export async function GET(req: NextRequest) {
@@ -1051,6 +1118,12 @@ export async function GET(req: NextRequest) {
     try {
       results.current_week = await loadCurrentWeek(sheets, conn);
       results.subs = await loadSubs(sheets, conn);
+
+      if (PRE_SEASON) {
+        results.s9_signups = await loadS9Signups(sheets, conn);
+      }
+
+      await loadWeeklyMatchups(sheets, conn);
       await loadWeeklyMatchups(sheets, conn);
       await loadIndividualStats(sheets, conn);
       await loadStreamSchedule(sheets, conn);

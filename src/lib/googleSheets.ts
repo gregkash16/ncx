@@ -32,6 +32,12 @@ export function getSheets(): sheets_v4.Sheets {
    Utility helpers
    =========================================================================== */
 
+// PRE_SEASON flag (env.local: PRE_SEASON=true|false)
+const PRE_SEASON =
+  String(process.env.PRE_SEASON ?? "")
+    .trim()
+    .toLowerCase() === "true";
+
 const norm = (v: unknown) => String(v ?? "").trim();
 
 async function dbQuery<T = any>(sql: string, params: any[] = []): Promise<T[]> {
@@ -55,6 +61,57 @@ async function getCurrentWeekFromDB(): Promise<string> {
   );
   return rows[0]?.week_label || "WEEK 1";
 }
+/* ===========================================================================
+   PRE-SEASON SIGNUPS (S9.signups)
+   =========================================================================== */
+
+export type PreSeasonSignupRow = {
+  ncxid: string;
+  first: string;
+  last: string;
+  prefOne: string;
+  prefTwo: string;
+  prefThree: string;
+};
+
+export async function fetchPreSeasonSignups(): Promise<PreSeasonSignupRow[]> {
+  // Fully qualify the schema so we *always* hit S9
+  const rows = await dbQuery<any>(`
+    SELECT
+      NCXID,
+      first_name,
+      last_name,
+      pref_one,
+      pref_two,
+      pref_three
+    FROM S9.signups
+    ORDER BY last_name ASC, first_name ASC
+  `);
+
+  return rows.map((r: any) => ({
+    ncxid: norm(r.NCXID),
+    first: norm(r.first_name),
+    last: norm(r.last_name),
+    prefOne: norm(r.pref_one),
+    prefTwo: norm(r.pref_two),
+    prefThree: norm(r.pref_three),
+  }));
+}
+
+export async function fetchPreSeasonSignupsCached() {
+  return fetchPreSeasonSignups();
+}
+
+/**
+ * Optional convenience wrapper:
+ * Call this from pages that need "signups", and it automatically switches
+ * based on PRE_SEASON. (Won't affect anything unless you use it.)
+ */
+export async function fetchSignupsAutoCached() {
+  if (PRE_SEASON) return fetchPreSeasonSignupsCached();
+  return []; // or throw, or your in-season equivalent once you decide it
+}
+
 
 /* ===========================================================================
    WEEKLY MATCHUPS
