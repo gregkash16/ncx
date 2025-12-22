@@ -13,8 +13,9 @@ export type TabKey =
   | "advstats"
   | "players"
   | "report"
+  | "prefs"
   | "team"
-  | "playoffs"; // 🔴 new hidden tab
+  | "playoffs";
 
 const MATCHUPS: TabKey = "matchups";
 function isMatchups(k: TabKey): k is "matchups" {
@@ -34,9 +35,16 @@ type HomeTabsProps = {
   advStatsPanel?: React.ReactNode;
   playersPanel?: React.ReactNode;
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
+
+  // ✅ NEW: Season 9 prefs panel (only shown when enabled)
+  prefsPanel?: React.ReactNode;
+
   teamPanel?: React.ReactNode; // still supported, just hidden
   playoffsPanel?: React.ReactNode; // 🔴 new hidden playoffs tab
   hideButtons?: boolean;
+
+  // ✅ NEW: gate the pill + routing for prefs
+  preSeasonEnabled?: boolean;
 };
 
 export default function HomeTabs({
@@ -48,9 +56,11 @@ export default function HomeTabs({
   advStatsPanel,
   playersPanel,
   reportPanel,
+  prefsPanel,
   teamPanel,
   playoffsPanel,
   hideButtons = false,
+  preSeasonEnabled = false,
 }: HomeTabsProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -59,13 +69,17 @@ export default function HomeTabs({
   const hasTeam = !!teamPanel;
   const hasPlayoffs = !!playoffsPanel;
 
+  // Only consider prefs "available" if we're in preseason AND a panel is provided
+  const hasPrefs = !!prefsPanel && preSeasonEnabled;
+
   // 🔑 Single source of truth: URL `tab` param
   const urlTabRaw = (searchParams.get("tab") as TabKey) || "home";
   let active: TabKey = urlTabRaw;
 
-  // If tab=team or tab=playoffs but the panel isn't provided, fall back to home
+  // If tab points to something unavailable, fall back to home
   if (active === "team" && !hasTeam) active = "home";
   if (active === "playoffs" && !hasPlayoffs) active = "home";
+  if (active === "prefs" && !hasPrefs) active = "home";
 
   const btnBase =
     "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
@@ -76,6 +90,16 @@ export default function HomeTabs({
   const isActive = (key: TabKey) => active === key;
 
   function goToTab(key: TabKey) {
+    // Prevent navigation to prefs when disabled (also cleans URL if someone clicks old link)
+    if (key === "prefs" && !hasPrefs) {
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      params.delete("tab");
+      params.delete("q");
+      const href = params.toString() ? `${pathname}?${params}` : pathname;
+      router.replace(href, { scroll: false });
+      return;
+    }
+
     const params = new URLSearchParams(Array.from(searchParams.entries()));
 
     if (isMatchups(key)) {
@@ -113,7 +137,7 @@ export default function HomeTabs({
       ? cloneElement(reportPanel, { goToTab })
       : reportPanel;
 
-  // No Team or Playoffs button, but still supports tab=team / tab=playoffs via URL
+  // Buttons (prefs only appears when preseason enabled)
   const buttons: Array<{ key: TabKey; label: string }> = [
     { key: "home", label: "Home" },
     { key: "current", label: "Current Week" },
@@ -123,6 +147,7 @@ export default function HomeTabs({
     { key: "advstats", label: "Adv. Stats" },
     { key: "players", label: "Players" },
     { key: "report", label: "Report a Game" },
+    ...(hasPrefs ? [{ key: "prefs" as const, label: "SEASON 9" }] : []),
   ];
 
   return (
@@ -164,8 +189,13 @@ export default function HomeTabs({
         {active === "advstats" && advStatsPanel}
         {active === "players" && playersPanel}
         {active === "report" && reportWithProp}
+
+        {/* ✅ prefs panel (only when enabled) */}
+        {active === "prefs" && hasPrefs && prefsPanel}
+
         {/* ✅ still render Team panel when tab=team, even without a button */}
         {active === "team" && hasTeam && teamPanel}
+
         {/* ✅ secret Playoffs tab, only if panel provided */}
         {active === "playoffs" && hasPlayoffs && playoffsPanel}
       </div>
