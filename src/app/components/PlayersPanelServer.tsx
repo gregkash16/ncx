@@ -2,7 +2,7 @@
 // Server Component (no 'use client')
 
 import PlayersPanel from "./PlayersPanel";
-import { getMysqlPool } from "@/lib/mysql";
+import { pool } from "@/lib/db";
 import { fetchVideosByNCXID } from "@/lib/youtube";
 
 /**
@@ -44,10 +44,9 @@ function ncxNumber(id: string): number {
 
 /** Main server component */
 export default async function PlayersPanelServer() {
-  const pool = getMysqlPool();
-
   try {
-    const [rows] = await pool.query<any[]>(`
+    const [rows] = await pool.query<any[]>(
+      `
       SELECT
         ncxid,
         first_name,
@@ -64,9 +63,10 @@ export default async function PlayersPanelServer() {
         championships
       FROM S8.all_time_stats
       ORDER BY id ASC
-    `);
+    `
+    );
 
-    const data: PlayerRow[] = rows.map((r) => ({
+    const data: PlayerRow[] = (rows ?? []).map((r) => ({
       ncxid: String(r.ncxid ?? ""),
       first: String(r.first_name ?? ""),
       last: String(r.last_name ?? ""),
@@ -100,7 +100,6 @@ export default async function PlayersPanelServer() {
     });
 
     return <PlayersPanel data={data} />;
-
   } catch (err: any) {
     return (
       <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">

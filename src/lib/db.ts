@@ -1,4 +1,4 @@
-// app/lib/db.ts
+// app/lib/db.ts (or src/lib/db.ts — pick ONE location)
 import mysql from "mysql2/promise";
 
 const DB_HOST = process.env.DB_HOST || "metro.proxy.rlwy.net";
@@ -7,8 +7,7 @@ const DB_USER = process.env.DB_USER || "root";
 const DB_PASSWORD = process.env.MYSQLPASSWORD || "";
 const DB_NAME = process.env.DB_NAME || "S8";
 
-// Prevent multiple pools during hot reload
-const globalForDB = global as unknown as {
+const globalForDB = globalThis as unknown as {
   mysqlPool: mysql.Pool | undefined;
 };
 
@@ -20,11 +19,14 @@ export const pool =
     user: DB_USER,
     password: DB_PASSWORD,
     database: DB_NAME,
+
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: Number(process.env.DB_POOL_LIMIT ?? "3"), // 👈 LOWER THIS
     queueLimit: 0,
+
+    // optional but helpful:
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
   });
 
-if (!globalForDB.mysqlPool) {
-  globalForDB.mysqlPool = pool;
-}
+if (!globalForDB.mysqlPool) globalForDB.mysqlPool = pool;

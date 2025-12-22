@@ -1,7 +1,7 @@
 // src/app/components/StandingsPanel.tsx
 import Image from "next/image";
 import { fetchTeamScheduleAllCached } from "@/lib/googleSheets";
-import { getMysqlPool } from "@/lib/mysql";
+import { pool } from "@/lib/db";
 
 /* ---------------------------------------------
    Types
@@ -35,7 +35,7 @@ type TeamResultsMap = Record<string, WeekResult[]>;
 
 type TeamPlayoffWindow = {
   team: string;
-  wins: number;     // current series wins
+  wins: number; // current series wins
   gameWins: number; // current game wins
   remaining: number; // series remaining
   minWins: number;
@@ -75,8 +75,6 @@ function parseWeekNum(label: string | undefined | null): number | null {
 --------------------------------------------- */
 
 async function fetchOverallStandingsFromDb(): Promise<OverallRow[]> {
-  const pool = getMysqlPool();
-
   const [rows] = await pool.query<any[]>(
     `
       SELECT
@@ -91,13 +89,13 @@ async function fetchOverallStandingsFromDb(): Promise<OverallRow[]> {
     `
   );
 
-  return rows.map((r) => ({
+  return (rows ?? []).map((r) => ({
     rank: Number(r.overall_rank),
-    team: String(r.team),
-    wins: Number(r.wins),
-    losses: Number(r.losses),
-    gameWins: Number(r.gameWins),
-    points: Number(r.points),
+    team: String(r.team ?? ""),
+    wins: Number(r.wins ?? 0),
+    losses: Number(r.losses ?? 0),
+    gameWins: Number(r.gameWins ?? 0),
+    points: Number(r.points ?? 0),
   }));
 }
 
@@ -106,8 +104,6 @@ async function fetchOverallStandingsFromDb(): Promise<OverallRow[]> {
  * one row per (week_label, awayTeam, homeTeam) with SUM of game wins.
  */
 async function fetchWeeklySeriesRows(): Promise<WeeklySeriesRow[]> {
-  const pool = getMysqlPool();
-
   const [rows] = await pool.query<any[]>(
     `
       SELECT
@@ -122,7 +118,7 @@ async function fetchWeeklySeriesRows(): Promise<WeeklySeriesRow[]> {
     `
   );
 
-  return rows.map((r) => ({
+  return (rows ?? []).map((r) => ({
     weekLabel: String(r.weekLabel ?? ""),
     awayTeam: String(r.awayTeam ?? "").trim(),
     homeTeam: String(r.homeTeam ?? "").trim(),
@@ -248,68 +244,51 @@ async function computeRemainingSeriesPerTeam(
   return remaining;
 }
 
-function canOtherPossiblyThreatenTeam(
-  other: TeamPlayoffWindow,
-  team: TeamPlayoffWindow
-): boolean {
-  const teamWorstWins = team.minWins;
-  const teamWorstGW = team.minGW;
-
-  const otherBestWins = other.maxWins;
-  const otherBestGW = other.maxGW;
-
-  if (otherBestWins > teamWorstWins) return true;
-  if (otherBestWins === teamWorstWins && otherBestGW >= teamWorstGW) return true;
-  return false;
-}
-
-function isTeamClinched(team: TeamPlayoffWindow, all: TeamPlayoffWindow[]): boolean {
-  let threats = 0;
-
-  for (const other of all) {
-    if (other.team === team.team) continue;
-    if (canOtherPossiblyThreatenTeam(other, team)) {
-      threats++;
-      if (threats > 15) return false;
-    }
-  }
-
-  return threats <= 15;
-}
-
 function canTeamStillMakeTop16(
   team: TeamPlayoffWindow,
   all: TeamPlayoffWindow[]
 ): boolean {
-  // Build a "best-case for THIS team, worst-case for everyone else" table
+  // Best case for THIS team, worst case for everyone else
   const snapshot = all.map((t) => {
     const isTarget = t.team === team.team;
 
     const wins = isTarget ? t.maxWins : t.minWins;
-    const gw   = isTarget ? t.maxGW   : t.minGW;
+    const gw = isTarget ? t.maxGW : t.minGW;
 
-    return {
-      team: t.team,
-      wins,
-      gw,
-    };
+    return { team: t.team, wins, gw };
   });
 
-  // Sort by wins desc, then game wins desc
   snapshot.sort((a, b) => {
     if (a.wins !== b.wins) return b.wins - a.wins;
     return b.gw - a.gw;
   });
 
   const rank = snapshot.findIndex((s) => s.team === team.team) + 1;
-  // If their best-case rank is 16 or better, they are NOT eliminated
-  return rank <= 16;
+  return rank <= 16; // can still finish 16th or better
 }
 
-function isTeamEliminatedSimple(team: TeamPlayoffWindow, all: TeamPlayoffWindow[]): boolean {
-  return !canTeamStillMakeTop16(team, all);
-}
+function hasTeamClinchedTop16(
+  team: TeamPlayoffWindow,
+  all: TeamPlayoffWindow[]
+): boolean {
+  // Worst case for THIS team, best case for everyone else
+  const snapshot = all.map((t) => {
+    const isTarget = t.team === team.team;
 
+    const wins = isTarget ? t.minWins : t.maxWins;
+    const gw = isTarget ? t.minGW : t.maxGW;
+
+    return { team: t.team, wins, gw };
+  });
+
+  snapshot.sort((a, b) => {
+    if (a.wins !== b.wins) return b.wins - a.wins;
+    return b.gw - a.gw;
+  });
+
+  const rank = snapshot.findIndex((s) => s.team === team.team) + 1;
+  return rank <= 16; // even in worst case, still 16th or better
+}
 
 function StreakPill({
   dir,
@@ -322,10 +301,8 @@ function StreakPill({
 
   const base =
     "inline-flex items-center justify-end gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border";
-  const upCls =
-    "bg-emerald-500/10 border-emerald-400/60 text-emerald-300";
-  const downCls =
-    "bg-red-500/10 border-red-400/60 text-red-300";
+  const upCls = "bg-emerald-500/10 border-emerald-400/60 text-emerald-300";
+  const downCls = "bg-red-500/10 border-red-400/60 text-red-300";
 
   const cls = dir === "up" ? upCls : downCls;
   const arrow = dir === "up" ? "↑" : "↓";
@@ -381,57 +358,13 @@ export default async function StandingsPanel() {
   }
 
   // 3) Playoff flags
-
-  function canTeamStillMakeTop16(
-  team: TeamPlayoffWindow,
-  all: TeamPlayoffWindow[]
-): boolean {
-  // Best case for THIS team, worst case for everyone else
-  const snapshot = all.map((t) => {
-    const isTarget = t.team === team.team;
-
-    const wins = isTarget ? t.maxWins : t.minWins;
-    const gw   = isTarget ? t.maxGW   : t.minGW;
-
-    return { team: t.team, wins, gw };
-  });
-
-  snapshot.sort((a, b) => {
-    if (a.wins !== b.wins) return b.wins - a.wins;
-    return b.gw - a.gw;
-  });
-
-  const rank = snapshot.findIndex((s) => s.team === team.team) + 1;
-  return rank <= 16; // can still finish 16th or better
-}
-
-function hasTeamClinchedTop16(
-  team: TeamPlayoffWindow,
-  all: TeamPlayoffWindow[]
-): boolean {
-  // Worst case for THIS team, best case for everyone else
-  const snapshot = all.map((t) => {
-    const isTarget = t.team === team.team;
-
-    const wins = isTarget ? t.minWins : t.maxWins;
-    const gw   = isTarget ? t.minGW   : t.maxGW;
-
-    return { team: t.team, wins, gw };
-  });
-
-  snapshot.sort((a, b) => {
-    if (a.wins !== b.wins) return b.wins - a.wins;
-    return b.gw - a.gw;
-  });
-
-  const rank = snapshot.findIndex((s) => s.team === team.team) + 1;
-  return rank <= 16; // even in worst case, still 16th or better
-}
-
-  let playoffFlags: Record<string, { clinched: boolean; eliminated: boolean }> = {};
+  let playoffFlags: Record<string, { clinched: boolean; eliminated: boolean }> =
+    {};
 
   try {
-    const remainingSeriesPerTeam = await computeRemainingSeriesPerTeam(teamResults);
+    const remainingSeriesPerTeam = await computeRemainingSeriesPerTeam(
+      teamResults
+    );
 
     const teams: TeamPlayoffWindow[] = data.map((row) => {
       const wins = toInt(row.wins);
@@ -464,8 +397,6 @@ function hasTeamClinchedTop16(
 
       playoffFlags[t.team] = { clinched, eliminated };
     }
-
-
   } catch (e) {
     console.error("❌ playoff math ERROR:", e);
     playoffFlags = {};
@@ -492,6 +423,7 @@ function hasTeamClinchedTop16(
               <th className="text-right w-24">Strk</th>
             </tr>
           </thead>
+
           <tbody className="text-sm">
             {data.map((row) => {
               const slug = teamNameToSlug(row.team);
@@ -504,10 +436,7 @@ function hasTeamClinchedTop16(
               );
 
               const flags =
-                playoffFlags[row.team] ?? {
-                  clinched: false,
-                  eliminated: false,
-                };
+                playoffFlags[row.team] ?? { clinched: false, eliminated: false };
 
               return (
                 <tr
@@ -515,6 +444,7 @@ function hasTeamClinchedTop16(
                   className="border-t border-zinc-800 hover:bg-zinc-800/40 transition-colors"
                 >
                   <td className="py-2 px-2">{row.rank}</td>
+
                   <td className="py-2 px-2">
                     <a
                       href={href}
@@ -530,6 +460,7 @@ function hasTeamClinchedTop16(
                           unoptimized
                         />
                       </span>
+
                       <span className="truncate">
                         {row.team}
                         {flags.clinched && (
@@ -545,6 +476,7 @@ function hasTeamClinchedTop16(
                       </span>
                     </a>
                   </td>
+
                   <td className="py-2 px-2 text-right tabular-nums">
                     {row.wins}
                   </td>

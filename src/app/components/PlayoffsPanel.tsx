@@ -1,8 +1,7 @@
 // src/app/components/PlayoffsPanel.tsx
 import Image from "next/image";
-import { getMysqlPool } from "@/lib/mysql";
+import { pool } from "@/lib/db";
 import { teamSlug } from "@/lib/slug";
-import { fetchOverallStandingsCached } from "@/lib/googleSheets";
 
 /* ---------------------------------------------
    Types
@@ -38,28 +37,22 @@ type Region = {
 };
 
 /* ---------------------------------------------
-   Load standings from MySQL instead of Sheets
+   Load standings from MySQL
 --------------------------------------------- */
 async function fetchOverallStandingsFromDb(): Promise<OverallRow[]> {
-  const pool = getMysqlPool();
+  const sql =
+    "SELECT `rank`, `team`, `wins`, `losses`, `game_wins`, `points` FROM `overall_standings` ORDER BY `rank` ASC";
 
-  try {
-    const sql = "SELECT `rank`, `team`, `wins`, `losses`, `game_wins`, `points` FROM `overall_standings` ORDER BY `rank` ASC";
+  const [rows] = await pool.query<any[]>(sql);
 
-    const [rows] = await pool.query<any[]>(sql);
-
-    return rows.map((r) => ({
-      rank: Number(r.rank),
-      team: String(r.team),
-      wins: Number(r.wins),
-      losses: Number(r.losses),
-      gameWins: Number(r.game_wins),
-      points: Number(r.points),
-    }));
-  } catch (err) {
-    console.error("❌ fetchOverallStandingsFromDb ERROR:", err);
-    throw err;
-  }
+  return (rows ?? []).map((r) => ({
+    rank: Number(r.rank),
+    team: String(r.team ?? ""),
+    wins: Number(r.wins ?? 0),
+    losses: Number(r.losses ?? 0),
+    gameWins: Number(r.game_wins ?? 0),
+    points: Number(r.points ?? 0),
+  }));
 }
 
 /* ---------------------------------------------
@@ -89,6 +82,7 @@ function buildRegions(rows: OverallRow[]): Region[] {
   const threeSeeds = top16.slice(8, 12).map((r) => toSeeded(r, 3));
   const fourSeeds = top16.slice(12, 16).map((r) => toSeeded(r, 4));
 
+  // "difficulty" ordering: worse rank number is harder
   const twoByDifficulty = [...twoSeeds].sort((a, b) => b.rank - a.rank);
   const threeByDifficulty = [...threeSeeds].sort((a, b) => b.rank - a.rank);
   const fourByDifficulty = [...fourSeeds].sort((a, b) => b.rank - a.rank);
@@ -113,8 +107,7 @@ function RegionCard({ region }: { region: Region }) {
   const game1Home = oneSeed;
   const game1Away = fourSeed;
 
-  const game2Home =
-    twoSeed.rank < threeSeed.rank ? twoSeed : threeSeed;
+  const game2Home = twoSeed.rank < threeSeed.rank ? twoSeed : threeSeed;
   const game2Away = game2Home === twoSeed ? threeSeed : twoSeed;
 
   const matchRow = (label: string, away: SeededTeam, home: SeededTeam) => {
@@ -129,7 +122,10 @@ function RegionCard({ region }: { region: Region }) {
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          <a href={awayHref} className="flex items-center gap-2 min-w-0 hover:underline">
+          <a
+            href={awayHref}
+            className="flex items-center gap-2 min-w-0 hover:underline"
+          >
             <span className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-900 border border-zinc-700 overflow-hidden shrink-0">
               <Image
                 src={`/logos/${away.slug}.webp`}
@@ -148,7 +144,10 @@ function RegionCard({ region }: { region: Region }) {
 
           <span className="mx-1 text-[11px] text-zinc-500">at</span>
 
-          <a href={homeHref} className="flex items-center gap-2 min-w-0 justify-end hover:underline">
+          <a
+            href={homeHref}
+            className="flex items-center gap-2 min-w-0 justify-end hover:underline"
+          >
             <span className="truncate">
               <span className="text-xs text-zinc-400 mr-1">({home.seed})</span>
               {home.team}
@@ -184,7 +183,10 @@ function RegionCard({ region }: { region: Region }) {
         <div>
           <div className="text-xs uppercase text-zinc-400">{regionName}</div>
           <div className="text-sm font-semibold text-zinc-100">
-            Top Seed: <span className="text-cyan-300">{topSeedTeam} (1) – #{oneSeed.rank}</span>
+            Top Seed:{" "}
+            <span className="text-cyan-300">
+              {topSeedTeam} (1) – #{oneSeed.rank}
+            </span>
           </div>
         </div>
       </header>
@@ -206,7 +208,8 @@ export default async function PlayoffsPanel() {
 
   try {
     data = await fetchOverallStandingsFromDb();
-  } catch {
+  } catch (err) {
+    console.error("❌ PlayoffsPanel DB error:", err);
     errorMsg = "Database unavailable. Please try again.";
   }
 

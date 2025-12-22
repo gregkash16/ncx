@@ -4,7 +4,6 @@
 
 import { google, sheets_v4 } from "googleapis";
 import { pool } from "@/lib/db";
-import { getMysqlPool } from "@/lib/mysql";
 
 /* ===========================================================================
    Legacy Google Sheets Auth (kept only so older code doesn’t break)
@@ -504,31 +503,27 @@ export type OverallRow = {
 };
 
 export async function fetchOverallStandingsCached(): Promise<OverallRow[]> {
-  const pool = getMysqlPool();
-
-  const result = await pool.query<any[]>(
+  const [rows] = await pool.query<any[]>(
     `
     SELECT 
-      rank,
-      team,
-      wins,
-      losses,
-      gameWins,
-      points
-    FROM S8_overall_standings
-    ORDER BY rank ASC
+      \`rank\`,
+      \`team\`,
+      \`wins\`,
+      \`losses\`,
+      \`game_wins\` AS gameWins,
+      \`points\`
+    FROM \`overall_standings\`
+    ORDER BY \`rank\` ASC
     `
   );
 
-  const rows = Array.isArray(result[0]) ? result[0] : [];
-
-  return rows.map((r) => ({
+  return (rows ?? []).map((r) => ({
     rank: Number(r.rank),
-    team: String(r.team),
-    wins: Number(r.wins),
-    losses: Number(r.losses),
-    gameWins: Number(r.gameWins),
-    points: Number(r.points),
+    team: String(r.team ?? ""),
+    wins: Number(r.wins ?? 0),
+    losses: Number(r.losses ?? 0),
+    gameWins: Number(r.gameWins ?? 0),
+    points: Number(r.points ?? 0),
   }));
 }
 

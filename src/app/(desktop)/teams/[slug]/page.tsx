@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { getMysqlPool } from "@/lib/mysql";
+import { pool } from "@/lib/db";
 
 export async function GET() {
   try {
-    const pool = getMysqlPool();
-
     const [rows] = await pool.query<any[]>(
       `
         SELECT DISTINCT awayTeam AS team FROM weekly_matchups
@@ -14,7 +12,7 @@ export async function GET() {
       `
     );
 
-    const teams = rows.map((r) => r.team).filter(Boolean);
+    const teams = (rows ?? []).map((r) => r.team).filter(Boolean);
 
     return NextResponse.json({ ok: true, teams });
   } catch (err: any) {
