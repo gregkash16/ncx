@@ -405,6 +405,25 @@ export default async function StandingsPanel() {
   // 4) Render
   return (
     <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
+      {/* Playoff Bracket image (full width, matches panel) */}
+      <div className="mb-4">
+        <a
+          href="/?tab=playoffs"
+          className="block rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950/40 hover:border-cyan-500/40 transition"
+          aria-label="View Playoff Bracket"
+        >
+          <Image
+            src="/bracket/pbracket.webp"
+            alt="Playoff bracket"
+            width={1600}
+            height={900}
+            className="w-full h-auto block"
+            priority
+            unoptimized
+          />
+        </a>
+      </div>
+      
       <h2 className="text-2xl font-bold tracking-wide text-center mb-4">
         <span className="text-pink-400">OVERALL</span>{" "}
         <span className="text-cyan-400">STANDINGS</span>
