@@ -46,13 +46,42 @@
 :root {
   --radius: 0.625rem;
 
-  /* NCX brand/background defaults (override per-team with <TeamTheme />) */
+  /* =========================================================
+     NCX THEME TOKENS (CHANGE THESE PER SEASON)
+     ---------------------------------------------------------
+     The goal: pages/components reference these variables (or
+     the helper classes below) instead of hardcoding colors.
+     ========================================================= */
+
+  /* Overall page gradient */
   --ncx-bg-start: #0b0b16;
   --ncx-bg-mid: #1a1033;
 
-  /* Default “accent glow” colors (RGB triplets). TeamTheme can override these. */
-  --team-primary-rgb: 255 0 255;
-  --team-secondary-rgb: 0 255 255;
+  /* Primary/secondary accent used by glow blobs + hero styling.
+     Use RGB triplets so we can do rgb(var(--x) / 0.xx). */
+  --ncx-accent-primary-rgb: 255 0 255;  /* currently magenta */
+  --ncx-accent-secondary-rgb: 0 255 255; /* currently cyan */
+
+  /* Hero title gradient colors (as hex, easier for gradients) */
+  --ncx-hero-from: #ec4899; /* pink-500 */
+  --ncx-hero-via: #a78bfa;  /* purple-400 */
+  --ncx-hero-to: #22d3ee;   /* cyan-400 */
+
+  /* Hero glow color (RGB triplet) */
+  --ncx-hero-glow-rgb: 255 0 255;
+
+  /* =========================================================
+     TEAM OVERRIDE HOOKS (OPTIONAL)
+     ---------------------------------------------------------
+     If you already have <TeamTheme /> in the future, it can
+     override these two. By default, they mirror ncx accents.
+     ========================================================= */
+  --team-primary-rgb: var(--ncx-accent-primary-rgb);
+  --team-secondary-rgb: var(--ncx-accent-secondary-rgb);
+
+  /* =========================================================
+     SHADCN / UI TOKENS (LEAVE THESE ALONE UNLESS YOU INTEND TO)
+     ========================================================= */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -87,6 +116,7 @@
 }
 
 .dark {
+  /* Keep your dark theme mapping exactly as you had it */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -143,21 +173,60 @@
   font-variant-ligatures: none;
 }
 
+/* =========================================================
+   REUSABLE NCX CLASSES (use these instead of hardcoding)
+   ========================================================= */
+
 /* Reusable NCX page background (centralized) */
 .ncx-gradient-bg {
-  background: linear-gradient(to bottom, var(--ncx-bg-start), var(--ncx-bg-mid), var(--ncx-bg-start));
+  background: linear-gradient(
+    to bottom,
+    var(--ncx-bg-start),
+    var(--ncx-bg-mid),
+    var(--ncx-bg-start)
+  );
+}
+
+/* Hero title gradient (drop-in replacement for from-pink/via-purple/to-cyan) */
+.ncx-hero-title {
+  background-image: linear-gradient(
+    to right,
+    var(--ncx-hero-from),
+    var(--ncx-hero-via),
+    var(--ncx-hero-to)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Hero glow (drop-in replacement for hardcoded drop-shadow rgba) */
+.ncx-hero-glow {
+  filter: drop-shadow(0 0 25px rgb(var(--ncx-hero-glow-rgb) / 0.25));
 }
 
 /* Reusable “neon” blobs for hero headers */
 .ncx-neon-blob-a {
-  background: radial-gradient(circle at 0% -20%, rgb(var(--team-primary-rgb) / 0.25), transparent 70%);
+  background: radial-gradient(
+    circle at 0% -20%,
+    rgb(var(--team-primary-rgb) / 0.25),
+    transparent 70%
+  );
   animation: pulse 4s ease-in-out infinite;
 }
 .ncx-neon-blob-b {
-  background: radial-gradient(circle at 120% 20%, rgb(var(--team-secondary-rgb) / 0.15), transparent 65%);
+  background: radial-gradient(
+    circle at 120% 20%,
+    rgb(var(--team-secondary-rgb) / 0.15),
+    transparent 65%
+  );
   animation: pulse 6s ease-in-out infinite;
 }
 .ncx-neon-blob-c {
-  background: radial-gradient(circle at 50% 120%, rgb(var(--team-primary-rgb) / 0.25), transparent 60%);
+  background: radial-gradient(
+    circle at 50% 120%,
+    rgb(var(--team-primary-rgb) / 0.25),
+    transparent 60%
+  );
   animation: pulse 5s ease-in-out infinite;
 }
