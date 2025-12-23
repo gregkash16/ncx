@@ -37,7 +37,6 @@ import {
 import { teamSlug } from "@/lib/slug";
 import Season9PrefsPanel from "../components/Season9PrefsPanel";
 
-
 function parseWeekNum(label: string | undefined | null): number | null {
   if (!label) return null;
   const m = label.trim().match(/week\s*(\d+)/i);
@@ -55,7 +54,6 @@ const enableCapsules = process.env.NEXT_PUBLIC_MATCH_CAPSULES === "1";
 const enableCapsulesAI = process.env.NEXT_PUBLIC_MATCH_CAPSULES_AI === "1";
 
 const preSeasonEnabled = process.env.PRE_SEASON === "true";
-
 
 /**
  * Given ?team=<slug> and the IndStats rows, try to recover the
@@ -272,14 +270,15 @@ export default async function HomePage({
   }
 
   return (
-    <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
+    <main className="min-h-screen overflow-visible ncx-gradient-bg text-zinc-100">
       <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-6 text-center">
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,0,150,0.25),transparent_70%)] animate-pulse" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_120%,rgba(0,255,255,0.15),transparent_60%)] blur-3xl" />
+          <div className="absolute inset-0 ncx-neon-blob-a" />
+          {/* was hardcoded cyan radial — now uses global token-driven blob */}
+          <div className="absolute inset-0 ncx-neon-blob-b blur-3xl" />
         </div>
 
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(255,0,255,0.25)]">
+        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight ncx-hero-title ncx-hero-glow">
           DRAFT LEAGUE • SEASON 8
         </h1>
         <div>
@@ -297,7 +296,12 @@ export default async function HomePage({
             hideButtons
             preSeasonEnabled={preSeasonEnabled}
             prefsPanel={preSeasonEnabled ? <Season9PrefsPanel /> : undefined}
-            homePanel={<HomeLanding message={message} factionMap={factionMap ?? undefined} />}
+            homePanel={
+              <HomeLanding
+                message={message}
+                factionMap={factionMap ?? undefined}
+              />
+            }
             currentWeekPanel={
               <CurrentWeekCard
                 key="current-week"
