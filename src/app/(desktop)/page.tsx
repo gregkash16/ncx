@@ -272,10 +272,10 @@ export default async function HomePage({
   }
 
   return (
-    <main className="min-h-screen overflow-visible bg-gradient-to-b from-[#0b0b16] via-[#1a1033] to-[#0b0b16] text-zinc-100">
+    <main className="min-h-screen overflow-visible ncx-gradient-bg text-zinc-100">
       <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-6 text-center">
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(255,0,150,0.25),transparent_70%)] animate-pulse" />
+          <div className="absolute inset-0 ncx-neon-blob-a" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_120%,rgba(0,255,255,0.15),transparent_60%)] blur-3xl" />
         </div>
 

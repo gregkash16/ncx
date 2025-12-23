@@ -45,6 +45,14 @@
 
 :root {
   --radius: 0.625rem;
+
+  /* NCX brand/background defaults (override per-team with <TeamTheme />) */
+  --ncx-bg-start: #0b0b16;
+  --ncx-bg-mid: #1a1033;
+
+  /* Default “accent glow” colors (RGB triplets). TeamTheme can override these. */
+  --team-primary-rgb: 255 0 255;
+  --team-secondary-rgb: 0 255 255;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -133,4 +141,23 @@
   font-family: "XWingShips", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   font-variant-ligatures: none;
+}
+
+/* Reusable NCX page background (centralized) */
+.ncx-gradient-bg {
+  background: linear-gradient(to bottom, var(--ncx-bg-start), var(--ncx-bg-mid), var(--ncx-bg-start));
+}
+
+/* Reusable “neon” blobs for hero headers */
+.ncx-neon-blob-a {
+  background: radial-gradient(circle at 0% -20%, rgb(var(--team-primary-rgb) / 0.25), transparent 70%);
+  animation: pulse 4s ease-in-out infinite;
+}
+.ncx-neon-blob-b {
+  background: radial-gradient(circle at 120% 20%, rgb(var(--team-secondary-rgb) / 0.15), transparent 65%);
+  animation: pulse 6s ease-in-out infinite;
+}
+.ncx-neon-blob-c {
+  background: radial-gradient(circle at 50% 120%, rgb(var(--team-primary-rgb) / 0.25), transparent 60%);
+  animation: pulse 5s ease-in-out infinite;
 }

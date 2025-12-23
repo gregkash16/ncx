@@ -6,6 +6,7 @@ import NextImage from "next/image";
 import type { IndRow, FactionMap, MatchRow } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
 import PlayerDMLink from "@/app/components/PlayerDMLink";
+import { TEAM_COLOR_MAP } from "@/theme/teams";
 
 type ScheduleMap = Record<string, { day: string; slot: string }>;
 
@@ -152,33 +153,6 @@ function factionIconSrc(faction?: string) {
 
 // --- Team color mapping for thumbnails ---------------------------------
 
-const TEAM_COLOR_MAP: Record<string, string> = {
-  BERSERKERS: "#8b5a2b",
-  DEGENERATES: "#16a34a",
-  FIREBIRDS: "#ea580c",
-  FOXES: "#a855f7",
-  "GALACTIC WARDENS": "#16a34a",
-  HAVOC: "#eab308",
-  HEADHUNTERS: "#020617",
-  HOTSHOTS: "#facc99",
-  "JAGGED AXE": "#f97316",
-  KDB: "#14b8a6",
-  MAWLERS: "#14b8a6",
-  MEATBAGS: "#dc2626",
-  "MEGA MILK UNION": "#38bdf8",
-  MISFITS: "#ea580c",
-  "MON CALA SC": "#5eead4",
-  "NERF HERDERS": "#16a34a",
-  "ORDER 66": "#2563eb",
-  "OUTER RIM HEROES": "#2563eb",
-  PUDDLEJUMPERS: "#22c55e",
-  "PUDDLE JUMPERS": "#22c55e",
-  PUNISHERS: "#ef4444",
-  "RAVE CRAB CHAMPIONS": "#fb923c",
-  STARKILLERS: "#d97706",
-  "VOODOO KREWE": "#1d4ed8",
-  WOLFPACK: "#ec4899",
-};
 
 function getTeamColorHex(teamName?: string | null): string {
   if (!teamName) return "#0f172a";
