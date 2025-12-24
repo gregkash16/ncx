@@ -24,7 +24,7 @@ const S9_SIGN_UP_SHEET_ID =
   "1DlS10zpaOkEumIoTJLXWUS4XZfbpFG13crOtwoHr72w";
 
 
-const WEEK_TABS = Array.from({ length: 10 }, (_, i) => `WEEK ${i + 1}`);
+const WEEK_TABS = Array.from({ length: 14 }, (_, i) => `WEEK ${i + 1}`);
 
 // =============== HELPERS ===============
 
