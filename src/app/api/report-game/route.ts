@@ -985,63 +985,25 @@ async function syncAllTimeStats(
 ) {
   const rowsRes = await sheets.spreadsheets.values.get({
     spreadsheetId: statsSheetId,
-    range: "ALL TIME STATS!A2:U500",
+    range: "ALL TIME STATS!A2:V500",
     valueRenderOption: "FORMATTED_VALUE",
   });
   const rows = (rowsRes.data.values ?? []) as string[][];
 
   await conn.execute("DELETE FROM all_time_stats");
 
-  const sql = `
-    INSERT INTO all_time_stats (
-      ncxid,
-      first_name,
-      last_name,
-      discord,
-      wins,
-      losses,
-      points,
-      plms,
-      games,
-      win_pct,
-      ppg,
-      extra,
-      s1,
-      s2,
-      s3,
-      s4,
-      s5,
-      s6,
-      s7,
-      s8,
-      championships
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `;
+  const sql =
+    "INSERT INTO all_time_stats (" +
+    "ncxid, first_name, last_name, discord, wins, losses, points, plms, games, " +
+    "win_pct, ppg, extra, s1, s2, s3, s4, s5, s6, s7, s8, s9, championships" +
+    ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
   for (const r0 of rows) {
     const r = [
       ...r0,
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-    ].slice(0, 21);
+      "", "", "", "", "", "", "", "", "", "",
+      "", "", "", "", "", "", "", "", "", "", ""
+    ].slice(0, 22);
 
     const [
       ncxid,
@@ -1064,6 +1026,7 @@ async function syncAllTimeStats(
       s6,
       s7,
       s8,
+      s9,
       championships,
     ] = r.map(norm);
 
@@ -1090,6 +1053,7 @@ async function syncAllTimeStats(
       s6,
       s7,
       s8,
+      s9,
       toIntOrNone(championships),
     ]);
   }
@@ -1109,11 +1073,8 @@ async function syncTeamSchedule(
 
   await conn.execute("DELETE FROM team_schedule");
 
-  const sql = `
-    INSERT INTO team_schedule (
-      week_label, away_team, home_team
-    ) VALUES (?,?,?)
-  `;
+  const sql =
+  "INSERT INTO team_schedule (week_label, away_team, home_team) VALUES (?,?,?)";
 
   for (const r0 of rows) {
     const r = [...r0, "", "", "", ""].slice(0, 4);
@@ -1141,11 +1102,8 @@ async function syncOverallStandings(
 
   await conn.execute("DELETE FROM overall_standings");
 
-  const sql = `
-    INSERT INTO overall_standings (
-      team, \`rank\`, wins, losses, game_wins, points
-    ) VALUES (?,?,?,?,?,?)
-  `;
+  const sql =
+  "INSERT INTO overall_standings (team, `rank`, wins, losses, game_wins, points) VALUES (?,?,?,?,?,?)";
 
   for (const r0 of rows) {
     const r = [...r0, "", "", "", "", "", ""].slice(0, 6);

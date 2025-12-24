@@ -803,9 +803,11 @@ async function loadAdvStats(sheets: any, conn: mysql.Connection) {
 
 async function loadAllTimeStats(sheets: any, conn: mysql.Connection) {
   const sheetId = NCX_STATS_SHEET_ID || NCX_LEAGUE_SHEET_ID;
-  const rows = await getSheetValues(sheets, sheetId, "ALL TIME STATS!A2:U500");
+  const rows = await getSheetValues(sheets, sheetId, "ALL TIME STATS!A2:V500");
 
   await conn.execute("DELETE FROM all_time_stats");
+
+  // FIX: you are missing ONE placeholder in VALUES (need 22)
 
   const sql = `
     INSERT INTO all_time_stats (
@@ -829,14 +831,16 @@ async function loadAllTimeStats(sheets: any, conn: mysql.Connection) {
       s6,
       s7,
       s8,
+      s9,
       championships
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `;
 
+
   for (const r0 of rows) {
-    const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(
+    const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(
       0,
-      21
+      22
     );
 
     const [
@@ -860,6 +864,7 @@ async function loadAllTimeStats(sheets: any, conn: mysql.Connection) {
       s6,
       s7,
       s8,
+      s9,
       championships,
     ] = r.map(norm);
 
@@ -886,6 +891,7 @@ async function loadAllTimeStats(sheets: any, conn: mysql.Connection) {
       s6,
       s7,
       s8,
+      s9,
       toIntOrNone(championships),
     ]);
   }

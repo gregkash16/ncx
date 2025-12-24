@@ -59,7 +59,7 @@ export default async function PlayersPanelServer() {
         games,
         win_pct,
         ppg,
-        s1, s2, s3, s4, s5, s6, s7, s8,
+        s1, s2, s3, s4, s5, s6, s7, s8, s9,
         championships
       FROM S8.all_time_stats
       ORDER BY id ASC
@@ -87,6 +87,7 @@ export default async function PlayersPanelServer() {
         r.s6 || null,
         r.s7 || null,
         r.s8 || null,
+        r.s9 || null,
       ],
       championships: String(r.championships ?? ""),
     }));
