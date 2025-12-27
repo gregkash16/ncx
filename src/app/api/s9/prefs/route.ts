@@ -63,7 +63,7 @@ async function findRowByNcxidInColF(
   // We scan column F starting at row 2 (skip header)
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: "Sheet1!F2:F",
+    range: "'Form Responses 1'!F2:F",
   });
 
   const values: string[][] = (res.data.values ?? []) as any;
@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
     }
 
     // pref_one = J, pref_two = K, pref_three = L
-    const range = `Sheet1!J${rowNum}:L${rowNum}`;
+    const range = `'Form Responses 1'!J${rowNum}:L${rowNum}`;
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
