@@ -41,7 +41,7 @@ export default function DesktopNavTabs() {
     ? [
         ...tabsBase,
         // ✅ pill comes after Report a Game
-        { key: "prefs", label: "SEASON 9", href: "/?tab=prefs" },
+        { key: "prefs", label: "S9 Signups", href: "/?tab=prefs" },
       ]
     : tabsBase;
 
