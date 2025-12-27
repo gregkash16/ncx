@@ -80,24 +80,30 @@ async function findRowByNcxidInColF(
 }
 
 async function triggerSeed() {
+  const nextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+
   const baseUrl =
-    process.env.NEXTAUTH_URL ||
-    process.env.VERCEL_URL?.startsWith("http")
-      ? process.env.VERCEL_URL
-      : process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
+    nextAuthUrl ||
+    (vercelUrl
+      ? vercelUrl.startsWith("http")
+        ? vercelUrl
+        : `https://${vercelUrl}`
+      : "http://localhost:3000");
 
   const key = process.env.SEED_API_KEY;
   if (!key) throw new Error("Missing SEED_API_KEY");
 
-  const url = `${baseUrl}/api/seed-mysql?key=${encodeURIComponent(key)}`;
-  const res = await fetch(url, { method: "GET", cache: "no-store" });
+  const url = new URL("/api/seed-mysql", baseUrl);
+  url.searchParams.set("key", key);
+
+  const res = await fetch(url.toString(), { method: "GET", cache: "no-store" });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(`Seed failed: ${res.status} ${txt}`);
   }
 }
+
 
 export async function GET() {
   try {
