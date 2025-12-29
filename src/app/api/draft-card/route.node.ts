@@ -78,6 +78,12 @@ async function factionPngDataUrl(faction: string): Promise<string> {
 
 export async function GET(req: NextRequest) {
   try {
+
+  console.log("RUNTIME CHECK", {
+  edge: typeof (globalThis as any).EdgeRuntime !== "undefined",
+  node: typeof process !== "undefined",
+  });
+
     const { pool } = await import("@/lib/db");
     const { searchParams } = new URL(req.url);
 
