@@ -1,11 +1,11 @@
+export const runtime = "nodejs";
+export const preferredRegion = "home";
+
 import React from "react";
 import { ImageResponse } from "@vercel/og";
 import { NextRequest } from "next/server";
 import path from "path";
 import { promises as fs } from "fs";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const CARD_W = 1920;
 const CARD_H = 1080;
