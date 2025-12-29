@@ -1,8 +1,6 @@
 import React from "react";
 import { ImageResponse } from "@vercel/og";
 import { NextRequest } from "next/server";
-import path from "path";
-import { promises as fs } from "fs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +38,15 @@ function normFaction(v: unknown): string {
     .replace(/\s+/g, " ");
 }
 
+function getOrigin(req: NextRequest) {
+  const proto = req.headers.get("x-forwarded-proto") || "http";
+  const host =
+    req.headers.get("x-forwarded-host") ||
+    req.headers.get("host") ||
+    "localhost:3000";
+  return `${proto}://${host}`;
+}
+
 function isAdminBypass(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const provided = norm(searchParams.get("key"));
@@ -47,31 +54,19 @@ function isAdminBypass(req: NextRequest) {
   return !!expected && provided === expected;
 }
 
-/* -------- faction PNGs (NO HTTP) -------- */
-
-const FACTION_FILE: Record<string, string> = {
-  REPUBLIC: "Republic.png",
-  CIS: "CIS.png",
-  REBELS: "Rebels.png",
-  EMPIRE: "Empire.png",
-  RESISTANCE: "Resistance.png",
-  "FIRST ORDER": "First Order.png",
-  SCUM: "Scum.png",
-};
-
-async function factionPngDataUrl(faction: string): Promise<string> {
-  const key = normFaction(faction);
-  const file = FACTION_FILE[key];
-  if (!file) return "";
-
-  try {
-    const filePath = path.join(process.cwd(), "public", "factions", file);
-    const buf = await fs.readFile(filePath);
-    return `data:image/png;base64,${buf.toString("base64")}`;
-  } catch (e) {
-    console.error("faction png read failed:", faction, e);
-    return "";
+async function fetchAsDataUrl(url: string): Promise<string> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(
+      `Image fetch failed (${res.status}) for ${url} :: ${txt.slice(0, 120)}`
+    );
   }
+
+  const contentType = res.headers.get("content-type") || "image/png";
+  const ab = await res.arrayBuffer();
+  const b64 = Buffer.from(ab).toString("base64");
+  return `data:${contentType};base64,${b64}`;
 }
 
 /* ---------------- handler ---------------- */
@@ -79,6 +74,8 @@ async function factionPngDataUrl(faction: string): Promise<string> {
 export async function GET(req: NextRequest) {
   try {
     const { pool } = await import("@/lib/db");
+
+    const origin = getOrigin(req);
     const { searchParams } = new URL(req.url);
 
     const adminBypass = isAdminBypass(req);
@@ -96,7 +93,7 @@ export async function GET(req: NextRequest) {
     const oP2 = norm(searchParams.get("p2"));
     const oP3 = norm(searchParams.get("p3"));
 
-    /* ---------- DB lookups (never fatal) ---------- */
+    /* ---------- DB lookups (fully safe) ---------- */
 
     let at: any = null;
     try {
@@ -131,7 +128,7 @@ export async function GET(req: NextRequest) {
     try {
       const [rows] = await pool.query<any[]>(
         `
-        SELECT first_name, last_name, pref_one, pref_two, pref_three
+        SELECT ncxid, first_name, last_name, pref_one, pref_two, pref_three
         FROM S9.signups
         WHERE ncxid = ?
         LIMIT 1
@@ -161,8 +158,23 @@ export async function GET(req: NextRequest) {
       ? [oP1, oP2, oP3].filter(Boolean)
       : [norm(s9?.pref_one), norm(s9?.pref_two), norm(s9?.pref_three)].filter(Boolean);
 
+    /* ---------- faction logos ---------- */
+
+    const logoUrls = prefs.slice(0, 3).map((p) => {
+      const key = normFaction(p);
+      return key ? `${origin}/api/faction-logo?faction=${encodeURIComponent(key)}` : "";
+    });
+
     const prefLogoDataUrls = await Promise.all(
-      prefs.slice(0, 3).map((p) => factionPngDataUrl(p))
+      logoUrls.map(async (u) => {
+        if (!u) return "";
+        try {
+          return await fetchAsDataUrl(u);
+        } catch (e) {
+          console.error("logo fetch failed", u, e);
+          return "";
+        }
+      })
     );
 
     /* ---------- stats ---------- */
@@ -175,6 +187,12 @@ export async function GET(req: NextRequest) {
     const points = Number(at?.points ?? 0);
     const plms = Number(at?.plms ?? 0);
     const championships = norm(at?.championships);
+
+    const seasonRows: Array<{ season: string; text: string }> = [];
+    for (let i = 1; i <= 8; i++) {
+      const t = norm(at?.[`s${i}`]);
+      if (t) seasonRows.push({ season: `Season ${i}`, text: t });
+    }
 
     const displayName =
       first || last ? `${first} ${last}`.trim() : `NCX ${ncxid}`;
@@ -253,11 +271,14 @@ export async function GET(req: NextRequest) {
           },
           E("div", { style: { fontSize: 74, fontWeight: 850 } }, displayName),
 
+          // prefs
           E(
             "div",
             { style: { display: "flex", gap: 16 } },
-            ...[0, 1, 2].map((i) =>
-              E(
+            ...[0, 1, 2].map((i) => {
+              const label = prefs[i] || "—";
+              const logo = prefLogoDataUrls[i];
+              return E(
                 "div",
                 {
                   key: i,
@@ -272,15 +293,15 @@ export async function GET(req: NextRequest) {
                       "linear-gradient(90deg, rgba(236,72,153,0.16), rgba(168,85,247,0.12), rgba(56,189,248,0.10))",
                   },
                 },
-                prefLogoDataUrls[i] &&
+                logo &&
                   E("img", {
-                    src: prefLogoDataUrls[i],
+                    src: logo,
                     width: LOGO_W,
                     height: LOGO_H,
                   }),
-                E("div", null, prefs[i] || "—")
-              )
-            )
+                E("div", null, label)
+              );
+            })
           ),
 
           E("div", null, `W-L: ${wins}-${losses}`),
