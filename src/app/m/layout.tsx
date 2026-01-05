@@ -1,9 +1,9 @@
 // src/app/m/layout.tsx
 import type { ReactNode } from "react";
-import MobileBottomNav from "./mobile/MobileBottomNav";
+// import MobileBottomNav from "./mobile/MobileBottomNav";
 import NotificationsDrawer from "../components/NotificationsDrawer";
-import { Menu } from "lucide-react";
-
+import { Menu, Settings } from "lucide-react";
+import MobileNavButton from "./mobile/MobileNavButton";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -20,9 +20,6 @@ export default async function MobileLayout({ children }: { children: ReactNode }
         : { name?: string | null; image?: string | null })
     | undefined;
 
-  // Height of the fixed bottom nav (keep in sync with the wrapper below)
-  const NAV_PX = 64;
-
   return (
     // Let the *page* scroll (no overflow-hidden / fixed height here)
     // Use the "small viewport" unit to avoid iOS address bar jumps.
@@ -32,14 +29,7 @@ export default async function MobileLayout({ children }: { children: ReactNode }
         <div className="flex items-center justify-between gap-3 p-3">
           {/* Left cluster: menu, logo, title */}
           <div className="flex items-center gap-3">
-            <NotificationsDrawer>
-              <button
-                aria-label="Open menu"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900/70 hover:bg-neutral-800 active:scale-95"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-            </NotificationsDrawer>
+            <MobileNavButton />
 
             <img src="/logo.webp" alt="NCX" className="h-7 w-7 rounded-lg" />
             <h1 className="text-lg font-extrabold tracking-wide bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_12px_rgba(255,0,255,0.25)]">
@@ -62,6 +52,15 @@ export default async function MobileLayout({ children }: { children: ReactNode }
                   {user.name ?? "You"}
                 </span>
 
+                <NotificationsDrawer>
+                  <button
+                    aria-label="Notification settings"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900/70 hover:bg-neutral-800 active:scale-95"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </button>
+                </NotificationsDrawer>
+
                 {/* Sign out via POST with callback back to /m */}
                 <form method="post" action="/api/auth/signout" className="m-0 p-0">
                   <input type="hidden" name="callbackUrl" value="/m" />
@@ -82,12 +81,6 @@ export default async function MobileLayout({ children }: { children: ReactNode }
               </a>
             )}
 
-            <a
-              href="/?desktop=1"
-              className="text-xs font-medium text-neutral-300 underline underline-offset-4 hover:text-white"
-            >
-              Desktop
-            </a>
           </div>
         </div>
       </header>
@@ -97,27 +90,14 @@ export default async function MobileLayout({ children }: { children: ReactNode }
           - Bottom padding reserves space for the fixed nav + safe area */}
       <main
         className="flex-1 pt-[env(safe-area-inset-top)]"
-        style={{
-          paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
-        }}
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
+
         <div className="mx-auto max-w-screen-sm px-3">
           {children}
         </div>
       </main>
 
-      {/* Fixed bottom nav wrapper:
-          - Fixed to viewport bottom
-          - Height must match NAV_PX above */}
-      <div
-        className="fixed inset-x-0 bottom-0 z-30"
-        style={{
-          height: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
-          paddingBottom: "env(safe-area-inset-bottom)",
-        }}
-      >
-        <MobileBottomNav />
-      </div>
     </div>
   );
 }
