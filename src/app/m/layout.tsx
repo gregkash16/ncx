@@ -1,9 +1,11 @@
 // src/app/m/layout.tsx
 import type { ReactNode } from "react";
-// import MobileBottomNav from "./mobile/MobileBottomNav";
-import NotificationsDrawer from "../components/NotificationsDrawer";
-import { Menu, Settings } from "lucide-react";
+
+import MobileBottomNav from "./mobile/MobileBottomNav";
 import MobileNavButton from "./mobile/MobileNavButton";
+import NotificationsDrawer from "../components/NotificationsDrawer";
+import { Settings } from "lucide-react";
+
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -20,14 +22,15 @@ export default async function MobileLayout({ children }: { children: ReactNode }
         : { name?: string | null; image?: string | null })
     | undefined;
 
+  // Height of the fixed bottom nav (keep in sync with MobileBottomNav wrapper)
+  const NAV_PX = 64;
+
   return (
-    // Let the *page* scroll (no overflow-hidden / fixed height here)
-    // Use the "small viewport" unit to avoid iOS address bar jumps.
     <div className="min-h-[100svh] flex flex-col bg-neutral-950 text-neutral-100">
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
         <div className="flex items-center justify-between gap-3 p-3">
-          {/* Left cluster: menu, logo, title */}
+          {/* Left cluster: hamburger, logo, title */}
           <div className="flex items-center gap-3">
             <MobileNavButton />
 
@@ -37,7 +40,7 @@ export default async function MobileLayout({ children }: { children: ReactNode }
             </h1>
           </div>
 
-          {/* Right cluster: Auth status + desktop link */}
+          {/* Right cluster: auth + notifications */}
           <div className="flex items-center gap-2">
             {user ? (
               <div className="flex items-center gap-2">
@@ -48,6 +51,7 @@ export default async function MobileLayout({ children }: { children: ReactNode }
                     className="h-7 w-7 rounded-full border border-neutral-700"
                   />
                 ) : null}
+
                 <span className="hidden sm:inline text-xs font-medium text-neutral-200">
                   {user.name ?? "You"}
                 </span>
@@ -80,24 +84,32 @@ export default async function MobileLayout({ children }: { children: ReactNode }
                 Sign in
               </a>
             )}
-
           </div>
         </div>
       </header>
 
       {/* Main content:
-          - Now uses normal document scroll (no overflow-y-auto)
-          - Bottom padding reserves space for the fixed nav + safe area */}
+          - Document scroll
+          - Bottom padding reserves space for fixed bottom nav + safe area */}
       <main
         className="flex-1 pt-[env(safe-area-inset-top)]"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        style={{
+          paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
+        }}
       >
-
-        <div className="mx-auto max-w-screen-sm px-3">
-          {children}
-        </div>
+        <div className="mx-auto max-w-screen-sm px-3">{children}</div>
       </main>
 
+      {/* Fixed bottom nav wrapper */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-30"
+        style={{
+          height: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        <MobileBottomNav />
+      </div>
     </div>
   );
 }
