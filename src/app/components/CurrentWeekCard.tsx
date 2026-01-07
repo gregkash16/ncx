@@ -233,11 +233,15 @@ export default async function CurrentWeekCard({
 
       {/* Week selector strip */}
       {activeNum && activeNum > 1 && (
-        <div className="flex flex-wrap justify-center gap-2 mb-5">
+        <div className="grid grid-cols-7 gap-2 mb-5 justify-items-center">
           {pastWeeks.map((wk) => {
             const selected = wk.toUpperCase() === targetTab.toUpperCase();
-            const isActive =
-              wk.toUpperCase() === activeWeekNorm.toUpperCase();
+            const isActive = wk.toUpperCase() === activeWeekNorm.toUpperCase();
+
+            // Weeks 1–7 in row 1, 8+ in row 2 (and beyond, if ever)
+            const wkNum = parseWeekNum(wk) ?? 0;
+            const rowStartClass =
+              wkNum >= 8 ? "row-start-2" : "row-start-1";
 
             // 🔗 Always stay on Current Week tab when switching weeks
             const href =
@@ -252,6 +256,8 @@ export default async function CurrentWeekCard({
                 scroll={false}
                 className={[
                   btnBase,
+                  rowStartClass,
+                  "w-full max-w-[9rem] flex items-center justify-center text-center",
                   isActive
                     ? "border-yellow-400/70"
                     : selected
@@ -270,10 +276,12 @@ export default async function CurrentWeekCard({
                 />
                 <span className="relative z-10">{wk}</span>
               </Link>
+
             );
           })}
         </div>
       )}
+
 
       {/* Matchup grid */}
       {items.length === 0 ? (
