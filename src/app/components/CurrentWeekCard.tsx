@@ -7,6 +7,7 @@ import {
   fetchMatchupsDataCached,
   type MatchRow,
 } from "@/lib/googleSheets";
+import { getTeamPrimaryHex } from "@/theme/teams";
 
 type SeriesRow = {
   awayTeam: string;
@@ -20,14 +21,18 @@ function toInt(val: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/* ───────────────────────── Win Boxes ───────────────────────── */
+
 function WinBoxes({
   wins,
   direction = "right",
+  color,
 }: {
   wins: number;
   direction?: "left" | "right";
+  color: string;
 }) {
-  const count = Math.max(0, Math.min(4, wins)); // clamp between 0–4
+  const count = Math.max(0, Math.min(4, wins));
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: 4 }).map((_, i) => {
@@ -35,12 +40,19 @@ function WinBoxes({
         return (
           <span
             key={i}
-            className={[
-              "inline-block size-3.5 rounded-[3px] border transition-colors duration-200",
+            className="inline-block size-4 rounded-[3px] border"
+            style={
               filled
-                ? "bg-green-500/90 border-green-500/80 shadow-[0_0_6px_rgba(34,197,94,0.35)]"
-                : "bg-zinc-800 border-zinc-700",
-            ].join(" ")}
+                ? {
+                    backgroundColor: color,
+                    borderColor: color,
+                    boxShadow: `0 0 6px ${color}66`,
+                  }
+                : {
+                    backgroundColor: "#27272a",
+                    borderColor: "#3f3f46",
+                  }
+            }
           />
         );
       })}
@@ -48,16 +60,16 @@ function WinBoxes({
   );
 }
 
+/* ───────────────────────── Logo ───────────────────────── */
+
 function Logo({
   name,
   side,
   size = 28,
-  className = "",
 }: {
   name: string;
   side: "left" | "right";
   size?: number;
-  className?: string;
 }) {
   const src = `/logos/${teamSlug(name)}.webp`;
   return (
@@ -69,7 +81,6 @@ function Logo({
       className={[
         "inline-block shrink-0 object-contain",
         side === "left" ? "mr-2" : "ml-2",
-        className,
       ].join(" ")}
       decoding="async"
       loading="lazy"
@@ -77,13 +88,12 @@ function Logo({
   );
 }
 
-function parseWeekNum(label: string | undefined): number | null {
+/* ───────────────────────── Week helpers ───────────────────────── */
+
+function parseWeekNum(label?: string): number | null {
   if (!label) return null;
   const m = label.trim().match(/week\s*(\d+)/i);
   return m ? parseInt(m[1], 10) : null;
-}
-function formatWeekLabel(n: number) {
-  return `WEEK ${n}`;
 }
 function normalizeWeekTab(label?: string | null) {
   const n = parseWeekNum(label ?? undefined);
@@ -91,15 +101,12 @@ function normalizeWeekTab(label?: string | null) {
   return String(label ?? "").trim().toUpperCase() || "WEEK 1";
 }
 
-/**
- * Build series rows from weekly_matchups in MySQL.
- * We treat each 7-game block (seriesNo) between a pair of teams as a series.
- * Wins are derived from game points.
- */
+/* ───────────────────────── Series builder ───────────────────────── */
+
 function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
   type SeriesAgg = {
-    leftTeam: string;   // away (left)
-    rightTeam: string;  // home (right)
+    leftTeam: string;
+    rightTeam: string;
     leftWins: number;
     rightWins: number;
   };
@@ -120,15 +127,12 @@ function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
         : 0;
     if (!seriesNo) continue;
 
-    // Key ignores orientation so all games in the same pairing collapse together,
-    // but we set orientation once (first time we see the series).
     const a = away.localeCompare(home) <= 0 ? away : home;
     const b = away.localeCompare(home) <= 0 ? home : away;
     const key = `${seriesNo}|${a}|${b}`;
 
     let agg = map.get(key);
     if (!agg) {
-      // Establish left/right from the first matchup we see for this series:
       agg = { leftTeam: away, rightTeam: home, leftWins: 0, rightWins: 0 };
       map.set(key, agg);
     }
@@ -137,11 +141,8 @@ function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
     const homePts = Number(String(m.homePts ?? "").trim() || "NaN");
     if (Number.isFinite(awayPts) && Number.isFinite(homePts) && awayPts !== homePts) {
       const winner = awayPts > homePts ? away : home;
-
-      // Award win to whichever side (left/right) that winner is on.
       if (winner === agg.leftTeam) agg.leftWins += 1;
       else if (winner === agg.rightTeam) agg.rightWins += 1;
-      // (If data ever has swapped home/away between games, this will just ignore unknowns.)
     }
   }
 
@@ -153,6 +154,8 @@ function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
   }));
 }
 
+/* ───────────────────────── Component ───────────────────────── */
+
 export default async function CurrentWeekCard({
   activeWeek,
   selectedWeek,
@@ -160,204 +163,78 @@ export default async function CurrentWeekCard({
   activeWeek: string;
   selectedWeek?: string | null;
 }) {
-  // 🔹 Match the logic from page.tsx exactly:
-  // - If selectedWeek is valid, fetch that week.
-  // - Otherwise, fetch the active week.
   let weekLabelForCard: string;
   let matches: MatchRow[] = [];
 
-  try {
-    if (selectedWeek && selectedWeek.trim()) {
-      const { weekTab, matches: fetched } = await fetchMatchupsDataCached(
-        selectedWeek
-      );
-      weekLabelForCard = weekTab;
-      matches = fetched ?? [];
-    } else {
-      const { weekTab, matches: fetched } = await fetchMatchupsDataCached();
-      weekLabelForCard = weekTab;
-      matches = fetched ?? [];
-    }
-  } catch (err: any) {
-    return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-red-800/60">
-        <h2 className="text-xl font-semibold text-red-400">
-          Couldn’t load current week
-        </h2>
-        <p className="mt-2 text-zinc-400">
-          {process.env.NODE_ENV !== "production" && (
-            <>
-              <span className="block">
-                {String(err?.message ?? "MySQL / matchups load error")}
-              </span>
-            </>
-          )}
-        </p>
-      </div>
-    );
+  if (selectedWeek && selectedWeek.trim()) {
+    const { weekTab, matches: fetched } =
+      await fetchMatchupsDataCached(selectedWeek);
+    weekLabelForCard = weekTab;
+    matches = fetched ?? [];
+  } else {
+    const { weekTab, matches: fetched } =
+      await fetchMatchupsDataCached();
+    weekLabelForCard = weekTab;
+    matches = fetched ?? [];
   }
 
   const targetTab = normalizeWeekTab(weekLabelForCard);
   const activeWeekNorm = normalizeWeekTab(activeWeek);
 
-  const activeNum = parseWeekNum(activeWeek);
-  const pastWeeks =
-    activeNum && activeNum > 0
-      ? Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1))
-      : [];
-
-  // Build series rows (aggregate per 7-game block & team pair)
   const series = buildSeriesFromMatches(matches);
 
-  const items = series.map((s) => {
-    const seriesOver = s.awayWins >= 4 || s.homeWins >= 4;
-    const awayWinner = seriesOver && s.awayWins >= 4 && s.awayWins > s.homeWins;
-    const homeWinner = seriesOver && s.homeWins >= 4 && s.homeWins > s.awayWins;
-    return { ...s, seriesOver, awayWinner, homeWinner };
-  });
-
-  const GREEN = "34,197,94";
-  const RED = "239,68,68";
-
-  const btnBase =
-    "group relative overflow-hidden rounded-xl border bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
-  const gradient =
-    "pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100";
-
   return (
-    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 hover:border-purple-500/40 transition w-full">
-      <h2 className="text-2xl font-extrabold text-center uppercase bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-transparent bg-clip-text drop-shadow-[0_0_20px_rgba(255,0,255,0.25)] mb-4 tracking-wide">
-        {targetTab === activeWeekNorm ? "Current Week" : "Week View"} —{" "}
-        {targetTab}
+    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
+      <h2 className="text-2xl font-extrabold text-center mb-4">
+        {targetTab === activeWeekNorm ? "Current Week" : "Week View"} — {targetTab}
       </h2>
 
-      {/* Week selector strip */}
-      {activeNum && activeNum > 1 && (
-        <div className="grid grid-cols-7 gap-2 mb-5 justify-items-center">
-          {pastWeeks.map((wk) => {
-            const selected = wk.toUpperCase() === targetTab.toUpperCase();
-            const isActive = wk.toUpperCase() === activeWeekNorm.toUpperCase();
+      <ul className="space-y-3">
+        {series.map((m, i) => {
+          const gamesPlayed = m.awayWins + m.homeWins;
+          const gamesLeft = Math.max(0, 7 - gamesPlayed);
 
-            // Weeks 1–7 in row 1, 8+ in row 2 (and beyond, if ever)
-            const wkNum = parseWeekNum(wk) ?? 0;
-            const rowStartClass =
-              wkNum >= 8 ? "row-start-2" : "row-start-1";
+          return (
+            <li key={i}>
+              <div className="grid grid-cols-[1fr_260px_1fr] items-center gap-4 border border-zinc-800 rounded-xl px-6 py-4 bg-zinc-950/60">
+                {/* Away */}
+                <div className="flex items-center text-zinc-300">
+                  <Logo name={m.awayTeam} side="left" />
+                  <span className="break-words">{m.awayTeam}</span>
+                </div>
 
-            // 🔗 Always stay on Current Week tab when switching weeks
-            const href =
-              wk === activeWeek
-                ? "/?tab=current"
-                : `/?tab=current&w=${encodeURIComponent(wk)}`;
-
-            return (
-              <Link
-                key={wk}
-                href={href}
-                scroll={false}
-                className={[
-                  btnBase,
-                  rowStartClass,
-                  "w-full max-w-[9rem] flex items-center justify-center text-center",
-                  isActive
-                    ? "border-yellow-400/70"
-                    : selected
-                    ? "border-cyan-400/60"
-                    : "border-purple-500/40",
-                ].join(" ")}
-              >
-                <span
-                  className={[
-                    gradient,
-                    isActive
-                      ? "bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20"
-                      : "bg-gradient-to-r from-pink-600/20 via-purple-500/20 to-cyan-500/20",
-                    selected ? "opacity-100" : "",
-                  ].join(" ")}
-                />
-                <span className="relative z-10">{wk}</span>
-              </Link>
-
-            );
-          })}
-        </div>
-      )}
-
-
-      {/* Matchup grid */}
-      {items.length === 0 ? (
-        <p className="mt-2 text-zinc-400">No matchups found.</p>
-      ) : (
-        <ul className="mt-3 space-y-3 text-base">
-          {items.map((m, i) => {
-            const leftColor = m.awayWinner ? RED : m.homeWinner ? GREEN : "0,0,0";
-            const rightColor = m.homeWinner ? RED : m.awayWinner ? GREEN : "0,0,0";
-
-            const gradientStyle: React.CSSProperties = m.seriesOver
-              ? {
-                  backgroundImage: `
-                    linear-gradient(to left, rgba(${leftColor},0.35), rgba(0,0,0,0) 35%),
-                    linear-gradient(to right, rgba(${rightColor},0.35), rgba(0,0,0,0) 35%)
-                  `,
-                }
-              : {};
-
-            const q = `${m.awayTeam} ${m.homeTeam}`;
-            const href = `/?tab=matchups&w=${encodeURIComponent(
-              targetTab
-            )}&q=${encodeURIComponent(q)}`;
-
-            return (
-              <li key={i} className="list-none">
-                <Link
-                  href={href}
-                  scroll={false}
-                  className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border border-zinc-800 rounded-xl px-5 py-3 bg-zinc-950/60 relative overflow-hidden hover:border-purple-500/50 hover:bg-zinc-900/40 cursor-pointer"
-                  style={gradientStyle}
-                >
-                  {/* Away (left) */}
-                  <div
-                    className={[
-                      "flex items-center justify-start text-zinc-300",
-                      m.awayWinner
-                        ? "font-bold uppercase"
-                        : m.homeWinner
-                        ? "line-through"
-                        : "",
-                    ].join(" ")}
-                  >
-                    <Logo name={m.awayTeam} side="left" />
-                    <span className="break-words">{m.awayTeam}</span>
-                  </div>
-
-                  {/* Center score / win boxes */}
-                  <div className="flex items-center justify-center gap-3 z-10">
-                    <WinBoxes wins={m.awayWins} direction="left" />
-                    <div className="text-center min-w-[5.5rem] font-semibold text-zinc-100">
+                {/* Center */}
+                <div className="flex flex-col items-center gap-1">
+                  <div className="flex items-center gap-4">
+                    <WinBoxes
+                      wins={m.awayWins}
+                      direction="left"
+                      color={getTeamPrimaryHex(m.awayTeam) ?? "#0f172a"}
+                    />
+                    <div className="font-bold text-xl text-zinc-100">
                       {m.awayWins} : {m.homeWins}
                     </div>
-                    <WinBoxes wins={m.homeWins} direction="right" />
+                    <WinBoxes
+                      wins={m.homeWins}
+                      direction="right"
+                      color={getTeamPrimaryHex(m.homeTeam) ?? "#0f172a"}
+                    />
                   </div>
+                  <div className="text-xs text-zinc-400">
+                    {gamesLeft} game{gamesLeft === 1 ? "" : "s"} remaining
+                  </div>
+                </div>
 
-                  {/* Home (right) */}
-                  <div
-                    className={[
-                      "flex items-center justify-end text-zinc-300",
-                      m.homeWinner
-                        ? "font-bold uppercase"
-                        : m.awayWinner
-                        ? "line-through"
-                        : "",
-                    ].join(" ")}
-                  >
-                    <span className="break-words">{m.homeTeam}</span>
-                    <Logo name={m.homeTeam} side="right" />
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                {/* Home */}
+                <div className="flex items-center justify-end text-zinc-300">
+                  <span className="break-words">{m.homeTeam}</span>
+                  <Logo name={m.homeTeam} side="right" />
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
