@@ -3,10 +3,7 @@
 import type React from "react";
 import Link from "next/link";
 import { teamSlug } from "@/lib/slug";
-import {
-  fetchMatchupsDataCached,
-  type MatchRow,
-} from "@/lib/googleSheets";
+import { fetchMatchupsDataCached, type MatchRow } from "@/lib/googleSheets";
 import { getTeamPrimaryHex } from "@/theme/teams";
 
 type SeriesRow = {
@@ -139,7 +136,11 @@ function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
 
     const awayPts = Number(String(m.awayPts ?? "").trim() || "NaN");
     const homePts = Number(String(m.homePts ?? "").trim() || "NaN");
-    if (Number.isFinite(awayPts) && Number.isFinite(homePts) && awayPts !== homePts) {
+    if (
+      Number.isFinite(awayPts) &&
+      Number.isFinite(homePts) &&
+      awayPts !== homePts
+    ) {
       const winner = awayPts > homePts ? away : home;
       if (winner === agg.leftTeam) agg.leftWins += 1;
       else if (winner === agg.rightTeam) agg.rightWins += 1;
@@ -172,8 +173,7 @@ export default async function CurrentWeekCard({
     weekLabelForCard = weekTab;
     matches = fetched ?? [];
   } else {
-    const { weekTab, matches: fetched } =
-      await fetchMatchupsDataCached();
+    const { weekTab, matches: fetched } = await fetchMatchupsDataCached();
     weekLabelForCard = weekTab;
     matches = fetched ?? [];
   }
@@ -194,43 +194,58 @@ export default async function CurrentWeekCard({
           const gamesPlayed = m.awayWins + m.homeWins;
           const gamesLeft = Math.max(0, 7 - gamesPlayed);
 
+          // ✅ MatchupsPanel expects:
+          //   tab=matchups
+          //   w = week label (e.g. "WEEK 4")
+          //   q = filter text (we want Home Team)
+          const href =
+            `/?tab=matchups` +
+            `&w=${encodeURIComponent(targetTab)}` +
+            `&q=${encodeURIComponent(m.homeTeam)}`;
+
           return (
             <li key={i}>
-              <div className="grid grid-cols-[1fr_260px_1fr] items-center gap-4 border border-zinc-800 rounded-xl px-6 py-4 bg-zinc-950/60">
-                {/* Away */}
-                <div className="flex items-center text-zinc-300">
-                  <Logo name={m.awayTeam} side="left" />
-                  <span className="break-words">{m.awayTeam}</span>
-                </div>
+              <Link
+                href={href}
+                className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400/40"
+                aria-label={`View ${targetTab} matchups filtered to ${m.homeTeam}`}
+              >
+                <div className="grid grid-cols-[1fr_260px_1fr] items-center gap-4 border border-zinc-800 rounded-xl px-6 py-4 bg-zinc-950/60 hover:bg-zinc-950/80 transition-colors">
+                  {/* Away */}
+                  <div className="flex items-center text-zinc-300">
+                    <Logo name={m.awayTeam} side="left" />
+                    <span className="break-words">{m.awayTeam}</span>
+                  </div>
 
-                {/* Center */}
-                <div className="flex flex-col items-center gap-1">
-                  <div className="flex items-center gap-4">
-                    <WinBoxes
-                      wins={m.awayWins}
-                      direction="left"
-                      color={getTeamPrimaryHex(m.awayTeam) ?? "#0f172a"}
-                    />
-                    <div className="font-bold text-xl text-zinc-100">
-                      {m.awayWins} : {m.homeWins}
+                  {/* Center */}
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex items-center gap-4">
+                      <WinBoxes
+                        wins={m.awayWins}
+                        direction="left"
+                        color={getTeamPrimaryHex(m.awayTeam) ?? "#0f172a"}
+                      />
+                      <div className="font-bold text-xl text-zinc-100">
+                        {m.awayWins} : {m.homeWins}
+                      </div>
+                      <WinBoxes
+                        wins={m.homeWins}
+                        direction="right"
+                        color={getTeamPrimaryHex(m.homeTeam) ?? "#0f172a"}
+                      />
                     </div>
-                    <WinBoxes
-                      wins={m.homeWins}
-                      direction="right"
-                      color={getTeamPrimaryHex(m.homeTeam) ?? "#0f172a"}
-                    />
+                    <div className="text-xs text-zinc-400">
+                      {gamesLeft} game{gamesLeft === 1 ? "" : "s"} remaining
+                    </div>
                   </div>
-                  <div className="text-xs text-zinc-400">
-                    {gamesLeft} game{gamesLeft === 1 ? "" : "s"} remaining
-                  </div>
-                </div>
 
-                {/* Home */}
-                <div className="flex items-center justify-end text-zinc-300">
-                  <span className="break-words">{m.homeTeam}</span>
-                  <Logo name={m.homeTeam} side="right" />
+                  {/* Home */}
+                  <div className="flex items-center justify-end text-zinc-300">
+                    <span className="break-words">{m.homeTeam}</span>
+                    <Logo name={m.homeTeam} side="right" />
+                  </div>
                 </div>
-              </div>
+              </Link>
             </li>
           );
         })}

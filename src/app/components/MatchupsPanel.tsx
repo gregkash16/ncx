@@ -892,7 +892,7 @@ export default function MatchupsPanel({
       </h2>
 
       {activeNum && activeNum > 0 && (
-        <div className="flex flex-wrap justify-center gap-2 mb-5">
+        <div className="grid grid-cols-7 gap-2 justify-center mb-5 max-w-fit mx-auto">
           {weeksPills.map((wk) => {
             const isActive = wk.toUpperCase() === (activeWeek || "").toUpperCase();
             const selected =
