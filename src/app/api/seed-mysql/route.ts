@@ -956,43 +956,40 @@ async function loadOverallStandings(sheets: any, conn: mysql.Connection) {
   }
 }
 
-async function loadLists(sheets: any, conn: mysql.Connection) {
-  // Preload xws -> init map from railway.IDs (ids 0001–0726)
+async function syncListsIncremental(sheets: any, conn: mysql.Connection) {
+  // 0) preload xws->init once
   const [idRows] = await conn.query<any[]>(
     "SELECT xws, init FROM railway.IDs WHERE id >= '0001' AND id <= '0726'"
   );
-
   const initByXws: InitLookup = new Map();
   for (const row of idRows) {
-    const key = row.xws as string | null;
-    const initVal = row.init;
-    if (!key || initVal == null) continue;
-    initByXws.set(String(key), Number(initVal));
+    if (!row.xws || row.init == null) continue;
+    initByXws.set(String(row.xws), Number(row.init));
   }
 
-  const rows = await getSheetValues(
-    sheets,
-    NCX_LEAGUE_SHEET_ID,
-    "Lists!A2:D"
-  );
+  // 1) Pull list URL rows from Sheets
+  const rows = await getSheetValues(sheets, NCX_LEAGUE_SHEET_ID, "Lists!A2:D");
 
-  await conn.execute("DELETE FROM lists");
+  // 2) Upsert URLs; invalidate derived fields if URL changed
+  const upsertSql = `
+    INSERT INTO lists (week_label, game, away_list, home_list)
+    VALUES (?,?,?,?)
+    ON DUPLICATE KEY UPDATE
+      -- set URLs
+      away_list = VALUES(away_list),
+      home_list = VALUES(home_list),
 
-  const sql = `
-    INSERT INTO lists (
-      week_label,
-      game,
-      away_list,
-      home_list,
-      away_xws,
-      home_xws,
-      away_letters,
-      home_letters,
-      home_count,
-      away_count,
-      home_average_init,
-      away_average_init
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      -- invalidate AWAY derived fields if away_list changed
+      away_xws = IF(COALESCE(away_list,'') <> COALESCE(VALUES(away_list),''), NULL, away_xws),
+      away_letters = IF(COALESCE(away_list,'') <> COALESCE(VALUES(away_list),''), NULL, away_letters),
+      away_count = IF(COALESCE(away_list,'') <> COALESCE(VALUES(away_list),''), NULL, away_count),
+      away_average_init = IF(COALESCE(away_list,'') <> COALESCE(VALUES(away_list),''), NULL, away_average_init),
+
+      -- invalidate HOME derived fields if home_list changed
+      home_xws = IF(COALESCE(home_list,'') <> COALESCE(VALUES(home_list),''), NULL, home_xws),
+      home_letters = IF(COALESCE(home_list,'') <> COALESCE(VALUES(home_list),''), NULL, home_letters),
+      home_count = IF(COALESCE(home_list,'') <> COALESCE(VALUES(home_list),''), NULL, home_count),
+      home_average_init = IF(COALESCE(home_list,'') <> COALESCE(VALUES(home_list),''), NULL, home_average_init)
   `;
 
   for (const r0 of rows) {
@@ -1001,63 +998,150 @@ async function loadLists(sheets: any, conn: mysql.Connection) {
     const game = norm(r[1]);
     const awayList = norm(r[2]) || null;
     const homeList = norm(r[3]) || null;
-
     if (!weekRaw || !game) continue;
 
     const weekLabel = normalizeWeekLabel(weekRaw);
+    await conn.execute(upsertSql, [weekLabel, game, awayList, homeList]);
+  }
 
-    let awayXwsJson: string | null = null;
-    let homeXwsJson: string | null = null;
-    let awayLetters: string | null = null;
-    let homeLetters: string | null = null;
+  // 3) Refresh only dirty sides
+  // (treat "dirty" as missing xws/letters/count/avg for a side)
+  const [dirtyRows] = await conn.query<any[]>(
+    `
+    SELECT
+      week_label, game,
+      away_list, home_list,
+      away_xws, home_xws,
+      away_letters, home_letters,
+      away_count, home_count,
+      away_average_init, home_average_init
+    FROM lists
+    WHERE
+      (
+        COALESCE(away_list,'') <> ''
+        AND (away_xws IS NULL OR away_letters IS NULL OR away_count IS NULL OR away_average_init IS NULL)
+      )
+      OR
+      (
+        COALESCE(home_list,'') <> ''
+        AND (home_xws IS NULL OR home_letters IS NULL OR home_count IS NULL OR home_average_init IS NULL)
+      )
+    `
+  );
 
-    // Build XWS + letters for away
-    if (awayList) {
-      const xws = await fetchXwsFromListUrl(awayList);
-      if (xws) {
-        awayXwsJson = JSON.stringify(xws);
-        const glyphs = shipsToGlyphs(xws.pilots ?? []);
-        awayLetters = glyphs || null;
+  // per-run URL->XWS dedupe cache
+  const xwsCache = new Map<string, XwsResponse | null>();
+
+  for (const row of dirtyRows) {
+    const weekLabel = String(row.week_label);
+    const game = String(row.game);
+
+    // AWAY
+    {
+      const url = String(row.away_list ?? "").trim();
+      const needsAway =
+        url &&
+        (row.away_xws == null ||
+          row.away_letters == null ||
+          row.away_count == null ||
+          row.away_average_init == null);
+
+      if (needsAway) {
+        const { xwsJson, letters, count, avgInit } =
+          await resolveDerivedForUrl(url, initByXws, xwsCache);
+
+        await conn.execute(
+          `
+          UPDATE lists
+          SET
+            away_xws = ?,
+            away_letters = ?,
+            away_count = ?,
+            away_average_init = ?
+          WHERE week_label = ? AND game = ?
+          `,
+          [xwsJson, letters, count, avgInit, weekLabel, game]
+        );
       }
     }
 
-    // Build XWS + letters for home
-    if (homeList) {
-      const xws = await fetchXwsFromListUrl(homeList);
-      if (xws) {
-        homeXwsJson = JSON.stringify(xws);
-        const glyphs = shipsToGlyphs(xws.pilots ?? []);
-        homeLetters = glyphs || null;
+    // HOME
+    {
+      const url = String(row.home_list ?? "").trim();
+      const needsHome =
+        url &&
+        (row.home_xws == null ||
+          row.home_letters == null ||
+          row.home_count == null ||
+          row.home_average_init == null);
+
+      if (needsHome) {
+        const { xwsJson, letters, count, avgInit } =
+          await resolveDerivedForUrl(url, initByXws, xwsCache);
+
+        await conn.execute(
+          `
+          UPDATE lists
+          SET
+            home_xws = ?,
+            home_letters = ?,
+            home_count = ?,
+            home_average_init = ?
+          WHERE week_label = ? AND game = ?
+          `,
+          [xwsJson, letters, count, avgInit, weekLabel, game]
+        );
       }
     }
-
-    // If home_xws / away_xws are null, all derived fields stay null
-    const {
-      count: awayCount,
-      avgInit: awayAvgInit,
-    } = computeCountAndAverageInit(awayXwsJson, initByXws);
-
-    const {
-      count: homeCount,
-      avgInit: homeAvgInit,
-    } = computeCountAndAverageInit(homeXwsJson, initByXws);
-
-    await conn.execute(sql, [
-      weekLabel,
-      game,
-      awayList,
-      homeList,
-      awayXwsJson,
-      homeXwsJson,
-      awayLetters,
-      homeLetters,
-      homeCount,
-      awayCount,
-      homeAvgInit,
-      awayAvgInit,
-    ]);
   }
 }
+
+function isValidListLinkSeed(url: string): boolean {
+  const s = String(url ?? "").trim().toLowerCase();
+  if (!s) return false;
+  const isUrlLike = /^https?:\/\//.test(s);
+  if (!isUrlLike) return false;
+  return s.startsWith("https://yasb.app") || s.startsWith("https://launchbaynext.app");
+}
+
+async function resolveDerivedForUrl(
+  url: string,
+  initByXws: InitLookup,
+  xwsCache: Map<string, XwsResponse | null>
+): Promise<{
+  xwsJson: string | null;
+  letters: string | null;
+  count: number | null;
+  avgInit: number | null;
+}> {
+  const trimmed = String(url ?? "").trim();
+  if (!trimmed || !isValidListLinkSeed(trimmed)) {
+    return { xwsJson: null, letters: null, count: null, avgInit: null };
+  }
+
+  // dedupe per run
+  let xws = xwsCache.get(trimmed) ?? null;
+  if (!xwsCache.has(trimmed)) {
+    xws = await fetchXwsFromListUrl(trimmed); // <-- exists in seed-mysql
+    xwsCache.set(trimmed, xws);
+  }
+
+  if (!xws) {
+    return { xwsJson: null, letters: null, count: null, avgInit: null };
+  }
+
+  const xwsJson = JSON.stringify(xws);
+
+  // seed's shipsToGlyphs returns string, so convert empty to null
+  const glyphStr = shipsToGlyphs(xws.pilots ?? []);
+  const letters = glyphStr ? glyphStr : null;
+
+  // seed's computeCountAndAverageInit expects JSON string
+  const { count, avgInit } = computeCountAndAverageInit(xwsJson, initByXws);
+
+  return { xwsJson, letters, count, avgInit };
+}
+
 
 async function loadS9Signups(sheets: any, conn: mysql.Connection) {
   // Read from the S9 signup sheet (first tab), starting at row 2 to skip headers.
@@ -1130,7 +1214,6 @@ export async function GET(req: NextRequest) {
       }
 
       await loadWeeklyMatchups(sheets, conn);
-      await loadWeeklyMatchups(sheets, conn);
       await loadIndividualStats(sheets, conn);
       await loadStreamSchedule(sheets, conn);
       await loadDiscordMap(sheets, conn);
@@ -1139,7 +1222,10 @@ export async function GET(req: NextRequest) {
       await loadAllTimeStats(sheets, conn);
       await loadTeamSchedule(sheets, conn);
       await loadOverallStandings(sheets, conn);
-      await loadLists(sheets, conn);
+
+      // ✅ incremental + cache-friendly list sync
+      await syncListsIncremental(sheets, conn);
+
     } finally {
       await conn.end();
     }
