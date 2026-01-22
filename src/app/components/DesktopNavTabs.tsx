@@ -13,7 +13,8 @@ type TabKey =
   | "advstats"
   | "players"
   | "report"
-  | "prefs"; // ✅ NEW
+  | "prefs"
+  | "podcast"; // ✅ add
 
 const tabsBase: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "home", label: "Home", href: "/" },
@@ -23,6 +24,7 @@ const tabsBase: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "indstats", label: "Ind. Stats", href: "/?tab=indstats" },
   { key: "advstats", label: "Adv. Stats", href: "/?tab=advstats" },
   { key: "players", label: "Players", href: "/?tab=players" },
+  { key: "podcast", label: "Podcast", href: "/?tab=podcast" },
   { key: "report", label: "Report a Game", href: "/?tab=report" },
 ];
 

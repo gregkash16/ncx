@@ -12,6 +12,7 @@ export type TabKey =
   | "indstats"
   | "advstats"
   | "players"
+  | "podcast" // ✅ NEW
   | "report"
   | "prefs"
   | "team"
@@ -34,16 +35,20 @@ type HomeTabsProps = {
   indStatsPanel?: React.ReactNode;
   advStatsPanel?: React.ReactNode;
   playersPanel?: React.ReactNode;
+
+  // ✅ NEW: podcast panel
+  podcastPanel?: React.ReactNode;
+
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
 
-  // ✅ NEW: Season 9 prefs panel (only shown when enabled)
+  // ✅ Season 9 prefs panel (only shown when enabled)
   prefsPanel?: React.ReactNode;
 
   teamPanel?: React.ReactNode; // still supported, just hidden
-  playoffsPanel?: React.ReactNode; // 🔴 new hidden playoffs tab
+  playoffsPanel?: React.ReactNode; // secret tab
   hideButtons?: boolean;
 
-  // ✅ NEW: gate the pill + routing for prefs
+  // ✅ gate the pill + routing for prefs
   preSeasonEnabled?: boolean;
 };
 
@@ -55,6 +60,10 @@ export default function HomeTabs({
   indStatsPanel,
   advStatsPanel,
   playersPanel,
+
+  // ✅ IMPORTANT: actually destructure it so it's in scope
+  podcastPanel,
+
   reportPanel,
   prefsPanel,
   teamPanel,
@@ -72,6 +81,9 @@ export default function HomeTabs({
   // Only consider prefs "available" if we're in preseason AND a panel is provided
   const hasPrefs = !!prefsPanel && preSeasonEnabled;
 
+  // Podcast is always allowed if a panel is provided (no preseason gating)
+  const hasPodcast = !!podcastPanel;
+
   // 🔑 Single source of truth: URL `tab` param
   const urlTabRaw = (searchParams.get("tab") as TabKey) || "home";
   let active: TabKey = urlTabRaw;
@@ -80,6 +92,7 @@ export default function HomeTabs({
   if (active === "team" && !hasTeam) active = "home";
   if (active === "playoffs" && !hasPlayoffs) active = "home";
   if (active === "prefs" && !hasPrefs) active = "home";
+  if (active === "podcast" && !hasPodcast) active = "home";
 
   const btnBase =
     "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
@@ -92,6 +105,16 @@ export default function HomeTabs({
   function goToTab(key: TabKey) {
     // Prevent navigation to prefs when disabled (also cleans URL if someone clicks old link)
     if (key === "prefs" && !hasPrefs) {
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      params.delete("tab");
+      params.delete("q");
+      const href = params.toString() ? `${pathname}?${params}` : pathname;
+      router.replace(href, { scroll: false });
+      return;
+    }
+
+    // Prevent navigation to podcast if panel isn't provided (safety)
+    if (key === "podcast" && !hasPodcast) {
       const params = new URLSearchParams(Array.from(searchParams.entries()));
       params.delete("tab");
       params.delete("q");
@@ -146,6 +169,7 @@ export default function HomeTabs({
     { key: "indstats", label: "Ind. Stats" },
     { key: "advstats", label: "Adv. Stats" },
     { key: "players", label: "Players" },
+    ...(hasPodcast ? [{ key: "podcast" as const, label: "Podcast" }] : []),
     { key: "report", label: "Report a Game" },
     ...(hasPrefs ? [{ key: "prefs" as const, label: "SEASON 9" }] : []),
   ];
@@ -188,6 +212,10 @@ export default function HomeTabs({
         {active === "indstats" && indStatsPanel}
         {active === "advstats" && advStatsPanel}
         {active === "players" && playersPanel}
+
+        {/* ✅ Podcast */}
+        {active === "podcast" && podcastPanel}
+
         {active === "report" && reportWithProp}
 
         {/* ✅ prefs panel (only when enabled) */}

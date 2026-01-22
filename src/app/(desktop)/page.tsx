@@ -36,6 +36,7 @@ import {
 } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
 import Season9PrefsPanel from "../components/Season9PrefsPanel";
+import PodcastPanel from "../components/PodcastPanel";
 
 function parseWeekNum(label: string | undefined | null): number | null {
   if (!label) return null;
@@ -296,6 +297,7 @@ export default async function HomePage({
             hideButtons
             preSeasonEnabled={preSeasonEnabled}
             prefsPanel={preSeasonEnabled ? <Season9PrefsPanel /> : undefined}
+            podcastPanel={<PodcastPanel />} // ✅ ALWAYS AVAILABLE
             homePanel={
               <HomeLanding
                 message={message}
