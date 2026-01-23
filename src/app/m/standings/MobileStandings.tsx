@@ -82,7 +82,6 @@ async function loadWeekSeriesResults(
 
   const data: any[][] = resp.data.values ?? [];
 
-  // same grid as CurrentWeekCard / TeamSchedulePanel:
   // visually row 10,20,... => indices 9,19,... => rowNum starts at 9
   for (let rowNum = 9; rowNum < 120; rowNum += 10) {
     const idx = rowNum - 1;
@@ -98,10 +97,7 @@ async function loadWeekSeriesResults(
     const seriesOver = awayWins >= 4 || homeWins >= 4;
     if (!seriesOver) continue;
 
-    if (awayWins === homeWins) {
-      // shouldn't really happen in best-of-7; ignore if it does
-      continue;
-    }
+    if (awayWins === homeWins) continue;
 
     const awayResult: SeriesResult = awayWins > homeWins ? "win" : "loss";
     const homeResult: SeriesResult = homeWins > awayWins ? "win" : "loss";
@@ -132,7 +128,7 @@ function getStreakForTeam(
   for (let i = weekResults.length - 1; i >= 0; i--) {
     const map = weekResults[i];
     const res = map.get(teamName);
-    if (!res) continue; // no completed series for this team that week
+    if (!res) continue;
 
     if (!last) {
       last = res;
@@ -159,10 +155,11 @@ function StreakPill({
 
   const base =
     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border";
+
   const upCls =
-    "bg-emerald-500/10 border-emerald-400/60 text-emerald-300";
+    "bg-[rgb(var(--ncx-success-rgb)/0.12)] border-[rgb(var(--ncx-success-rgb)/0.45)] text-[rgb(var(--ncx-success-rgb))]";
   const downCls =
-    "bg-red-500/10 border-red-400/60 text-red-300";
+    "bg-[rgb(var(--ncx-danger-rgb)/0.12)] border-[rgb(var(--ncx-danger-rgb)/0.45)] text-[rgb(var(--ncx-danger-rgb))]";
 
   const cls = dir === "up" ? upCls : downCls;
   const arrow = dir === "up" ? "↑" : "↓";
@@ -177,36 +174,27 @@ function StreakPill({
 
 /** -------------------- Playoff math helpers (same as desktop) -------------------- **/
 
-// Treat the season as 10 weeks (real length)
 const MAX_WEEKS_FOR_PLAYOFF_MATH = 10;
 
 type TeamPlayoffWindow = {
   team: string;
-  wins: number;     // current series wins
-  gameWins: number; // current game wins
+  wins: number;
+  gameWins: number;
 
-  remaining: number; // remaining series (not yet finished)
+  remaining: number;
   minWins: number;
   maxWins: number;
   minGW: number;
   maxGW: number;
 };
 
-/**
- * Compute remaining series for each team using:
- * - SCHEDULE overview (total scheduled series)
- * - weekResults (completed series by week)
- *
- * Only weeks 1..MAX_WEEKS_FOR_PLAYOFF_MATH are considered.
- */
 async function computeRemainingSeriesPerTeam(
   weekResults: Map<string, SeriesResult>[] | null,
   activeWeekNum: number | null
 ): Promise<Record<string, number>> {
-  const schedule = await fetchTeamScheduleAllCached(); // [{week, away, home}, ...]
+  const schedule = await fetchTeamScheduleAllCached();
   const remaining: Record<string, number> = {};
 
-  // Total scheduled series per team, capped by MAX_WEEKS_FOR_PLAYOFF_MATH
   for (const row of schedule) {
     const away = row.away;
     const home = row.home;
@@ -218,7 +206,6 @@ async function computeRemainingSeriesPerTeam(
     if (home) remaining[home] = (remaining[home] ?? 0) + 1;
   }
 
-  // Subtract completed series from WEEK 1..min(activeWeekNum, MAX_WEEKS_FOR_PLAYOFF_MATH)
   if (weekResults && activeWeekNum) {
     const cappedActive = Math.min(activeWeekNum, MAX_WEEKS_FOR_PLAYOFF_MATH);
 
@@ -235,7 +222,6 @@ async function computeRemainingSeriesPerTeam(
     }
   }
 
-  // Clamp
   for (const k of Object.keys(remaining)) {
     if (remaining[k] < 0) remaining[k] = 0;
   }
@@ -243,14 +229,6 @@ async function computeRemainingSeriesPerTeam(
   return remaining;
 }
 
-/**
- * Can "other" possibly finish at or above "team" in the
- * worst-case for team / best-case for other, using
- * (wins, gameWins) with gameWins as the only tiebreaker.
- *
- * Ties on wins+GW are treated as dangerous (since points,
- * which we ignore, could go either way).
- */
 function canOtherPossiblyThreatenTeam(
   other: TeamPlayoffWindow,
   team: TeamPlayoffWindow
@@ -266,15 +244,7 @@ function canOtherPossiblyThreatenTeam(
   return false;
 }
 
-/**
- * A team is clinched if, even in their worst case, there
- * are at most 15 teams that can possibly finish at or
- * above them in (wins, gameWins).
- */
-function isTeamClinched(
-  team: TeamPlayoffWindow,
-  all: TeamPlayoffWindow[]
-): boolean {
+function isTeamClinched(team: TeamPlayoffWindow, all: TeamPlayoffWindow[]): boolean {
   let threats = 0;
 
   for (const other of all) {
@@ -288,15 +258,7 @@ function isTeamClinched(
   return threats <= 15;
 }
 
-/**
- * A team is eliminated if, even in their best case, there
- * are already 16 teams that are guaranteed to finish strictly
- * ahead of them in (wins, gameWins).
- */
-function isTeamEliminated(
-  team: TeamPlayoffWindow,
-  all: TeamPlayoffWindow[]
-): boolean {
+function isTeamEliminated(team: TeamPlayoffWindow, all: TeamPlayoffWindow[]): boolean {
   const bestWins = team.maxWins;
   const bestGW = team.maxGW;
 
@@ -326,7 +288,6 @@ export default async function MobileStandings() {
   const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
   const sheets = getSheets();
 
-  // --- Overall standings ---
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: "OVERALL RECORD!A2:F25",
@@ -348,7 +309,6 @@ export default async function MobileStandings() {
     points: String(r[5] ?? ""),
   }));
 
-  // --- Series streaks & active week ---
   let weekResults: Map<string, SeriesResult>[] | null = null;
   let activeNum: number | null = null;
 
@@ -376,14 +336,7 @@ export default async function MobileStandings() {
     activeNum = null;
   }
 
-  // --- Playoff flags (clinched / eliminated) ---
-  let playoffFlags: Record<
-    string,
-    {
-      clinched: boolean;
-      eliminated: boolean;
-    }
-  > = {};
+  let playoffFlags: Record<string, { clinched: boolean; eliminated: boolean }> = {};
 
   try {
     if (data.length > 0 && weekResults && activeNum) {
@@ -428,7 +381,7 @@ export default async function MobileStandings() {
 
   if (!data.length) {
     return (
-      <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 text-center text-neutral-300">
+      <div className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] p-4 text-center text-[var(--ncx-text-muted)]">
         No standings data found.
       </div>
     );
@@ -436,8 +389,8 @@ export default async function MobileStandings() {
 
   return (
     <section className="w-full">
-      <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-3 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
-        <h2 className="mb-3 text-xl font-extrabold tracking-wide bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+      <div className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] p-3 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
+        <h2 className="mb-3 text-xl font-extrabold tracking-wide ncx-hero-title">
           Standings
         </h2>
 
@@ -447,30 +400,25 @@ export default async function MobileStandings() {
             const href = slug ? `/m/team/${encodeURIComponent(slug)}` : undefined;
             const { dir, count } = getStreakForTeam(t.team, weekResults);
 
-            const flags =
-              playoffFlags[t.team] ?? {
-                clinched: false,
-                eliminated: false,
-              };
+            const flags = playoffFlags[t.team] ?? { clinched: false, eliminated: false };
 
             const content = (
               <>
-                {/* Top row: rank + team + streak pill */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 text-right text-sm font-semibold text-neutral-400">
+                    <span className="w-6 text-right text-sm font-semibold text-[var(--ncx-text-muted)]">
                       {t.rank || i + 1}
                     </span>
                     <Logo name={t.team} size={24} />
-                    <span className="truncate text-sm font-medium text-neutral-200">
+                    <span className="truncate text-sm font-medium text-[var(--ncx-text-primary)]/90">
                       {t.team}
                       {flags.clinched && (
-                        <span className="ml-1 text-[10px] font-semibold text-emerald-400/70">
+                        <span className="ml-1 text-[10px] font-semibold text-[rgb(var(--ncx-success-rgb)/0.75)]">
                           - ✓
                         </span>
                       )}
                       {!flags.clinched && flags.eliminated && (
-                        <span className="ml-1 text-[10px] font-semibold text-red-400/70">
+                        <span className="ml-1 text-[10px] font-semibold text-[rgb(var(--ncx-danger-rgb)/0.75)]">
                           - x
                         </span>
                       )}
@@ -479,33 +427,30 @@ export default async function MobileStandings() {
                   <StreakPill dir={dir} count={count} />
                 </div>
 
-                {/* Bottom row: stats — never wraps horizontally */}
-                <div className="mt-2 grid grid-cols-4 gap-2 text-xs text-neutral-300">
-                  <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
-                    <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+                <div className="mt-2 grid grid-cols-4 gap-2 text-xs text-[var(--ncx-text-primary)]/85">
+                  <div className="rounded-lg bg-[rgb(0_0_0/0.28)] border border-[var(--ncx-border)] px-2 py-1 text-center">
+                    <div className="uppercase text-[10px] tracking-wide text-[var(--ncx-text-muted)]">
                       W
                     </div>
                     <div className="font-semibold tabular-nums">{t.wins}</div>
                   </div>
-                  <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
-                    <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+                  <div className="rounded-lg bg-[rgb(0_0_0/0.28)] border border-[var(--ncx-border)] px-2 py-1 text-center">
+                    <div className="uppercase text-[10px] tracking-wide text-[var(--ncx-text-muted)]">
                       L
                     </div>
                     <div className="font-semibold tabular-nums">{t.losses}</div>
                   </div>
-                  <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
-                    <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+                  <div className="rounded-lg bg-[rgb(0_0_0/0.28)] border border-[var(--ncx-border)] px-2 py-1 text-center">
+                    <div className="uppercase text-[10px] tracking-wide text-[var(--ncx-text-muted)]">
                       GW
                     </div>
-                    <div className="font-semibold tabular-nums">
-                      {t.gameWins}
-                    </div>
+                    <div className="font-semibold tabular-nums">{t.gameWins}</div>
                   </div>
-                  <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
-                    <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+                  <div className="rounded-lg bg-[rgb(0_0_0/0.28)] border border-[var(--ncx-border)] px-2 py-1 text-center">
+                    <div className="uppercase text-[10px] tracking-wide text-[var(--ncx-text-muted)]">
                       Pts
                     </div>
-                    <div className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 tabular-nums">
+                    <div className="font-bold tabular-nums text-[rgb(var(--ncx-secondary-rgb))]">
                       {t.points}
                     </div>
                   </div>
@@ -516,7 +461,7 @@ export default async function MobileStandings() {
             return (
               <li
                 key={`${t.rank}-${t.team}`}
-                className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-2.5"
+                className="rounded-2xl border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.35)] p-2.5 hover:border-[rgb(var(--ncx-primary-rgb)/0.35)]"
               >
                 {href ? (
                   <Link href={href} className="block" prefetch={false}>
@@ -530,16 +475,17 @@ export default async function MobileStandings() {
           })}
         </ul>
 
-        {/* Link to Playoff Bracket */}
+        {/*  
         <div className="mt-4 flex justify-center">
           <Link
             href="/m/playoffs"
             prefetch={false}
-            className="inline-block rounded-xl border border-cyan-500/40 bg-neutral-950/80 px-4 py-2 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400 transition"
+            className="inline-block rounded-xl border border-[rgb(var(--ncx-primary-rgb)/0.45)] bg-[rgb(0_0_0/0.35)] px-4 py-2 text-sm font-semibold text-[rgb(var(--ncx-primary-rgb))] hover:bg-[rgb(var(--ncx-primary-rgb)/0.12)] hover:border-[rgb(var(--ncx-primary-rgb)/0.60)] transition"
           >
             🏆 View Playoff Bracket
           </Link>
         </div>
+      */}
       </div>
     </section>
   );

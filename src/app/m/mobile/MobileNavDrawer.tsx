@@ -92,27 +92,29 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
   const sheet = (
     <div className="fixed inset-0 z-[2147483647]">
       {/* FULLY OPAQUE overlay so nothing shows through */}
-      <div className="absolute inset-0 bg-neutral-950" />
+      <div className="absolute inset-0 bg-[var(--ncx-bg-start)]" />
 
       {/* TOP HALF: navigation panel */}
       <aside
-        className="absolute inset-x-0 top-0 h-[50svh] border-b border-neutral-800 bg-neutral-950"
+        className="absolute inset-x-0 top-0 h-[50svh] border-b border-[var(--ncx-border)] bg-[var(--ncx-bg-panel)]"
         role="dialog"
         aria-modal="true"
         aria-label="Navigation"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-800 p-3">
+        <div className="flex items-center justify-between border-b border-[var(--ncx-border)] p-3">
           <div className="flex items-center gap-2">
             <img src="/logo.webp" alt="NCX" className="h-7 w-7 rounded-lg" />
-            <div className="text-sm font-extrabold tracking-wide">NCX</div>
+            <div className="text-sm font-extrabold tracking-wide text-[var(--ncx-text-primary)]">
+              NCX
+            </div>
           </div>
 
           <button
             aria-label="Close"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 active:scale-95"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.28)] hover:bg-[rgb(0_0_0/0.40)] active:scale-95 text-[var(--ncx-text-primary)]"
           >
             <X className="h-5 w-5" />
           </button>
@@ -132,8 +134,8 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
                   onClick={onClose}
                   className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
                     active
-                      ? "bg-neutral-900 text-white"
-                      : "text-neutral-300 hover:bg-neutral-900 hover:text-white"
+                      ? "bg-[rgb(var(--ncx-primary-rgb)/0.12)] text-[var(--ncx-text-primary)] border border-[rgb(var(--ncx-primary-rgb)/0.25)]"
+                      : "text-[var(--ncx-text-primary)]/80 hover:bg-[rgb(0_0_0/0.24)] hover:text-[var(--ncx-text-primary)] border border-transparent"
                   }`}
                   aria-current={active ? "page" : undefined}
                 >
@@ -145,8 +147,8 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
           </div>
 
           {/* Stats links always visible */}
-          <div className="mt-3 border-t border-neutral-800 pt-3">
-            <div className="px-3 pb-2 text-[11px] font-semibold tracking-wide text-neutral-400">
+          <div className="mt-3 border-t border-[var(--ncx-border)] pt-3">
+            <div className="px-3 pb-2 text-[11px] font-semibold tracking-wide text-[var(--ncx-text-muted)]">
               STATS
             </div>
             <div className="space-y-1">
@@ -160,8 +162,8 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
                     onClick={onClose}
                     className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
                       active
-                        ? "bg-neutral-900 text-white"
-                        : "text-neutral-300 hover:bg-neutral-900 hover:text-white"
+                        ? "bg-[rgb(var(--ncx-primary-rgb)/0.12)] text-[var(--ncx-text-primary)] border border-[rgb(var(--ncx-primary-rgb)/0.25)]"
+                        : "text-[var(--ncx-text-primary)]/80 hover:bg-[rgb(0_0_0/0.24)] hover:text-[var(--ncx-text-primary)] border border-transparent"
                     }`}
                     aria-current={active ? "page" : undefined}
                   >
@@ -179,7 +181,7 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
       <button
         aria-label="Close navigation"
         onClick={onClose}
-        className="absolute inset-x-0 bottom-0 h-[50svh] bg-neutral-950"
+        className="absolute inset-x-0 bottom-0 h-[50svh] bg-[var(--ncx-bg-start)]"
       />
     </div>
   );

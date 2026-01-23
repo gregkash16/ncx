@@ -33,7 +33,6 @@ type GameRow = {
   isMyGame: boolean;
   canEditAwayId: boolean;
   canEditHomeId: boolean;
-  // NEW: list URLs coming from GET /api/report-game
   awayList?: string;
   homeList?: string;
 };
@@ -45,16 +44,15 @@ type FoundPayload = {
   games: GameRow[];
 };
 
-type NotOk =
-  | {
-      ok: false;
-      reason:
-        | "NOT_AUTH"
-        | "NO_DISCORD_ID"
-        | "NO_NCXID"
-        | "NO_GAME_FOUND"
-        | "SERVER_ERROR";
-    };
+type NotOk = {
+  ok: false;
+  reason:
+    | "NOT_AUTH"
+    | "NO_DISCORD_ID"
+    | "NO_NCXID"
+    | "NO_GAME_FOUND"
+    | "SERVER_ERROR";
+};
 
 const SCENARIOS = ["ANCIENT", "CHANCE", "ASSAULT", "SCRAMBLE", "SALVAGE"] as const;
 
@@ -62,10 +60,8 @@ export default function MobileReportPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FoundPayload | NotOk | null>(null);
 
-  // which game index in data.games
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // form state
   const [awayPts, setAwayPts] = useState("");
   const [homePts, setHomePts] = useState("");
   const [scenario, setScenario] = useState("");
@@ -73,14 +69,12 @@ export default function MobileReportPage() {
   const [homeId, setHomeId] = useState("");
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
 
-  // NEW: list URLs
   const [awayList, setAwayList] = useState("");
   const [homeList, setHomeList] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
 
-  // Load manageable games
   useEffect(() => {
     let alive = true;
 
@@ -118,9 +112,7 @@ export default function MobileReportPage() {
           setConfirmOverwrite(false);
         }
       } catch {
-        if (alive) {
-          setData({ ok: false, reason: "SERVER_ERROR" });
-        }
+        if (alive) setData({ ok: false, reason: "SERVER_ERROR" });
       } finally {
         if (alive) setLoading(false);
       }
@@ -134,12 +126,10 @@ export default function MobileReportPage() {
   const selectedGame: GameRow | null = useMemo(() => {
     if (!data || !data.ok) return null;
     if (!data.games || data.games.length === 0) return null;
-    if (selectedIndex < 0 || selectedIndex >= data.games.length)
-      return data.games[0];
+    if (selectedIndex < 0 || selectedIndex >= data.games.length) return data.games[0];
     return data.games[selectedIndex];
   }, [data, selectedIndex]);
 
-  // Match desktop: detect if scores or IDs are actually being edited
   const editingScores = useMemo(() => {
     if (!selectedGame) return false;
     return (
@@ -151,35 +141,24 @@ export default function MobileReportPage() {
 
   const editingIds = useMemo(() => {
     if (!selectedGame) return false;
-    return (
-      awayId !== (selectedGame.away.id || "") ||
-      homeId !== (selectedGame.home.id || "")
-    );
+    return awayId !== (selectedGame.away.id || "") || homeId !== (selectedGame.home.id || "");
   }, [selectedGame, awayId, homeId]);
 
-  // NEW: detect list changes
   const editingLists = useMemo(() => {
     if (!selectedGame) return false;
-    return (
-      awayList !== (selectedGame.awayList || "") ||
-      homeList !== (selectedGame.homeList || "")
-    );
+    return awayList !== (selectedGame.awayList || "") || homeList !== (selectedGame.homeList || "");
   }, [selectedGame, awayList, homeList]);
 
   const canSubmit = useMemo(() => {
     if (!data || !data.ok || !selectedGame) return false;
 
-    // Nothing changed? No submit.
     if (!editingScores && !editingIds && !editingLists) return false;
 
-    // If we’re editing scores, require scores + scenario,
-    // and confirm overwrite if scores already exist.
     if (editingScores) {
       if (awayPts === "" || homePts === "" || !scenario) return false;
       if (selectedGame.alreadyFilled && !confirmOverwrite) return false;
     }
 
-    // If we’re only changing IDs or lists, that's fine – backend enforces perms & link validity.
     return true;
   }, [
     data,
@@ -204,12 +183,10 @@ export default function MobileReportPage() {
         force: confirmOverwrite,
         newAwayId: awayId,
         newHomeId: homeId,
-        // always send lists; API will decide what to do
         awayList: awayList.trim(),
         homeList: homeList.trim(),
       };
 
-      // Only send scores + scenario if they actually changed
       if (editingScores) {
         payload.awayPts = Number(awayPts);
         payload.homePts = Number(homePts);
@@ -238,7 +215,6 @@ export default function MobileReportPage() {
       }
 
       setNotice("✅ Report saved!");
-      // mobile: go back to matchups view
       setTimeout(() => {
         window.location.assign("/m/matchups");
       }, 900);
@@ -284,11 +260,9 @@ export default function MobileReportPage() {
     );
   }
 
-  // ---------- RENDER STATES ----------
-
   if (loading) {
     return (
-      <div className="p-4 text-center text-neutral-400">
+      <div className="p-4 text-center text-[var(--ncx-text-muted)]">
         Loading your matchups…
       </div>
     );
@@ -296,7 +270,7 @@ export default function MobileReportPage() {
 
   if (!data) {
     return (
-      <div className="p-4 text-center text-neutral-400">
+      <div className="p-4 text-center text-[var(--ncx-text-muted)]">
         Could not load.
       </div>
     );
@@ -304,83 +278,70 @@ export default function MobileReportPage() {
 
   if (!data.ok) {
     let msg = "Something went wrong.";
-    if (data.reason === "NOT_AUTH")
-      msg = "Please sign in via Discord to report a game.";
-    if (data.reason === "NO_DISCORD_ID")
-      msg = "No Discord ID found. Try logging out/in.";
-    if (data.reason === "NO_NCXID")
-      msg = "We couldn't find your NCXID in the sheet.";
-    if (data.reason === "NO_GAME_FOUND")
-      msg = "We couldn't find any games for you to manage this week.";
-    if (data.reason === "SERVER_ERROR")
-      msg = "Server error while loading games.";
+    if (data.reason === "NOT_AUTH") msg = "Please sign in via Discord to report a game.";
+    if (data.reason === "NO_DISCORD_ID") msg = "No Discord ID found. Try logging out/in.";
+    if (data.reason === "NO_NCXID") msg = "We couldn't find your NCXID in the sheet.";
+    if (data.reason === "NO_GAME_FOUND") msg = "We couldn't find any games for you to manage this week.";
+    if (data.reason === "SERVER_ERROR") msg = "Server error while loading games.";
 
-    return (
-      <div className="p-4 text-center text-neutral-400">
-        {msg}
-      </div>
-    );
+    return <div className="p-4 text-center text-[var(--ncx-text-muted)]">{msg}</div>;
   }
 
   if (!selectedGame) {
     return (
-      <div className="p-4 text-center text-neutral-400">
+      <div className="p-4 text-center text-[var(--ncx-text-muted)]">
         No games available to report this week.
       </div>
     );
   }
 
   const { weekTab, role } = data;
-  const {
-    game,
-    away,
-    home,
-    alreadyFilled,
-    canEditAwayId,
-    canEditHomeId,
-  } = selectedGame;
+  const { game, away, home, alreadyFilled, canEditAwayId, canEditHomeId } = selectedGame;
+
+  const inputBase =
+    "w-full rounded-lg bg-[rgb(0_0_0/0.28)] border border-[var(--ncx-border)] px-3 py-2 outline-none focus:border-[rgb(var(--ncx-primary-rgb)/0.65)]";
 
   return (
-    <div className="space-y-5 p-3">
+    <div className="space-y-5 p-3 text-[var(--ncx-text-primary)]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <h2 className="text-lg font-semibold text-pink-400">
-            Report — <span className="text-white">{weekTab}</span>
+          <h2 className="text-lg font-semibold">
+            <span className="text-[rgb(var(--ncx-secondary-rgb))]">Report</span> —{" "}
+            <span className="text-[var(--ncx-text-primary)]">{weekTab}</span>
           </h2>
-          <span className="mt-0.5 text-[11px] text-neutral-400">
+          <span className="mt-0.5 text-[11px] text-[var(--ncx-text-muted)]">
             Role:{" "}
-            <span className="font-medium text-neutral-200 capitalize">
+            <span className="font-medium text-[var(--ncx-text-primary)]/90 capitalize">
               {role}
             </span>
           </span>
         </div>
+
         <span
           className={`text-[11px] px-2 py-1 rounded-full border ${
             alreadyFilled
-              ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-300"
-              : "border-purple-400/50 bg-purple-500/10 text-purple-300"
+              ? "border-[rgb(var(--ncx-primary-rgb)/0.55)] bg-[rgb(var(--ncx-primary-rgb)/0.10)] text-[rgb(var(--ncx-primary-rgb))]"
+              : "border-[rgb(var(--ncx-secondary-rgb)/0.55)] bg-[rgb(var(--ncx-secondary-rgb)/0.10)] text-[rgb(var(--ncx-secondary-rgb))]"
           }`}
         >
           Game #{game}
         </span>
       </div>
 
-      {/* Game selector (dropdown, like desktop) */}
+      {/* Game selector */}
       {data.games.length > 1 && (
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-neutral-300">
+          <label className="block text-xs font-medium text-[var(--ncx-text-primary)]/85">
             Select a game to edit
           </label>
           <select
             value={String(selectedIndex)}
             onChange={(e) => handleSelectGame(Number(e.target.value))}
-            className="w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-pink-400/60"
+            className={`${inputBase} text-sm text-[var(--ncx-text-primary)]`}
           >
             {data.games.map((g, idx) => {
-              const baseLabel = `G${g.game}: ${g.away.team || "—"} vs ${
-                g.home.team || "—"
-              }`;
+              const baseLabel = `G${g.game}: ${g.away.team || "—"} vs ${g.home.team || "—"}`;
               const label = g.isMyGame ? `${baseLabel} • MY GAME` : baseLabel;
               return (
                 <option key={`${g.rowIndex}-${g.game}`} value={idx}>
@@ -389,9 +350,8 @@ export default function MobileReportPage() {
               );
             })}
           </select>
-          <p className="text-[11px] text-neutral-500">
-            Admins and captains can switch between any games they&apos;re allowed
-            to manage.
+          <p className="text-[11px] text-[var(--ncx-text-muted)]">
+            Admins and captains can switch between any games they&apos;re allowed to manage.
           </p>
         </div>
       )}
@@ -399,78 +359,78 @@ export default function MobileReportPage() {
       {/* Team cards */}
       <div className="grid grid-cols-2 gap-3">
         {/* Away */}
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-3 space-y-2">
-          <div className="text-xs text-neutral-400 mb-1">Away</div>
+        <div className="rounded-xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/70 p-3 space-y-2">
+          <div className="text-xs text-[var(--ncx-text-muted)] mb-1">Away</div>
           <div className="flex items-center gap-1 text-sm font-semibold">
             <TeamLogo name={away.team} />
-            <span className="text-neutral-200">{away.team || "—"}</span>
+            <span className="text-[var(--ncx-text-primary)]/90">{away.team || "—"}</span>
           </div>
-          <div className="mt-1 text-xs text-neutral-400 flex flex-col gap-1">
-            <span className="font-medium text-white">
-              {away.name || "—"}
-            </span>
+
+          <div className="mt-1 text-xs text-[var(--ncx-text-muted)] flex flex-col gap-1">
+            <span className="font-medium text-[var(--ncx-text-primary)]">{away.name || "—"}</span>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-neutral-400">NCX ID:</span>
+              <span className="text-[11px] text-[var(--ncx-text-muted)]">NCX ID:</span>
               {canEditAwayId ? (
                 <input
                   type="text"
                   value={awayId}
                   onChange={(e) => setAwayId(e.target.value)}
-                  className="w-20 rounded bg-neutral-900 border border-neutral-700 px-2 py-1 text-[11px] text-neutral-100 outline-none focus:border-pink-400/70"
+                  className="w-20 rounded bg-[rgb(0_0_0/0.28)] border border-[var(--ncx-border)] px-2 py-1 text-[11px] text-[var(--ncx-text-primary)] outline-none focus:border-[rgb(var(--ncx-primary-rgb)/0.70)]"
                   placeholder="e.g. 23"
                 />
               ) : (
-                <span className="text-[11px] bg-neutral-800 px-2 py-0.5 rounded">
+                <span className="text-[11px] bg-[rgb(0_0_0/0.30)] border border-[var(--ncx-border)] px-2 py-0.5 rounded">
                   {away.id || "—"}
                 </span>
               )}
             </div>
           </div>
-          <div className="mt-1 text-[11px] text-neutral-400">
+
+          <div className="mt-1 text-[11px] text-[var(--ncx-text-muted)]">
             W-L:{" "}
-            <span className="text-neutral-200">
+            <span className="text-[var(--ncx-text-primary)]/90">
               {away.wins || 0}-{away.losses || 0}
             </span>{" "}
             • PL/MS:{" "}
-            <span className="text-neutral-200">{away.plms || "-"}</span>
+            <span className="text-[var(--ncx-text-primary)]/90">{away.plms || "-"}</span>
           </div>
         </div>
 
         {/* Home */}
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-3 space-y-2">
-          <div className="text-xs text-neutral-400 mb-1">Home</div>
+        <div className="rounded-xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/70 p-3 space-y-2">
+          <div className="text-xs text-[var(--ncx-text-muted)] mb-1">Home</div>
           <div className="flex items-center gap-1 text-sm font-semibold">
             <TeamLogo name={home.team} />
-            <span className="text-neutral-200">{home.team || "—"}</span>
+            <span className="text-[var(--ncx-text-primary)]/90">{home.team || "—"}</span>
           </div>
-          <div className="mt-1 text-xs text-neutral-400 flex flex-col gap-1">
-            <span className="font-medium text-white">
-              {home.name || "—"}
-            </span>
+
+          <div className="mt-1 text-xs text-[var(--ncx-text-muted)] flex flex-col gap-1">
+            <span className="font-medium text-[var(--ncx-text-primary)]">{home.name || "—"}</span>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-neutral-400">NCX ID:</span>
+              <span className="text-[11px] text-[var(--ncx-text-muted)]">NCX ID:</span>
               {canEditHomeId ? (
                 <input
                   type="text"
                   value={homeId}
                   onChange={(e) => setHomeId(e.target.value)}
-                  className="w-20 rounded bg-neutral-900 border border-neutral-700 px-2 py-1 text-[11px] text-neutral-100 outline-none focus:border-pink-400/70"
+                  className="w-20 rounded bg-[rgb(0_0_0/0.28)] border border-[var(--ncx-border)] px-2 py-1 text-[11px] text-[var(--ncx-text-primary)] outline-none focus:border-[rgb(var(--ncx-primary-rgb)/0.70)]"
                   placeholder="e.g. 17"
                 />
               ) : (
-                <span className="text-[11px] bg-neutral-800 px-2 py-0.5 rounded">
+                <span className="text-[11px] bg-[rgb(0_0_0/0.30)] border border-[var(--ncx-border)] px-2 py-0.5 rounded">
                   {home.id || "—"}
                 </span>
               )}
             </div>
           </div>
-          <div className="mt-1 text-[11px] text-neutral-400">
+
+          <div className="mt-1 text-[11px] text-[var(--ncx-text-muted)]">
             W-L:{" "}
-            <span className="text-neutral-200">
+            <span className="text-[var(--ncx-text-primary)]/90">
               {home.wins || 0}-{home.losses || 0}
             </span>{" "}
             • PL/MS:{" "}
-            <span className="text-neutral-200">{home.plms || "-"}</span>
+            <span className="text-[var(--ncx-text-primary)]/90">{home.plms || "-"}</span>
           </div>
         </div>
       </div>
@@ -478,33 +438,33 @@ export default function MobileReportPage() {
       {/* Scores + scenario */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <label className="block">
-          <span className="text-xs text-neutral-400">Away Score</span>
+          <span className="text-xs text-[var(--ncx-text-muted)]">Away Score</span>
           <input
             type="number"
             min={0}
             value={awayPts}
             onChange={(e) => setAwayPts(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-sm outline-none focus:border-pink-400/60"
+            className={`mt-1 ${inputBase} text-sm`}
           />
         </label>
 
         <label className="block">
-          <span className="text-xs text-neutral-400">Home Score</span>
+          <span className="text-xs text-[var(--ncx-text-muted)]">Home Score</span>
           <input
             type="number"
             min={0}
             value={homePts}
             onChange={(e) => setHomePts(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-sm outline-none focus:border-pink-400/60"
+            className={`mt-1 ${inputBase} text-sm`}
           />
         </label>
 
         <label className="block">
-          <span className="text-xs text-neutral-400">Scenario</span>
+          <span className="text-xs text-[var(--ncx-text-muted)]">Scenario</span>
           <select
             value={scenario}
             onChange={(e) => setScenario(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-sm outline-none focus:border-pink-400/60"
+            className={`mt-1 ${inputBase} text-sm text-[var(--ncx-text-primary)]`}
           >
             <option value="">Choose…</option>
             {SCENARIOS.map((s) => (
@@ -518,38 +478,41 @@ export default function MobileReportPage() {
 
       {/* Lists (optional) */}
       <div className="space-y-2">
-        <span className="text-xs text-neutral-400">
-          Squad list links <span className="text-neutral-500">(optional)</span>
+        <span className="text-xs text-[var(--ncx-text-muted)]">
+          Squad list links <span className="opacity-70">(optional)</span>
         </span>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-[11px] text-neutral-400">Away list (YASB / LBN)</span>
+            <span className="text-[11px] text-[var(--ncx-text-muted)]">Away list (YASB / LBN)</span>
             <input
               type="url"
               value={awayList}
               onChange={(e) => setAwayList(e.target.value)}
-              className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-xs text-neutral-100 outline-none focus:border-pink-400/60"
+              className={`mt-1 ${inputBase} text-xs text-[var(--ncx-text-primary)]`}
               placeholder="https://yasb.app/..."
             />
           </label>
+
           <label className="block">
-            <span className="text-[11px] text-neutral-400">Home list (YASB / LBN)</span>
+            <span className="text-[11px] text-[var(--ncx-text-muted)]">Home list (YASB / LBN)</span>
             <input
               type="url"
               value={homeList}
               onChange={(e) => setHomeList(e.target.value)}
-              className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2 text-xs text-neutral-100 outline-none focus:border-pink-400/60"
+              className={`mt-1 ${inputBase} text-xs text-[var(--ncx-text-primary)]`}
               placeholder="https://launchbaynext.app/..."
             />
           </label>
         </div>
-        <p className="text-[11px] text-neutral-500">
+
+        <p className="text-[11px] text-[var(--ncx-text-muted)]">
           Paste YASB or LaunchBayNext URLs. Leave blank if you don&apos;t want to share lists.
         </p>
       </div>
 
       {alreadyFilled && editingScores && (
-        <label className="flex items-center gap-2 text-sm text-neutral-300">
+        <label className="flex items-center gap-2 text-sm text-[var(--ncx-text-primary)]/85">
           <input
             type="checkbox"
             checked={confirmOverwrite}
@@ -562,14 +525,12 @@ export default function MobileReportPage() {
       <button
         onClick={submit}
         disabled={!canSubmit || submitting}
-        className="w-full rounded-xl bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 py-3 text-sm font-semibold text-white shadow disabled:opacity-50"
+        className="w-full rounded-xl bg-gradient-to-r from-[rgb(var(--ncx-secondary-rgb))] via-[rgb(var(--ncx-primary-rgb))] to-[rgb(var(--ncx-secondary-rgb))] py-3 text-sm font-semibold text-[rgb(0_0_0/0.85)] shadow disabled:opacity-50"
       >
         {submitting ? "Submitting…" : "Submit Report"}
       </button>
 
-      {notice && (
-        <p className="text-center text-sm text-neutral-300">{notice}</p>
-      )}
+      {notice && <p className="text-center text-sm text-[var(--ncx-text-primary)]/85">{notice}</p>}
     </div>
   );
 }

@@ -18,7 +18,6 @@ type MatchRow = {
   homePts?: string | number;
   scenario?: string;
 
-  // NEW: optional Discord deep-link data
   awayDiscordId?: string | null;
   homeDiscordId?: string | null;
   awayDiscordTag?: string | null;
@@ -55,7 +54,11 @@ function pickTeamFilter(q: string, rows: MatchRow[]): string {
   if (!tokens.length) return "";
 
   const allTeams = Array.from(
-    new Set(rows.flatMap((r) => [r.awayTeam, r.homeTeam]).filter(Boolean) as string[])
+    new Set(
+      rows
+        .flatMap((r) => [r.awayTeam, r.homeTeam])
+        .filter(Boolean) as string[]
+    )
   );
   const teamBySlug = new Map(allTeams.map((t) => [teamSlug(t), t]));
 
@@ -90,7 +93,10 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
 
   // Initialize from URL (?q may be "AWAY HOME" from Current)
   const qFromUrlRaw = (sp.get("q") ?? "").trim();
-  const qFromUrlTeam = useMemo(() => pickTeamFilter(qFromUrlRaw, baseRows), [qFromUrlRaw, baseRows]);
+  const qFromUrlTeam = useMemo(
+    () => pickTeamFilter(qFromUrlRaw, baseRows),
+    [qFromUrlRaw, baseRows]
+  );
   const wFromUrl = (sp.get("w") ?? "").trim();
 
   const [query, setQuery] = useState(qFromUrlTeam);
@@ -103,7 +109,10 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
   }, [qFromUrlTeam]);
 
   const activeNum = useMemo(() => parseWeekNum(activeWeek), [activeWeek]);
-  const selectedNum = useMemo(() => parseWeekNum(wFromUrl || weekLabel), [wFromUrl, weekLabel]);
+  const selectedNum = useMemo(
+    () => parseWeekNum(wFromUrl || weekLabel),
+    [wFromUrl, weekLabel]
+  );
 
   const isCurrentSelected = useMemo(() => {
     if (!activeNum) return true;
@@ -116,7 +125,9 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
   }, [activeNum, activeWeek]);
 
   const scheduleOn =
-    Boolean(weekLabel) && Boolean(scheduleWeek) && weekLabel.trim() === scheduleWeek.trim();
+    Boolean(weekLabel) &&
+    Boolean(scheduleWeek) &&
+    weekLabel.trim() === scheduleWeek.trim();
 
   const rows = useMemo(() => {
     const q = (query || "").toLowerCase().trim();
@@ -137,7 +148,15 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
         );
       } else {
         arr = arr.filter((m) =>
-          [m.awayId, m.homeId, m.awayName, m.homeName, m.awayTeam, m.homeTeam, m.scenario]
+          [
+            m.awayId,
+            m.homeId,
+            m.awayName,
+            m.homeName,
+            m.awayTeam,
+            m.homeTeam,
+            m.scenario,
+          ]
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(q))
         );
@@ -167,7 +186,8 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
   function onSelectRow(row: MatchRow) {
     const combined = `${row.awayTeam} ${row.homeTeam}`.trim();
     setUrlQuery(combined);
-    const singleTeam = pickTeamFilter(combined, baseRows) || row.awayTeam || row.homeTeam;
+    const singleTeam =
+      pickTeamFilter(combined, baseRows) || row.awayTeam || row.homeTeam;
     setQuery(singleTeam);
 
     requestAnimationFrame(() => {
@@ -186,48 +206,71 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
     router.replace(href, { scroll: false });
   }
 
+  // Token-driven button base (reused in Current view)
+  const btnBase =
+    "group relative overflow-hidden rounded-md border bg-[var(--ncx-bg-panel)] px-3 py-1.5 text-xs font-semibold text-[var(--ncx-text-primary)] shadow transition active:scale-[0.98]";
+  const glowBase =
+    "pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100";
+
   return (
-    <div className="max-w-screen-sm mx-auto px-3 py-5">
-      <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-3">
-        <h2 className="mb-3 text-center text-[15px] font-extrabold tracking-wide bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-          WEEKLY MATCHUPS {weekLabel ? <span className="text-zinc-400">• {weekLabel}</span> : null}
+    <div className="mx-auto max-w-screen-sm px-3 py-5">
+      <div className="rounded-2xl bg-[var(--ncx-bg-elev)] border border-[var(--ncx-border)] p-3 shadow-[0_4px_20px_rgb(0_0_0/0.25)]">
+        <h2 className="mb-3 text-center text-[15px] font-extrabold tracking-wide text-transparent bg-clip-text bg-[var(--ncx-hero-gradient)]">
+          WEEKLY MATCHUPS{" "}
+          {weekLabel ? (
+            <span className="text-[var(--ncx-text-muted)]">• {weekLabel}</span>
+          ) : null}
         </h2>
 
+        {/* Week pills */}
         {activeNum && activeNum > 1 && (
           <div className="mb-4 flex flex-wrap justify-center gap-2">
             <button
               type="button"
               onClick={() => goWeek(activeWeek)}
-              className="group relative overflow-hidden rounded-md border border-yellow-400/70 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow transition active:scale-[0.98]"
+              className={[btnBase, "border-[rgb(var(--ncx-warn-rgb)/0.55)]"].join(
+                " "
+              )}
             >
-              <span className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20 opacity-100 group-hover:opacity-100" />
+              <span
+                className={[
+                  glowBase,
+                  "bg-[linear-gradient(90deg,rgb(var(--ncx-warn-rgb)/0.18),rgb(var(--ncx-warn-rgb)/0.10),rgb(var(--ncx-warn-rgb)/0.18))]",
+                  "opacity-100",
+                ].join(" ")}
+              />
               <span className="relative z-10">Current</span>
             </button>
 
             {weekPills.map((wk) => {
-              const selected = wk.toUpperCase() === weekLabel.toUpperCase() && !isCurrentSelected;
+              const selected =
+                wk.toUpperCase() === weekLabel.toUpperCase() && !isCurrentSelected;
               const isActive = wk.toUpperCase() === activeWeek.toUpperCase();
 
-              const cls =
-                isActive
-                  ? "border-yellow-400/70"
-                  : selected
-                  ? "border-cyan-400/60"
-                  : "border-purple-500/40";
+              const borderCls = isActive
+                ? "border-[rgb(var(--ncx-warn-rgb)/0.55)]"
+                : selected
+                ? "border-[rgb(var(--ncx-primary-rgb)/0.45)]"
+                : "border-[rgb(var(--ncx-accent-rgb)/0.35)]";
 
-              const glow =
-                isActive
-                  ? "bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20"
-                  : "bg-gradient-to-r from-pink-600/20 via-purple-500/20 to-cyan-500/20";
+              const glow = isActive
+                ? "bg-[linear-gradient(90deg,rgb(var(--ncx-warn-rgb)/0.18),rgb(var(--ncx-warn-rgb)/0.10),rgb(var(--ncx-warn-rgb)/0.18))]"
+                : "bg-[linear-gradient(90deg,rgb(var(--ncx-secondary-rgb)/0.16),rgb(var(--ncx-accent-rgb)/0.14),rgb(var(--ncx-primary-rgb)/0.16))]";
 
               return (
                 <button
                   key={wk}
                   type="button"
                   onClick={() => goWeek(wk)}
-                  className={`group relative overflow-hidden rounded-md border ${cls} bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white shadow transition active:scale-[0.98]`}
+                  className={[btnBase, borderCls].join(" ")}
                 >
-                  <span className={`pointer-events-none absolute inset-0 z-0 ${glow} ${selected ? "opacity-100" : ""}`} />
+                  <span
+                    className={[
+                      glowBase,
+                      glow,
+                      selected ? "opacity-100" : "",
+                    ].join(" ")}
+                  />
                   <span className="relative z-10">{wk}</span>
                 </button>
               );
@@ -235,22 +278,23 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
           </div>
         )}
 
-        <div className="sticky top-0 z-20 -mx-3 px-3 py-3 mb-4 bg-zinc-900/85 backdrop-blur supports-[backdrop-filter]:bg-zinc-900/60 border-b border-zinc-800 rounded-none">
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        {/* Sticky filter bar */}
+        <div className="sticky top-0 z-20 -mx-3 mb-4 border-b border-[var(--ncx-border)] bg-[color:rgb(var(--ncx-bg-rgb)/0.80)] px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-[color:rgb(var(--ncx-bg-rgb)/0.55)]">
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
             <input
               type="text"
               inputMode="text"
               placeholder="Filter by NCXID, Name, Team, or Scenario..."
-              className="w-full sm:flex-1 rounded-lg bg-zinc-800 border border-zinc-700 text-sm px-4 py-3 sm:py-2 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-pink-500"
+              className="w-full rounded-lg border border-[var(--ncx-border)] bg-[var(--ncx-bg-panel)] px-4 py-3 text-sm text-[var(--ncx-text-primary)] placeholder:text-[var(--ncx-text-dim)] outline-none focus:ring-2 focus:ring-[rgb(var(--ncx-secondary-rgb)/0.35)] sm:flex-1 sm:py-2"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Filter matchups"
             />
-            <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm text-zinc-300">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--ncx-text-muted)] sm:gap-6">
               <label className="inline-flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className="size-4"
+                  className="size-4 accent-[rgb(var(--ncx-primary-rgb))]"
                   checked={onlyCompleted}
                   onChange={(e) => {
                     setOnlyCompleted(e.target.checked);
@@ -263,7 +307,7 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
               <label className="inline-flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className="size-4"
+                  className="size-4 accent-[rgb(var(--ncx-accent-rgb))]"
                   checked={onlyScheduled}
                   onChange={(e) => {
                     setOnlyScheduled(e.target.checked);
@@ -281,7 +325,7 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
                     setQuery("");
                     setUrlQuery(null);
                   }}
-                  className="ml-auto inline-flex items-center rounded-full border border-zinc-700 bg-zinc-800/70 px-3 py-1 text-[12px] text-zinc-200 hover:bg-zinc-800"
+                  className="ml-auto inline-flex items-center rounded-full border border-[var(--ncx-border)] bg-[var(--ncx-bg-panel)] px-3 py-1 text-[12px] text-[var(--ncx-text-primary)] hover:bg-[var(--ncx-bg-elev)]"
                   aria-label="Clear filter"
                 >
                   ✕ Clear
@@ -291,8 +335,11 @@ export default function MatchupsClient({ payload }: { payload: Payload }) {
           </div>
         </div>
 
+        {/* Results */}
         {rows.length === 0 ? (
-          <div className="px-3 py-6 text-center text-zinc-400">No matchups found.</div>
+          <div className="px-3 py-6 text-center text-[var(--ncx-text-muted)]">
+            No matchups found.
+          </div>
         ) : (
           <div className="space-y-4">
             {rows.map((row, i) => (

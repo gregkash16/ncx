@@ -12,7 +12,7 @@ export default function MobileNavButton() {
       <button
         aria-label="Open navigation"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900/70 hover:bg-neutral-800 active:scale-95"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.28)] hover:bg-[rgb(0_0_0/0.40)] active:scale-95 text-[var(--ncx-text-primary)]"
       >
         <Menu className="h-5 w-5" />
       </button>

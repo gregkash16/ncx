@@ -77,11 +77,11 @@ export default function IndStatsSearch() {
 
   return (
     <section className="w-full">
-      <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
-        <h2 className="text-center text-xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400">
+      <div className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-bg-elev)] p-4 shadow-[0_4px_20px_rgb(0_0_0/0.25)]">
+        <h2 className="text-center text-xl font-extrabold tracking-wide text-transparent bg-clip-text bg-[var(--ncx-hero-gradient)]">
           Individual Stats
         </h2>
-        <p className="mt-1 text-center text-xs text-neutral-400">
+        <p className="mt-1 text-center text-xs text-[var(--ncx-text-muted)]">
           Search by name, NCXID, team, or faction.
         </p>
 
@@ -94,28 +94,28 @@ export default function IndStatsSearch() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="e.g. Luke, NCX123, Rebels…"
-            className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full rounded-lg border border-[var(--ncx-border)] bg-[var(--ncx-bg-panel)] px-3 py-2 text-sm text-[var(--ncx-text-primary)] placeholder:text-[var(--ncx-text-dim)] outline-none focus:ring-2 focus:ring-[rgb(var(--ncx-secondary-rgb)/0.35)]"
           />
           <button
             type="submit"
-            className="shrink-0 rounded-lg border border-purple-500/40 bg-neutral-950 px-3 py-2 text-sm font-semibold text-neutral-100 hover:border-purple-400/70"
+            className="shrink-0 rounded-lg border border-[rgb(var(--ncx-accent-rgb)/0.35)] bg-[var(--ncx-bg-panel)] px-3 py-2 text-sm font-semibold text-[var(--ncx-text-primary)] hover:border-[rgb(var(--ncx-accent-rgb)/0.55)] hover:bg-[var(--ncx-bg-elev)]"
           >
             Search
           </button>
         </form>
 
         {!touched && (
-          <div className="mt-4 text-center text-sm text-neutral-400">
+          <div className="mt-4 text-center text-sm text-[var(--ncx-text-muted)]">
             Start by searching for a player.
           </div>
         )}
         {loading && (
-          <div className="mt-4 text-center text-sm text-neutral-300">
+          <div className="mt-4 text-center text-sm text-[var(--ncx-text-primary)]">
             Searching…
           </div>
         )}
         {showEmptyState && (
-          <div className="mt-4 text-center text-sm text-neutral-400">
+          <div className="mt-4 text-center text-sm text-[var(--ncx-text-muted)]">
             No players matched “{q}”.
           </div>
         )}
@@ -131,13 +131,13 @@ export default function IndStatsSearch() {
               return (
                 <li
                   key={p.ncxid}
-                  className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3"
+                  className="rounded-xl border border-[var(--ncx-border)] bg-[var(--ncx-bg-panel)] p-3"
                 >
                   {/* Top row: Rank badge • Name • Team/Faction */}
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <span
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900 text-[11px] font-semibold text-neutral-300"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--ncx-border)] bg-[color:rgb(var(--ncx-bg-rgb)/0.55)] text-[11px] font-semibold text-[var(--ncx-text-muted)]"
                         title="Rank"
                       >
                         {p.rank || "—"}
@@ -149,27 +149,27 @@ export default function IndStatsSearch() {
                         alt={p.team || "Team"}
                         width={24}
                         height={24}
-                        className="inline-block object-contain shrink-0"
+                        className="inline-block shrink-0 object-contain"
                         unoptimized
                         loading="lazy"
                         decoding="async"
                       />
 
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-neutral-200">
+                        <div className="truncate text-sm font-medium text-[var(--ncx-text-primary)]">
                           {name}
                         </div>
-                        <div className="text-[11px] text-neutral-400">
+                        <div className="text-[11px] text-[var(--ncx-text-muted)]">
                           {p.team || "—"} {p.faction ? `• ${p.faction}` : ""}
                         </div>
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <div className="text-xs text-neutral-300">
+                      <div className="text-xs text-[var(--ncx-text-muted)]">
                         GP: {p.games}
                       </div>
-                      <div className="text-xs font-semibold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400">
+                      <div className="text-xs font-semibold text-transparent bg-clip-text bg-[var(--ncx-hero-gradient)]">
                         {wl}
                       </div>
                     </div>
@@ -198,11 +198,11 @@ export default function IndStatsSearch() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-neutral-900/60 px-2 py-1">
-      <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+    <div className="rounded-lg border border-[var(--ncx-border)] bg-[color:rgb(var(--ncx-bg-rgb)/0.45)] px-2 py-1">
+      <div className="uppercase text-[10px] tracking-wide text-[var(--ncx-text-muted)]">
         {label}
       </div>
-      <div className="font-semibold tabular-nums text-neutral-200">
+      <div className="font-semibold tabular-nums text-[var(--ncx-text-primary)]">
         {value}
       </div>
     </div>

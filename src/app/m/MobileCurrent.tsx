@@ -68,9 +68,11 @@ export default async function MobileCurrent({
 
   if (!spreadsheetId) {
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-        <h2 className="text-lg font-semibold text-pink-400">Current Week</h2>
-        <p className="mt-2 text-sm text-zinc-400">
+      <div className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] p-4">
+        <h2 className="text-lg font-semibold ncx-hero-title">
+          Current Week
+        </h2>
+        <p className="mt-2 text-sm text-[var(--ncx-text-muted)]">
           Missing env var <code>NCX_LEAGUE_SHEET_ID</code>.
         </p>
       </div>
@@ -133,24 +135,26 @@ export default async function MobileCurrent({
     series.push({ awayTeam, awayWins, homeTeam, homeWins });
   }
 
-  const GREEN = "34,197,94";
-  const RED = "239,68,68";
+  // winner highlight uses existing globals:
+  // - gold = --ncx-secondary-rgb (highlight)
+  // - cyan = --ncx-primary-rgb (accent)
 
   const btnBase =
-    "group relative overflow-hidden rounded-md border bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white shadow transition active:scale-[0.98]";
+    "group relative overflow-hidden rounded-md border bg-[var(--ncx-panel-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--ncx-text-primary)] shadow transition active:scale-[0.98]";
   const gradient =
     "pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100";
 
+  const isShowWeekActive =
+    showWeek.trim().toUpperCase() === activeWeek.trim().toUpperCase();
+
   return (
     <section className="w-full">
-      <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
+      <div className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-extrabold uppercase tracking-wide bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-            {showWeek.trim().toUpperCase() === activeWeek.trim().toUpperCase()
-              ? "Current Week"
-              : "Week View"}
+          <h2 className="text-xl font-extrabold uppercase tracking-wide ncx-hero-title">
+            {isShowWeekActive ? "Current Week" : "Week View"}
           </h2>
-          <span className="rounded-full border border-neutral-700 bg-neutral-950/70 px-2.5 py-1 text-xs text-neutral-300">
+          <span className="rounded-full border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/70 px-2.5 py-1 text-xs text-[var(--ncx-text-muted)]">
             {showWeek}
           </span>
         </div>
@@ -161,15 +165,16 @@ export default async function MobileCurrent({
             {/* Current (active week) */}
             <a
               href="/m/current"
-              className={[btnBase, "border-yellow-400/70"].join(" ")}
+              className={[
+                btnBase,
+                "border-[rgb(var(--ncx-secondary-rgb)/0.65)]",
+              ].join(" ")}
             >
               <span
                 className={[
                   gradient,
-                  "bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20",
-                  showWeek.toUpperCase() === activeWeek.toUpperCase()
-                    ? "opacity-100"
-                    : "",
+                  "bg-gradient-to-r from-[rgb(var(--ncx-secondary-rgb)/0.18)] via-[rgb(var(--ncx-secondary-rgb)/0.12)] to-[rgb(var(--ncx-secondary-rgb)/0.18)]",
+                  isShowWeekActive ? "opacity-100" : "",
                 ].join(" ")}
               />
               <span className="relative z-10">Current</span>
@@ -182,6 +187,7 @@ export default async function MobileCurrent({
               const href = isActive
                 ? "/m/current"
                 : `/m/current?w=${encodeURIComponent(wk)}`;
+
               return (
                 <a
                   key={wk}
@@ -189,18 +195,18 @@ export default async function MobileCurrent({
                   className={[
                     btnBase,
                     isActive
-                      ? "border-yellow-400/70"
+                      ? "border-[rgb(var(--ncx-secondary-rgb)/0.65)]"
                       : selected
-                      ? "border-cyan-400/60"
-                      : "border-purple-500/40",
+                      ? "border-[rgb(var(--ncx-primary-rgb)/0.55)]"
+                      : "border-[var(--ncx-border)]",
                   ].join(" ")}
                 >
                   <span
                     className={[
                       gradient,
                       isActive
-                        ? "bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20"
-                        : "bg-gradient-to-r from-pink-600/20 via-purple-500/20 to-cyan-500/20",
+                        ? "bg-gradient-to-r from-[rgb(var(--ncx-secondary-rgb)/0.18)] via-[rgb(var(--ncx-secondary-rgb)/0.12)] to-[rgb(var(--ncx-secondary-rgb)/0.18)]"
+                        : "bg-gradient-to-r from-[rgb(var(--ncx-primary-rgb)/0.14)] via-[rgb(var(--ncx-primary-rgb)/0.10)] to-[rgb(var(--ncx-secondary-rgb)/0.10)]",
                       selected ? "opacity-100" : "",
                     ].join(" ")}
                   />
@@ -213,7 +219,9 @@ export default async function MobileCurrent({
 
         {/* Body */}
         {series.length === 0 ? (
-          <p className="mt-3 text-sm text-neutral-400">No matchups found.</p>
+          <p className="mt-3 text-sm text-[var(--ncx-text-muted)]">
+            No matchups found.
+          </p>
         ) : (
           <ul className="mt-4 space-y-3">
             {series.map((m, i) => {
@@ -227,19 +235,30 @@ export default async function MobileCurrent({
                 else if (home > away) winner = "home";
               }
 
-              const leftColor =
-                winner === "away" ? GREEN : winner === "home" ? RED : "0,0,0";
-              const rightColor =
-                winner === "home" ? GREEN : winner === "away" ? RED : "0,0,0";
+              // Use brand tokens for winner shading:
+              // winner side uses gold wash; loser side uses cyan wash (still on-theme).
+              const leftRgb =
+                winner === "away"
+                  ? "var(--ncx-secondary-rgb)"
+                  : winner === "home"
+                  ? "var(--ncx-primary-rgb)"
+                  : null;
+              const rightRgb =
+                winner === "home"
+                  ? "var(--ncx-secondary-rgb)"
+                  : winner === "away"
+                  ? "var(--ncx-primary-rgb)"
+                  : null;
 
-              const gradientStyle: React.CSSProperties = seriesOver
-                ? {
-                    backgroundImage: `
-                      linear-gradient(to right, rgba(${leftColor},0.35) 0%, rgba(0,0,0,0) 25%),
-                      linear-gradient(to left,  rgba(${rightColor},0.35) 0%, rgba(0,0,0,0) 25%)
-                    `,
-                  }
-                : {};
+              const gradientStyle: React.CSSProperties =
+                seriesOver && (leftRgb || rightRgb)
+                  ? {
+                      backgroundImage: `
+                        ${leftRgb ? `linear-gradient(to right, rgb(${leftRgb} / 0.28) 0%, rgb(0 0 0 / 0) 25%),` : ""}
+                        ${rightRgb ? `linear-gradient(to left,  rgb(${rightRgb} / 0.28) 0%, rgb(0 0 0 / 0) 25%)` : ""}
+                      `,
+                    }
+                  : {};
 
               // Clicking a series -> Matchups tab with the same week + a team query
               const q = `${m.awayTeam} ${m.homeTeam}`.trim();
@@ -255,18 +274,18 @@ export default async function MobileCurrent({
                     aria-label={`Open ${m.awayTeam} vs ${m.homeTeam} in Matchups`}
                   >
                     <div
-                      className="relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/60 px-4 py-3 hover:border-purple-500/50 hover:bg-zinc-900/40"
+                      className="relative overflow-hidden rounded-xl border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.35)] px-4 py-3 hover:bg-[rgb(0_0_0/0.22)] hover:border-[rgb(var(--ncx-primary-rgb)/0.35)]"
                       style={gradientStyle}
                     >
                       <div className="flex items-center justify-between gap-3">
                         {/* Away */}
                         <div
                           className={[
-                            "flex min-w-0 items-center gap-2 text-zinc-200",
+                            "flex min-w-0 items-center gap-2 text-[var(--ncx-text-primary)]",
                             seriesOver && winner === "away"
                               ? "font-bold uppercase"
                               : seriesOver && winner === "home"
-                              ? "line-through"
+                              ? "line-through opacity-75"
                               : "",
                           ].join(" ")}
                         >
@@ -276,16 +295,18 @@ export default async function MobileCurrent({
                           </span>
                         </div>
 
-                        <span className="text-xs text-zinc-400">vs</span>
+                        <span className="text-xs text-[var(--ncx-text-muted)]">
+                          vs
+                        </span>
 
                         {/* Home */}
                         <div
                           className={[
-                            "flex min-w-0 items-center gap-2 justify-end text-zinc-200",
+                            "flex min-w-0 items-center gap-2 justify-end text-[var(--ncx-text-primary)]",
                             seriesOver && winner === "home"
                               ? "font-bold uppercase"
                               : seriesOver && winner === "away"
-                              ? "line-through"
+                              ? "line-through opacity-75"
                               : "",
                           ].join(" ")}
                         >
@@ -297,7 +318,7 @@ export default async function MobileCurrent({
                       </div>
 
                       {/* Score */}
-                      <div className="mt-2 text-center text-sm font-semibold text-zinc-100">
+                      <div className="mt-2 text-center text-sm font-semibold text-[var(--ncx-text-primary)]">
                         {away} : {home}
                       </div>
                     </div>

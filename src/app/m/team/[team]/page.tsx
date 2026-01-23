@@ -78,9 +78,7 @@ async function deriveSeriesFromWeek(weekTab: string, away: string, home: string)
   return { awayWins: 0, homeWins: 0, found: false };
 }
 
-async function enrichRowWithScore(
-  row: TeamScheduleRow
-): Promise<EnrichedRow> {
+async function enrichRowWithScore(row: TeamScheduleRow): Promise<EnrichedRow> {
   const weekTab = normalizeWeekLabel(row.week);
   try {
     const { awayWins, homeWins, found } = await deriveSeriesFromWeek(
@@ -100,11 +98,7 @@ async function enrichRowWithScore(
     }
     const seriesOver = awayWins >= 4 || homeWins >= 4;
     const status: Status =
-      awayWins > 0 || homeWins > 0
-        ? seriesOver
-          ? "FINAL"
-          : "IN PROGRESS"
-        : "SCHEDULED";
+      awayWins > 0 || homeWins > 0 ? (seriesOver ? "FINAL" : "IN PROGRESS") : "SCHEDULED";
     return { ...row, week: weekTab, status, awayWins, homeWins, seriesOver };
   } catch {
     return {
@@ -118,19 +112,13 @@ async function enrichRowWithScore(
   }
 }
 
-function StatusCell({
-  row,
-  teamName,
-}: {
-  row: EnrichedRow;
-  teamName: string;
-}) {
+function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
   if (row.status === "SCHEDULED") {
-    return <span className="text-neutral-500 text-xs">Scheduled</span>;
+    return <span className="text-[var(--ncx-text-muted)] text-xs opacity-75">Scheduled</span>;
   }
   if (row.status === "IN PROGRESS") {
     return (
-      <span className="text-xs font-semibold text-yellow-300">
+      <span className="text-xs font-semibold text-[rgb(var(--ncx-secondary-rgb))]">
         In Progress
       </span>
     );
@@ -147,7 +135,7 @@ function StatusCell({
 
   if (viewingWon) {
     return (
-      <div className="flex items-center justify-end gap-1 text-[11px] text-green-400 font-semibold">
+      <div className="flex items-center justify-end gap-1 text-[11px] text-[rgb(var(--ncx-success-rgb))] font-semibold">
         <span>Winner</span>
         <Image
           src={`/logos/${teamSlug(teamName)}.webp`}
@@ -162,7 +150,7 @@ function StatusCell({
   }
   if (viewingLost) {
     return (
-      <div className="flex items-center justify-end gap-1 text-[11px] text-red-400 font-semibold">
+      <div className="flex items-center justify-end gap-1 text-[11px] text-[rgb(var(--ncx-danger-rgb))] font-semibold">
         <span>Loser</span>
         <Image
           src={`/logos/${teamSlug(teamName)}.webp`}
@@ -175,7 +163,7 @@ function StatusCell({
       </div>
     );
   }
-  return <span className="text-xs text-neutral-400">Final</span>;
+  return <span className="text-xs text-[var(--ncx-text-muted)]">Final</span>;
 }
 
 /* ----------------------------- ROSTER HELPERS ----------------------------- */
@@ -234,14 +222,16 @@ function buildRosterForTeam(
     .filter((r) => String(r.team ?? "").trim() === teamName)
     .map((r) => {
       const ncxid = String(r.ncxid ?? "").trim();
-      const name = `${r.first ?? ""} ${r.last ?? ""}`.trim() || ncxid || "Unknown Pilot";
+      const name =
+        `${r.first ?? ""} ${r.last ?? ""}`.trim() || ncxid || "Unknown Pilot";
 
       const pickNum = Number(r.pick ?? 0);
       const isCaptain = pickNum === 0;
 
       const faction =
         (String(r.faction ?? "").trim() ||
-          (ncxid && factionMap ? factionMap[ncxid] ?? "" : "")) || null;
+          (ncxid && factionMap ? factionMap[ncxid] ?? "" : "")) ||
+        null;
 
       const wins = Number(r.wins ?? 0);
       const losses = Number(r.losses ?? 0);
@@ -297,20 +287,20 @@ export default async function MobileTeamSchedulePage({
   const roster = buildRosterForTeam(teamName, indStats ?? [], factionMap, discordMap);
 
   return (
-    <div className="p-3 space-y-4">
+    <div className="p-3 space-y-4 text-[var(--ncx-text-primary)]">
       {!rows.length ? (
         <>
-          <h2 className="text-lg font-bold text-neutral-100">
+          <h2 className="text-lg font-bold text-[var(--ncx-text-primary)]">
             Team Schedule
           </h2>
-          <p className="mt-2 text-sm text-neutral-400">
+          <p className="mt-2 text-sm text-[var(--ncx-text-muted)]">
             Couldn&apos;t find a schedule for “{team}”.
           </p>
         </>
       ) : (
         <>
           <header className="mb-1 flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border border-neutral-700 bg-neutral-900">
+            <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]">
               <Image
                 src={`/logos/${teamSlug(teamName)}.webp`}
                 alt={`${teamName} logo`}
@@ -322,10 +312,10 @@ export default async function MobileTeamSchedulePage({
             </span>
             <div>
               <h2 className="text-lg font-extrabold tracking-wide">
-                <span className="text-cyan-400">{teamName}</span>{" "}
-                <span className="text-neutral-200">Team Hub</span>
+                <span className="text-[rgb(var(--ncx-primary-rgb))]">{teamName}</span>{" "}
+                <span className="text-[var(--ncx-text-primary)]/90">Team Hub</span>
               </h2>
-              <p className="text-[11px] text-neutral-500">
+              <p className="text-[11px] text-[var(--ncx-text-muted)]">
                 Tap a week to jump to that week on the Current tab.
               </p>
             </div>
@@ -333,26 +323,27 @@ export default async function MobileTeamSchedulePage({
 
           {/* ROSTER (mobile) */}
           {roster.length > 0 && (
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900/80 p-3 space-y-2">
+            <section className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/85 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-neutral-100">
+                <h3 className="text-sm font-semibold text-[var(--ncx-text-primary)]">
                   Roster{" "}
-                  <span className="text-[11px] text-neutral-400">
+                  <span className="text-[11px] text-[var(--ncx-text-muted)]">
                     ({roster.length})
                   </span>
                 </h3>
-                <span className="text-[10px] text-neutral-500">
+                <span className="text-[10px] text-[var(--ncx-text-muted)]">
                   Captains marked with{" "}
-                  <span className="text-yellow-300 font-semibold">★</span>
+                  <span className="text-[rgb(var(--ncx-secondary-rgb))] font-semibold">★</span>
                 </span>
               </div>
 
               <div className="space-y-2">
                 {roster.map((p) => {
                   const factionIcon = factionIconSrc(p.faction);
+
                   const rowTone = p.isCaptain
-                    ? "border-yellow-500/60 bg-yellow-500/10"
-                    : "border-neutral-800 bg-neutral-950/60";
+                    ? "border border-[rgb(var(--ncx-secondary-rgb)/0.55)] bg-[rgb(var(--ncx-secondary-rgb)/0.10)]"
+                    : "border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.35)]";
 
                   return (
                     <div
@@ -362,7 +353,7 @@ export default async function MobileTeamSchedulePage({
                       {/* Faction icon with glow */}
                       {factionIcon ? (
                         <div className="relative h-8 w-8 shrink-0 flex items-center justify-center">
-                          <span className="absolute inset-0 rounded-full bg-white/10 blur-[6px]" />
+                          <span className="absolute inset-0 rounded-full bg-[rgb(var(--ncx-primary-rgb)/0.12)] blur-[6px]" />
                           <Image
                             src={factionIcon}
                             alt={`${p.faction ?? "Faction"} icon`}
@@ -373,7 +364,7 @@ export default async function MobileTeamSchedulePage({
                           />
                         </div>
                       ) : (
-                        <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-900 border border-neutral-700 flex items-center justify-center text-[10px] text-neutral-500">
+                        <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] flex items-center justify-center text-[10px] text-[var(--ncx-text-muted)]">
                           —
                         </div>
                       )}
@@ -384,21 +375,17 @@ export default async function MobileTeamSchedulePage({
                             name={p.name}
                             discordId={p.discordId}
                             titleSuffix={p.isCaptain ? "Team Captain" : "Open DM"}
-                            className="text-sm font-semibold text-cyan-200 hover:text-cyan-100"
+                            className="text-sm font-semibold text-[rgb(var(--ncx-primary-rgb))] hover:opacity-90"
                           />
                           {p.isCaptain && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/70 bg-yellow-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-yellow-100">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgb(var(--ncx-secondary-rgb)/0.65)] bg-[rgb(var(--ncx-secondary-rgb)/0.16)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--ncx-text-primary)]">
                               ★ Captain
                             </span>
                           )}
                         </div>
 
-                        <div className="mt-1 text-[11px] text-neutral-400 flex flex-wrap gap-x-2 gap-y-0.5">
-                          {p.faction && (
-                            <span>
-                              {p.faction}
-                            </span>
-                          )}
+                        <div className="mt-1 text-[11px] text-[var(--ncx-text-muted)] flex flex-wrap gap-x-2 gap-y-0.5">
+                          {p.faction && <span>{p.faction}</span>}
                           <span>
                             {p.wins}-{p.losses}
                           </span>
@@ -407,7 +394,7 @@ export default async function MobileTeamSchedulePage({
                         </div>
                       </div>
 
-                      <span className="shrink-0 rounded-full bg-neutral-900/90 border border-neutral-700 px-2 py-0.5 text-[10px] text-neutral-200 font-mono">
+                      <span className="shrink-0 rounded-full bg-[var(--ncx-panel-bg)]/90 border border-[var(--ncx-border)] px-2 py-0.5 text-[10px] text-[var(--ncx-text-primary)] font-mono">
                         {p.ncxid}
                       </span>
                     </div>
@@ -434,9 +421,9 @@ async function TeamTable({
   const enriched = await Promise.all(rows.map(enrichRowWithScore));
 
   return (
-    <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-2">
-      <table className="w-full text-left text-[13px] text-neutral-200">
-        <thead className="text-[11px] uppercase text-neutral-400">
+    <div className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/75 p-2">
+      <table className="w-full text-left text-[13px] text-[var(--ncx-text-primary)]">
+        <thead className="text-[11px] uppercase text-[var(--ncx-text-muted)]">
           <tr className="[&>th]:py-1.5 [&>th]:px-2">
             <th className="w-20">Week</th>
             <th className="w-[35%]">Away</th>
@@ -460,24 +447,28 @@ async function TeamTable({
                 (viewingIsAway && r.awayWins < r.homeWins) ||
                 (viewingIsHome && r.homeWins < r.awayWins);
 
-              if (viewingWon)
-                rowTone = "bg-green-900/20 border-green-700/50";
-              else if (viewingLost)
-                rowTone = "bg-red-900/20 border-red-700/50";
+              if (viewingWon) {
+                rowTone =
+                  "bg-[rgb(var(--ncx-success-rgb)/0.12)] border-[rgb(var(--ncx-success-rgb)/0.28)]";
+              } else if (viewingLost) {
+                rowTone =
+                  "bg-[rgb(var(--ncx-danger-rgb)/0.12)] border-[rgb(var(--ncx-danger-rgb)/0.28)]";
+              }
             } else if (r.status === "IN PROGRESS") {
-              rowTone = "bg-yellow-900/15 border-yellow-700/40";
+              rowTone =
+                "bg-[rgb(var(--ncx-secondary-rgb)/0.10)] border-[rgb(var(--ncx-secondary-rgb)/0.26)]";
             }
 
             return (
               <tr
                 key={`${weekLabel}-${i}`}
-                className={`border-t border-neutral-800 ${rowTone}`}
+                className={`border-t border-[var(--ncx-border)] ${rowTone}`}
               >
                 <td className="py-1.5 px-2 align-top">
                   <Link
                     href={weekHref}
                     prefetch={false}
-                    className="text-xs text-cyan-300 underline-offset-2 hover:text-cyan-200 hover:underline"
+                    className="text-xs text-[rgb(var(--ncx-primary-rgb))] underline-offset-2 hover:underline hover:opacity-90"
                   >
                     {weekLabel}
                   </Link>
