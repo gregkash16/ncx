@@ -19,6 +19,7 @@ const CHAMPIONS_BY_SEASON: Record<number, string> = {
   5: "ORDER 66",
   6: "MEATBAGS",
   7: "MEATBAGS",
+  8: "WOLFPACK"
 };
 
 /**
