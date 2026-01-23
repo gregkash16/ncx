@@ -37,6 +37,7 @@ import {
 import { teamSlug } from "@/lib/slug";
 import Season9PrefsPanel from "../components/Season9PrefsPanel";
 import PodcastPanel from "../components/PodcastPanel";
+import Image from "next/image";
 
 function parseWeekNum(label: string | undefined | null): number | null {
   if (!label) return null;
@@ -280,8 +281,19 @@ export default async function HomePage({
         </div>
 
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight ncx-hero-title ncx-hero-glow">
-          DRAFT LEAGUE • SEASON 8
+          SEASON 8 CHAMPS • WOLFPACK
         </h1>
+        {/* Logo */}
+        <div className="mt-8 flex justify-center">
+          <Image
+            src="/logos/wolfpack.webp"
+            alt="Wolfpack logo"
+            width={420}
+            height={420}
+            priority
+            className="w-64 md:w-96 lg:w-[420px] h-auto drop-shadow-[0_0_40px_rgba(255,255,255,0.15)]"
+          />
+        </div>
         <div>
           <p className="text-zinc-300 text-lg font-medium">{message}</p>
         </div>
