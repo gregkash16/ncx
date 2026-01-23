@@ -301,8 +301,13 @@ function StreakPill({
 
   const base =
     "inline-flex items-center justify-end gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border";
-  const upCls = "bg-emerald-500/10 border-emerald-400/60 text-emerald-300";
-  const downCls = "bg-red-500/10 border-red-400/60 text-red-300";
+
+  // Token-based styling:
+  // - "up" uses ncx primary (cyan)
+  // - "down" uses shadcn destructive token (global)
+  const upCls =
+    "border-[rgb(var(--ncx-primary-rgb)/0.60)] bg-[rgb(var(--ncx-primary-rgb)/0.10)] text-[rgb(var(--ncx-primary-rgb))]";
+  const downCls = "border-destructive/50 bg-destructive/10 text-destructive";
 
   const cls = dir === "up" ? upCls : downCls;
   const arrow = dir === "up" ? "↑" : "↓";
@@ -333,7 +338,7 @@ export default async function StandingsPanel() {
 
   if (errorMsg) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-sm text-amber-300 text-center">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-sm text-[rgb(var(--ncx-highlight-rgb))] text-center">
         {errorMsg}
       </div>
     );
@@ -341,7 +346,7 @@ export default async function StandingsPanel() {
 
   if (!data.length) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-sm text-zinc-400 text-center">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-sm text-[var(--ncx-text-muted)] text-center">
         No data.
       </div>
     );
@@ -362,9 +367,7 @@ export default async function StandingsPanel() {
     {};
 
   try {
-    const remainingSeriesPerTeam = await computeRemainingSeriesPerTeam(
-      teamResults
-    );
+    const remainingSeriesPerTeam = await computeRemainingSeriesPerTeam(teamResults);
 
     const teams: TeamPlayoffWindow[] = data.map((row) => {
       const wins = toInt(row.wins);
@@ -404,12 +407,12 @@ export default async function StandingsPanel() {
 
   // 4) Render
   return (
-    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
-      {/* Playoff Bracket image (full width, matches panel) */}
+    <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)]">
+      {/* Playoff Bracket image (hidden for now)
       <div className="mb-4">
         <a
           href="/?tab=playoffs"
-          className="block rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950/40 hover:border-cyan-500/40 transition"
+          className="block rounded-2xl overflow-hidden border border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.06)] hover:border-[rgb(var(--ncx-primary-rgb)/0.40)] transition"
           aria-label="View Playoff Bracket"
         >
           <Image
@@ -423,15 +426,16 @@ export default async function StandingsPanel() {
           />
         </a>
       </div>
-      
+      */}
+
       <h2 className="text-2xl font-bold tracking-wide text-center mb-4">
-        <span className="text-pink-400">OVERALL</span>{" "}
-        <span className="text-cyan-400">STANDINGS</span>
+        <span className="text-[var(--ncx-hero-to)]">OVERALL</span>{" "}
+        <span className="text-[rgb(var(--ncx-primary-rgb))]">STANDINGS</span>
       </h2>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-zinc-200">
-          <thead className="text-sm uppercase text-zinc-400">
+        <table className="w-full text-left text-[var(--ncx-text-primary)]">
+          <thead className="text-sm uppercase text-[var(--ncx-text-muted)]">
             <tr className="[&>th]:py-2 [&>th]:px-2">
               <th className="w-14">Rank</th>
               <th>Team</th>
@@ -449,10 +453,7 @@ export default async function StandingsPanel() {
               const logoSrc = `/logos/${slug}.webp`;
               const href = `/?tab=team&team=${encodeURIComponent(slug)}`;
 
-              const { dir, count } = getStreakForTeamFromResults(
-                row.team,
-                teamResults
-              );
+              const { dir, count } = getStreakForTeamFromResults(row.team, teamResults);
 
               const flags =
                 playoffFlags[row.team] ?? { clinched: false, eliminated: false };
@@ -460,7 +461,7 @@ export default async function StandingsPanel() {
               return (
                 <tr
                   key={`${row.rank}-${row.team}`}
-                  className="border-t border-zinc-800 hover:bg-zinc-800/40 transition-colors"
+                  className="border-t border-[var(--ncx-border)] hover:bg-[rgb(var(--ncx-primary-rgb)/0.06)] transition-colors"
                 >
                   <td className="py-2 px-2">{row.rank}</td>
 
@@ -469,7 +470,7 @@ export default async function StandingsPanel() {
                       href={href}
                       className="flex items-center gap-3 min-w-0 hover:underline underline-offset-2"
                     >
-                      <span className="shrink-0 rounded-md overflow-hidden bg-zinc-800 border border-zinc-700 w-[28px] h-[28px] flex items-center justify-center">
+                      <span className="shrink-0 rounded-md overflow-hidden bg-[rgb(var(--ncx-primary-rgb)/0.08)] border border-[var(--ncx-border)] w-[28px] h-[28px] flex items-center justify-center">
                         <Image
                           src={logoSrc}
                           alt={`${row.team} logo`}
@@ -482,13 +483,15 @@ export default async function StandingsPanel() {
 
                       <span className="truncate">
                         {row.team}
+
+                        {/* Clinched / Eliminated indicators use tokens (no emerald/red hardcodes) */}
                         {flags.clinched && (
-                          <span className="ml-2 text-[11px] font-semibold text-emerald-400/70">
+                          <span className="ml-2 text-[11px] font-semibold text-[rgb(var(--ncx-highlight-rgb))]">
                             - ✓
                           </span>
                         )}
                         {!flags.clinched && flags.eliminated && (
-                          <span className="ml-2 text-[11px] font-semibold text-red-400/70">
+                          <span className="ml-2 text-[11px] font-semibold text-[var(--ncx-text-muted)]">
                             - x
                           </span>
                         )}
@@ -496,18 +499,10 @@ export default async function StandingsPanel() {
                     </a>
                   </td>
 
-                  <td className="py-2 px-2 text-right tabular-nums">
-                    {row.wins}
-                  </td>
-                  <td className="py-2 px-2 text-right tabular-nums">
-                    {row.losses}
-                  </td>
-                  <td className="py-2 px-2 text-right tabular-nums">
-                    {row.gameWins}
-                  </td>
-                  <td className="py-2 px-2 text-right tabular-nums">
-                    {row.points}
-                  </td>
+                  <td className="py-2 px-2 text-right tabular-nums">{row.wins}</td>
+                  <td className="py-2 px-2 text-right tabular-nums">{row.losses}</td>
+                  <td className="py-2 px-2 text-right tabular-nums">{row.gameWins}</td>
+                  <td className="py-2 px-2 text-right tabular-nums">{row.points}</td>
                   <td className="py-2 px-2 text-right">
                     <StreakPill dir={dir} count={count} />
                   </td>
@@ -518,15 +513,16 @@ export default async function StandingsPanel() {
         </table>
       </div>
 
-      {/* Link to Playoff Bracket */}
+      {/* Link to Playoff Bracket (hidden for now)
       <div className="mt-4 flex justify-center">
         <a
           href="/?tab=playoffs"
-          className="inline-block rounded-xl border border-cyan-500/40 bg-zinc-950/70 px-4 py-2 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400 transition"
+          className="inline-block rounded-xl border border-[rgb(var(--ncx-primary-rgb)/0.40)] bg-[rgb(var(--ncx-primary-rgb)/0.08)] px-4 py-2 text-sm font-semibold text-[rgb(var(--ncx-primary-rgb))] hover:bg-[rgb(var(--ncx-primary-rgb)/0.18)] hover:border-[rgb(var(--ncx-primary-rgb)/0.60)] transition"
         >
           🏆 View Playoff Bracket
         </a>
       </div>
+      */}
     </div>
   );
 }

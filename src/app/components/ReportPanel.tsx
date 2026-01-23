@@ -180,8 +180,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
   const selectedGame: GameRow | null = useMemo(() => {
     if (!data || !data.ok) return null;
     if (!data.games || data.games.length === 0) return null;
-    if (selectedIndex < 0 || selectedIndex >= data.games.length)
-      return data.games[0];
+    if (selectedIndex < 0 || selectedIndex >= data.games.length) return data.games[0];
     return data.games[selectedIndex];
   }, [data, selectedIndex]);
 
@@ -196,18 +195,12 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
 
   const editingIds = useMemo(() => {
     if (!selectedGame) return false;
-    return (
-      awayId !== (selectedGame.away.id || "") ||
-      homeId !== (selectedGame.home.id || "")
-    );
+    return awayId !== (selectedGame.away.id || "") || homeId !== (selectedGame.home.id || "");
   }, [selectedGame, awayId, homeId]);
 
   const editingLists = useMemo(() => {
     if (!selectedGame) return false;
-    return (
-      awayList !== (selectedGame.awayList || "") ||
-      homeList !== (selectedGame.homeList || "")
-    );
+    return awayList !== (selectedGame.awayList || "") || homeList !== (selectedGame.homeList || "");
   }, [selectedGame, awayList, homeList]);
 
   const listError = useMemo(() => {
@@ -280,9 +273,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
 
       if (!res.ok) {
         if (json?.reason === "ALREADY_FILLED") {
-          setNotice(
-            "This game already has results. Check ‘Confirm overwrite’ to proceed."
-          );
+          setNotice("This game already has results. Check ‘Confirm overwrite’ to proceed.");
           return;
         }
         if (json?.reason === "BAD_LIST_LINK" && json?.message) {
@@ -344,7 +335,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
   // ----- RENDER STATES -----
   if (loading) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)]">
         Loading your matchup…
       </div>
     );
@@ -352,7 +343,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
 
   if (!data) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)]">
         Could not load.
       </div>
     );
@@ -360,16 +351,12 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
 
   if (!data.ok) {
     let msg = "Something went wrong.";
-    if (data.reason === "NOT_AUTH")
-      msg = "Please log in with your Discord to report a game.";
-    if (data.reason === "NO_DISCORD_ID")
-      msg = "No Discord ID found. Try logging out/in.";
-    if (data.reason === "NO_NCXID")
-      msg = "We couldn't find your NCXID mapping in the sheet.";
-    if (data.reason === "NO_GAME_FOUND")
-      msg = "We couldn't find a game for you this week.";
+    if (data.reason === "NOT_AUTH") msg = "Please log in with your Discord to report a game.";
+    if (data.reason === "NO_DISCORD_ID") msg = "No Discord ID found. Try logging out/in.";
+    if (data.reason === "NO_NCXID") msg = "We couldn't find your NCXID mapping in the sheet.";
+    if (data.reason === "NO_GAME_FOUND") msg = "We couldn't find a game for you this week.";
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)]">
         {msg}
       </div>
     );
@@ -377,26 +364,27 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
 
   if (!selectedGame) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)]">
         No games available to report this week.
       </div>
     );
   }
 
   const { weekTab, role } = data;
-  const { game, away, home, alreadyFilled, canEditAwayId, canEditHomeId } =
-    selectedGame;
+  const { game, away, home, alreadyFilled, canEditAwayId, canEditHomeId } = selectedGame;
 
   return (
-    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300 space-y-6">
+    <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)] space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-col">
-          <h2 className="text-xl font-semibold text-pink-400">
-            Report a Game — <span className="text-white">{weekTab}</span>
+          <h2 className="text-xl font-semibold text-[rgb(var(--ncx-highlight-rgb))]">
+            Report a Game — <span className="text-[var(--ncx-text-primary)]">{weekTab}</span>
           </h2>
-          <span className="mt-1 text-xs text-zinc-400">
+          <span className="mt-1 text-xs text-[var(--ncx-text-muted)]">
             Role:{" "}
-            <span className="font-medium text-zinc-200 capitalize">{role}</span>
+            <span className="font-medium text-[var(--ncx-text-primary)] capitalize">
+              {role}
+            </span>
           </span>
         </div>
 
@@ -408,7 +396,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
                 setShowSubs(next);
                 if (next) await loadSubsOnce();
               }}
-              className="text-xs px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-900/60 text-zinc-200 hover:border-pink-400/50"
+              className="text-xs px-3 py-2 rounded-lg border border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.10)] text-[var(--ncx-text-primary)] hover:border-[rgb(var(--ncx-highlight-rgb)/0.60)]"
               type="button"
             >
               {showSubs ? "Retract Subs" : "Show Subs"}
@@ -418,8 +406,8 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           <span
             className={`text-xs px-3 py-1 rounded-full border ${
               alreadyFilled
-                ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-300"
-                : "border-purple-400/50 bg-purple-500/10 text-purple-300"
+                ? "border-[rgb(var(--ncx-primary-rgb)/0.60)] bg-[rgb(var(--ncx-primary-rgb)/0.12)] text-[rgb(var(--ncx-primary-rgb))]"
+                : "border-[rgb(var(--ncx-highlight-rgb)/0.60)] bg-[rgb(var(--ncx-highlight-rgb)/0.12)] text-[rgb(var(--ncx-highlight-rgb))]"
             }`}
           >
             Game #{game}
@@ -429,27 +417,29 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
 
       {/* Subs drawer (admin/captain only) */}
       {(role === "admin" || role === "captain") && showSubs && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-2">
+        <div className="rounded-xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] p-4 space-y-2">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-zinc-200">
+            <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
               Subs ({subs.length})
             </div>
             <button
               onClick={() => setShowSubs(false)}
-              className="text-xs px-2 py-1 rounded border border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-pink-400/50"
+              className="text-xs px-2 py-1 rounded border border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.10)] text-[var(--ncx-text-primary)] hover:border-[rgb(var(--ncx-highlight-rgb)/0.60)]"
               type="button"
             >
               Retract
             </button>
           </div>
 
-          {subsLoading && <div className="text-sm text-zinc-400">Loading…</div>}
-          {subsError && <div className="text-sm text-red-400">{subsError}</div>}
+          {subsLoading && <div className="text-sm text-[var(--ncx-text-muted)]">Loading…</div>}
+          {subsError && (
+            <div className="text-sm text-[color:var(--destructive)]">{subsError}</div>
+          )}
 
           {!subsLoading && !subsError && subs.length > 0 && (
-            <div className="max-h-64 overflow-auto rounded-lg border border-zinc-800">
+            <div className="max-h-64 overflow-auto rounded-lg border border-[var(--ncx-border)]">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-zinc-950 text-zinc-300">
+                <thead className="sticky top-0 bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.18)] text-[var(--ncx-text-primary)]">
                   <tr>
                     <th className="text-left px-3 py-2">NCXID</th>
                     <th className="text-left px-3 py-2">First</th>
@@ -462,31 +452,30 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
                   {subs.map((s) => (
                     <tr
                       key={`${s.ncxid}-${s.discordId}`}
-                      className="border-t border-zinc-800"
+                      className="border-t border-[var(--ncx-border)]"
                     >
-                      <td className="px-3 py-2 text-zinc-200">
+                      <td className="px-3 py-2 text-[var(--ncx-text-primary)]">
                         {String(s.ncxid ?? "")}
                       </td>
-                      <td className="px-3 py-2 text-zinc-200">
+                      <td className="px-3 py-2 text-[var(--ncx-text-primary)]">
                         {String(s.first ?? "")}
                       </td>
-                      <td className="px-3 py-2 text-zinc-200">
+                      <td className="px-3 py-2 text-[var(--ncx-text-primary)]">
                         {String(s.last ?? "")}
                       </td>
                       <td className="px-3 py-2">
                         {s.discordId ? (
                           <a
                             href={`discord://-/users/${encodeURIComponent(String(s.discordId))}`}
-                            className="inline-flex items-center justify-center rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100 hover:border-pink-400/60"
+                            className="inline-flex items-center justify-center rounded-md border border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.10)] px-2 py-1 text-xs text-[var(--ncx-text-primary)] hover:border-[rgb(var(--ncx-highlight-rgb)/0.60)]"
                             title="Open Discord DM"
                           >
                             DM
                           </a>
                         ) : (
-                          <span className="text-zinc-500">—</span>
+                          <span className="text-[var(--ncx-text-muted)]">—</span>
                         )}
                       </td>
-
                     </tr>
                   ))}
                 </tbody>
@@ -495,7 +484,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
           )}
 
           {!subsLoading && !subsError && subs.length === 0 && (
-            <div className="text-sm text-zinc-400">No subs found.</div>
+            <div className="text-sm text-[var(--ncx-text-muted)]">No subs found.</div>
           )}
         </div>
       )}
@@ -503,13 +492,13 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
       {/* Game selector (dropdown instead of a pile of buttons) */}
       {data.games.length > 1 && (
         <div className="space-y-2">
-          <label className="block text-sm text-zinc-300">
+          <label className="block text-sm text-[var(--ncx-text-primary)]">
             Select a game to edit
           </label>
           <select
             value={selectedIndex}
             onChange={(e) => handleSelectGame(Number(e.target.value))}
-            className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-pink-400/60"
+            className="w-full rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] px-3 py-2 text-sm text-[var(--ncx-text-primary)] outline-none focus:border-[rgb(var(--ncx-highlight-rgb)/0.60)]"
           >
             {data.games.map((g, idx) => {
               const labelParts = [`G${g.game}:`, g.away.team || "—", "vs", g.home.team || "—"];
@@ -521,7 +510,7 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
               );
             })}
           </select>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-[var(--ncx-text-muted)]">
             Admins and captains can switch between all games they&apos;re allowed to manage.
           </p>
         </div>
@@ -529,76 +518,78 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Away card */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-2">
-          <div className="text-sm text-zinc-400 mb-1">Away</div>
+        <div className="rounded-xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] p-4 space-y-2">
+          <div className="text-sm text-[var(--ncx-text-muted)] mb-1">Away</div>
           <div className="flex items-center gap-2 text-lg font-semibold">
             <TeamLogo name={away.team} />
-            <span className="text-zinc-200">{away.team || "—"}</span>
+            <span className="text-[var(--ncx-text-primary)]">{away.team || "—"}</span>
           </div>
-          <div className="mt-1 text-sm text-zinc-400 flex flex-col gap-1">
+          <div className="mt-1 text-sm text-[var(--ncx-text-muted)] flex flex-col gap-1">
             <div>
-              <span className="font-medium text-white">{away.name || "—"}</span>
+              <span className="font-medium text-[var(--ncx-text-primary)]">{away.name || "—"}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400">NCX ID:</span>
+              <span className="text-xs text-[var(--ncx-text-muted)]">NCX ID:</span>
               {canEditAwayId ? (
                 <input
                   type="text"
                   value={awayId}
                   onChange={(e) => setAwayId(e.target.value)}
-                  className="w-24 rounded bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs text-zinc-100 outline-none focus:border-pink-400/70"
+                  className="w-24 rounded bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] px-2 py-1 text-xs text-[var(--ncx-text-primary)] outline-none focus:border-[rgb(var(--ncx-highlight-rgb)/0.70)]"
                   placeholder="e.g. 23"
                 />
               ) : (
-                <span className="text-xs bg-zinc-800 px-2 py-0.5 rounded">
+                <span className="text-xs bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.18)] px-2 py-0.5 rounded">
                   {away.id || "—"}
                 </span>
               )}
             </div>
           </div>
-          <div className="mt-2 text-sm text-zinc-400">
+          <div className="mt-2 text-sm text-[var(--ncx-text-muted)]">
             W-L:{" "}
-            <span className="text-zinc-200">
+            <span className="text-[var(--ncx-text-primary)]">
               {away.wins || 0}-{away.losses || 0}
             </span>{" "}
-            • PL/MS: <span className="text-zinc-200">{away.plms || "-"}</span>
+            • PL/MS:{" "}
+            <span className="text-[var(--ncx-text-primary)]">{away.plms || "-"}</span>
           </div>
         </div>
 
         {/* Home card */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-2">
-          <div className="text-sm text-zinc-400 mb-1">Home</div>
+        <div className="rounded-xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] p-4 space-y-2">
+          <div className="text-sm text-[var(--ncx-text-muted)] mb-1">Home</div>
           <div className="flex items-center gap-2 text-lg font-semibold">
             <TeamLogo name={home.team} />
-            <span className="text-zinc-200">{home.team || "—"}</span>
+            <span className="text-[var(--ncx-text-primary)]">{home.team || "—"}</span>
           </div>
-          <div className="mt-1 text-sm text-zinc-400 flex flex-col gap-1">
+          <div className="mt-1 text-sm text-[var(--ncx-text-muted)] flex flex-col gap-1">
             <div>
-              <span className="font-medium text-white">{home.name || "—"}</span>
+              <span className="font-medium text-[var(--ncx-text-primary)]">{home.name || "—"}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400">NCX ID:</span>
+              <span className="text-xs text-[var(--ncx-text-muted)]">NCX ID:</span>
               {canEditHomeId ? (
                 <input
                   type="text"
                   value={homeId}
                   onChange={(e) => setHomeId(e.target.value)}
-                  className="w-24 rounded bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs text-zinc-100 outline-none focus:border-pink-400/70"
+                  className="w-24 rounded bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] px-2 py-1 text-xs text-[var(--ncx-text-primary)] outline-none focus:border-[rgb(var(--ncx-highlight-rgb)/0.70)]"
                   placeholder="e.g. 17"
                 />
               ) : (
-                <span className="text-xs bg-zinc-800 px-2 py-0.5 rounded">
+                <span className="text-xs bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.18)] px-2 py-0.5 rounded">
                   {home.id || "—"}
                 </span>
               )}
             </div>
           </div>
-          <div className="mt-2 text-sm text-zinc-400">
+          <div className="mt-2 text-sm text-[var(--ncx-text-muted)]">
             W-L:{" "}
-            <span className="text-zinc-200">
+            <span className="text-[var(--ncx-text-primary)]">
               {home.wins || 0}-{home.losses || 0}
             </span>{" "}
-            • PL/MS: <span className="text-zinc-200">{home.plms || "-"}</span>
+            • PL/MS:{" "}
+            <span className="text-[var(--ncx-text-primary)]">{home.plms || "-"}</span>
           </div>
         </div>
       </div>
@@ -606,33 +597,33 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
       {/* Scores + scenario form */}
       <div className="grid sm:grid-cols-3 gap-4">
         <label className="block">
-          <span className="text-sm text-zinc-400">Away Score</span>
+          <span className="text-sm text-[var(--ncx-text-muted)]">Away Score</span>
           <input
             type="number"
             min={0}
             value={awayPts}
             onChange={(e) => setAwayPts(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:border-pink-400/60"
+            className="mt-1 w-full rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] px-3 py-2 outline-none focus:border-[rgb(var(--ncx-highlight-rgb)/0.60)]"
           />
         </label>
 
         <label className="block">
-          <span className="text-sm text-zinc-400">Home Score</span>
+          <span className="text-sm text-[var(--ncx-text-muted)]">Home Score</span>
           <input
             type="number"
             min={0}
             value={homePts}
             onChange={(e) => setHomePts(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:border-pink-400/60"
+            className="mt-1 w-full rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] px-3 py-2 outline-none focus:border-[rgb(var(--ncx-highlight-rgb)/0.60)]"
           />
         </label>
 
         <label className="block">
-          <span className="text-sm text-zinc-400">Scenario</span>
+          <span className="text-sm text-[var(--ncx-text-muted)]">Scenario</span>
           <select
             value={scenario}
             onChange={(e) => setScenario(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:border-pink-400/60"
+            className="mt-1 w-full rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] px-3 py-2 outline-none focus:border-[rgb(var(--ncx-highlight-rgb)/0.60)]"
           >
             <option value="" disabled>
               Choose…
@@ -649,36 +640,40 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
       {/* List URLs */}
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="block">
-          <span className="text-sm text-zinc-400">Away List (optional)</span>
+          <span className="text-sm text-[var(--ncx-text-muted)]">Away List (optional)</span>
           <input
             type="url"
             value={awayList}
             onChange={(e) => setAwayList(e.target.value)}
             placeholder="Paste YASB or LBN link"
-            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:border-pink-400/60"
+            className="mt-1 w-full rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] px-3 py-2 outline-none focus:border-[rgb(var(--ncx-highlight-rgb)/0.60)]"
           />
           {awayList && !isValidListLink(awayList) && (
-            <p className="mt-1 text-xs text-red-400">Should be a YASB or LBN Link</p>
+            <p className="mt-1 text-xs text-[color:var(--destructive)]">
+              Should be a YASB or LBN Link
+            </p>
           )}
         </label>
 
         <label className="block">
-          <span className="text-sm text-zinc-400">Home List (optional)</span>
+          <span className="text-sm text-[var(--ncx-text-muted)]">Home List (optional)</span>
           <input
             type="url"
             value={homeList}
             onChange={(e) => setHomeList(e.target.value)}
             placeholder="Paste YASB or LBN link"
-            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 outline-none focus:border-pink-400/60"
+            className="mt-1 w-full rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] px-3 py-2 outline-none focus:border-[rgb(var(--ncx-highlight-rgb)/0.60)]"
           />
           {homeList && !isValidListLink(homeList) && (
-            <p className="mt-1 text-xs text-red-400">Should be a YASB or LBN Link</p>
+            <p className="mt-1 text-xs text-[color:var(--destructive)]">
+              Should be a YASB or LBN Link
+            </p>
           )}
         </label>
       </div>
 
       {alreadyFilled && editingScores && (
-        <label className="flex items-center gap-2 text-sm text-zinc-300">
+        <label className="flex items-center gap-2 text-sm text-[var(--ncx-text-primary)]">
           <input
             type="checkbox"
             checked={confirmOverwrite}
@@ -692,16 +687,16 @@ export default function ReportPanel({ goToTab }: ReportPanelProps) {
         <button
           disabled={!canSubmit || submitting}
           onClick={submit}
-          className="px-6 py-2 rounded-xl bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 text-white font-semibold shadow-lg shadow-pink-600/30 disabled:opacity-50"
+          className="px-6 py-2 rounded-xl bg-[linear-gradient(to_right,var(--ncx-hero-to),var(--ncx-hero-via),var(--ncx-hero-from))] text-white font-semibold shadow-lg disabled:opacity-50"
         >
           {submitting ? "Submitting…" : "Submit Report"}
         </button>
-        {notice && <span className="text-sm text-zinc-300">{notice}</span>}
+        {notice && <span className="text-sm text-[var(--ncx-text-primary)]">{notice}</span>}
       </div>
 
       {/* subtle validation hint */}
       {listError && (
-        <div className="text-xs text-red-400">{listError}</div>
+        <div className="text-xs text-[color:var(--destructive)]">{listError}</div>
       )}
     </div>
   );

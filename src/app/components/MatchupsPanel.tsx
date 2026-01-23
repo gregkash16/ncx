@@ -55,7 +55,7 @@ type ScoutPayload = {
   }>;
 };
 
-// Lists map for a given week (from MySQL S8.lists)
+// Lists map for a given week (from MySQL S9.lists)
 type ListsForWeek = Record<
   string,
   {

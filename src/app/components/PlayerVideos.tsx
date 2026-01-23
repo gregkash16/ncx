@@ -78,21 +78,23 @@ export default function PlayerVideos({ ncxid }: { ncxid: string }) {
   return (
     <div className="space-y-4" onKeyDown={onKeyDown} tabIndex={0}>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-zinc-300">
+        <h3 className="text-sm font-semibold text-[var(--ncx-text-primary)]">
           YouTube Videos tagged{" "}
-          <span className="text-cyan-400">{ncxid}</span>
+          <span className="ncx-accent">{ncxid}</span>
         </h3>
-        {loading && <span className="text-xs text-zinc-500">Loading…</span>}
+        {loading && (
+          <span className="text-xs text-[var(--ncx-text-muted)]">Loading…</span>
+        )}
       </div>
 
       {err && (
-        <div className="text-sm text-red-300 border border-red-800/50 bg-red-900/20 rounded-lg px-3 py-2">
+        <div className="text-sm text-[var(--ncx-text-primary)] border border-[rgb(var(--ncx-highlight-rgb)/0.60)] bg-[rgb(var(--ncx-highlight-rgb)/0.12)] rounded-lg px-3 py-2">
           {err}
         </div>
       )}
 
       {!loading && !err && videos.length === 0 && (
-        <div className="text-sm text-zinc-500 italic">
+        <div className="text-sm text-[var(--ncx-text-muted)] italic">
           No videos found for this player.
         </div>
       )}
@@ -100,7 +102,7 @@ export default function PlayerVideos({ ncxid }: { ncxid: string }) {
       {/* Consistent 16:9 player wrapper */}
       {selected && (
         <div className="mx-auto w-full md:w-[960px]">
-          <div className="relative aspect-video rounded-xl overflow-hidden border border-zinc-800 bg-black">
+          <div className="relative aspect-video rounded-xl overflow-hidden border border-[var(--ncx-border)] bg-[var(--ncx-bg-start)]">
             <iframe
               key={selected.id}
               className="absolute inset-0 block w-full h-full"
@@ -125,10 +127,10 @@ export default function PlayerVideos({ ncxid }: { ncxid: string }) {
                   key={v.id}
                   onClick={() => setSelectedId(v.id)}
                   className={[
-                    "shrink-0 w-44 rounded-lg border p-2 text-left transition outline-none focus:ring-2 focus:ring-purple-500/60",
+                    "shrink-0 w-44 rounded-lg border p-2 text-left transition outline-none focus:ring-2 focus:ring-[rgb(var(--ncx-primary-rgb)/0.35)]",
                     active
-                      ? "border-purple-500/60 bg-purple-500/10"
-                      : "border-zinc-800 hover:border-purple-500/40",
+                      ? "border-[rgb(var(--ncx-primary-rgb)/0.60)] bg-[rgb(var(--ncx-primary-rgb)/0.12)]"
+                      : "border-[var(--ncx-border)] hover:border-[rgb(var(--ncx-primary-rgb)/0.40)]",
                   ].join(" ")}
                   aria-pressed={active}
                 >
@@ -138,7 +140,7 @@ export default function PlayerVideos({ ncxid }: { ncxid: string }) {
                     className="w-full h-24 object-cover rounded-md mb-2"
                     loading="lazy"
                   />
-                  <div className="text-xs text-zinc-300 line-clamp-2">
+                  <div className="text-xs text-[var(--ncx-text-primary)] line-clamp-2">
                     {v.title}
                   </div>
                 </button>

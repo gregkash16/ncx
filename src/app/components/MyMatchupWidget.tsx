@@ -179,9 +179,7 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
 
       if (!res.ok) {
         if (json?.reason === "ALREADY_FILLED") {
-          setNotice(
-            "This game already has results. Check ‘Confirm overwrite’ to proceed."
-          );
+          setNotice("This game already has results. Check ‘Confirm overwrite’ to proceed.");
           return;
         }
         setNotice("Submission failed. " + (json?.reason ?? ""));
@@ -224,12 +222,8 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
   const { weekTab } = data;
   const { game, away, home, alreadyFilled } = myGame;
 
-  const awayLogo = teamSlug(away.team)
-    ? `/logos/${teamSlug(away.team)}.webp`
-    : "/logos/default.png";
-  const homeLogo = teamSlug(home.team)
-    ? `/logos/${teamSlug(home.team)}.webp`
-    : "/logos/default.png";
+  const awayLogo = teamSlug(away.team) ? `/logos/${teamSlug(away.team)}.webp` : "/logos/default.png";
+  const homeLogo = teamSlug(home.team) ? `/logos/${teamSlug(home.team)}.webp` : "/logos/default.png";
 
   const awayScoreDisplay = awayPts === "" ? "—" : awayPts;
   const homeScoreDisplay = homePts === "" ? "—" : homePts;
@@ -244,22 +238,21 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
   const homeFactionIcon = factionIconSrc(homeFaction);
 
   return (
-    <div className="mt-6 mb-6 rounded-2xl border border-cyan-500/40 bg-zinc-900/80 p-5 shadow-lg">
+    <div className="mt-6 mb-6 rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] p-5 shadow-lg">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
         <div>
-          <h3 className="text-lg md:text-xl font-bold text-cyan-300">
-            Your Matchup This Week
-          </h3>
-          <p className="text-xs md:text-sm text-zinc-400 mt-1">
+          <h3 className="text-lg md:text-xl font-bold ncx-accent">Your Matchup This Week</h3>
+          <p className="text-xs md:text-sm text-[var(--ncx-text-muted)] mt-1">
             {weekTab ? `Week: ${weekTab} • Game #${game}` : `Game #${game}`}
           </p>
         </div>
+
         <span
           className={[
-            "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold",
+            "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border",
             isFinal
-              ? "bg-emerald-500/20 border border-emerald-400/60 text-emerald-200"
-              : "bg-pink-500/10 border border-pink-400/60 text-pink-200",
+              ? "bg-[rgb(var(--ncx-highlight-rgb)/0.12)] border-[rgb(var(--ncx-highlight-rgb))] text-[rgb(var(--ncx-highlight-rgb))]"
+              : "bg-[rgb(var(--ncx-primary-rgb)/0.10)] border-[rgb(var(--ncx-primary-rgb)/0.60)] text-[rgb(var(--ncx-primary-rgb))]",
           ].join(" ")}
         >
           {isFinal ? "Reported" : "Awaiting Report"}
@@ -295,13 +288,13 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
                 />
               )}
               <div>
-                <div className="text-xs text-zinc-400 uppercase">Away</div>
-                <div className="truncate text-sm font-semibold text-zinc-100">
+                <div className="text-xs text-[var(--ncx-text-muted)] uppercase">Away</div>
+                <div className="truncate text-sm font-semibold text-[var(--ncx-text-primary)]">
                   {away.team || "TBD"}
                 </div>
               </div>
             </div>
-            <div className="truncate text-xs text-zinc-400 mt-1">
+            <div className="truncate text-xs text-[var(--ncx-text-muted)] mt-1">
               {away.name || "—"} {away.id ? `• NCX ${away.id}` : ""}
             </div>
           </div>
@@ -309,12 +302,12 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
 
         {/* Score display */}
         <div className="md:w-1/3 flex flex-col items-center justify-center">
-          <div className="text-xs text-zinc-400 mb-1">
+          <div className="text-xs text-[var(--ncx-text-muted)] mb-1">
             {myGame.scenario || scenario || "No scenario recorded"}
           </div>
           <div className="text-3xl font-mono">
             <span>{awayScoreDisplay}</span>
-            <span className="mx-2 text-zinc-500">:</span>
+            <span className="mx-2 text-[var(--ncx-text-muted)]">:</span>
             <span>{homeScoreDisplay}</span>
           </div>
         </div>
@@ -324,8 +317,8 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
           <div className="min-w-0 text-right">
             <div className="flex items-center justify-end gap-2">
               <div>
-                <div className="text-xs text-zinc-400 uppercase">Home</div>
-                <div className="truncate text-sm font-semibold text-zinc-100">
+                <div className="text-xs text-[var(--ncx-text-muted)] uppercase">Home</div>
+                <div className="truncate text-sm font-semibold text-[var(--ncx-text-primary)]">
                   {home.team || "TBD"}
                 </div>
               </div>
@@ -342,7 +335,7 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
                 />
               )}
             </div>
-            <div className="truncate text-xs text-zinc-400 mt-1">
+            <div className="truncate text-xs text-[var(--ncx-text-muted)] mt-1">
               {home.name || "—"} {home.id ? `• NCX ${home.id}` : ""}
             </div>
           </div>
@@ -362,33 +355,33 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
       {/* Inline report form */}
       <div className="grid sm:grid-cols-3 gap-4 mb-3">
         <label className="block">
-          <span className="text-xs text-zinc-400">Away Score</span>
+          <span className="text-xs text-[var(--ncx-text-muted)]">Away Score</span>
           <input
             type="number"
             min={0}
             value={awayPts}
             onChange={(e) => setAwayPts(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm outline-none focus:border-cyan-400/70"
+            className="mt-1 w-full rounded-lg bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] px-3 py-2 text-sm outline-none focus:border-[rgb(var(--ncx-primary-rgb)/0.70)]"
           />
         </label>
 
         <label className="block">
-          <span className="text-xs text-zinc-400">Home Score</span>
+          <span className="text-xs text-[var(--ncx-text-muted)]">Home Score</span>
           <input
             type="number"
             min={0}
             value={homePts}
             onChange={(e) => setHomePts(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm outline-none focus:border-cyan-400/70"
+            className="mt-1 w-full rounded-lg bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] px-3 py-2 text-sm outline-none focus:border-[rgb(var(--ncx-primary-rgb)/0.70)]"
           />
         </label>
 
         <label className="block">
-          <span className="text-xs text-zinc-400">Scenario</span>
+          <span className="text-xs text-[var(--ncx-text-muted)]">Scenario</span>
           <select
             value={scenario}
             onChange={(e) => setScenario(e.target.value)}
-            className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm outline-none focus:border-cyan-400/70"
+            className="mt-1 w-full rounded-lg bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] px-3 py-2 text-sm outline-none focus:border-[rgb(var(--ncx-primary-rgb)/0.70)]"
           >
             <option value="" disabled>
               Choose…
@@ -403,7 +396,7 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
       </div>
 
       {alreadyFilled && editingScores && (
-        <label className="flex items-center gap-2 text-xs text-zinc-300 mb-2">
+        <label className="flex items-center gap-2 text-xs text-[var(--ncx-text-primary)] mb-2">
           <input
             type="checkbox"
             checked={confirmOverwrite}
@@ -417,21 +410,19 @@ export default function MyMatchupWidget({ factionMap }: MyMatchupWidgetProps) {
         <button
           disabled={!canSubmit || submitting}
           onClick={submit}
-          className="px-5 py-2 rounded-xl bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 text-white text-sm font-semibold shadow-lg shadow-pink-600/30 disabled:opacity-50"
+          className="px-5 py-2 rounded-xl bg-[linear-gradient(to_right,var(--ncx-hero-to),var(--ncx-hero-via),var(--ncx-hero-from))] text-white text-sm font-semibold shadow-lg disabled:opacity-50"
         >
           {submitting ? "Submitting…" : "Submit Report"}
         </button>
+
         <a
           href="/?tab=report"
-          className="text-xs text-zinc-400 hover:text-cyan-300 underline underline-offset-4"
+          className="text-xs text-[var(--ncx-text-muted)] hover:text-[rgb(var(--ncx-primary-rgb))] underline underline-offset-4"
         >
           Open full Report panel
         </a>
-        {notice && (
-          <span className="text-xs text-zinc-300">
-            {notice}
-          </span>
-        )}
+
+        {notice && <span className="text-xs text-[var(--ncx-text-primary)]">{notice}</span>}
       </div>
     </div>
   );

@@ -124,10 +124,14 @@ async function enrichRowWithScore(row: TeamScheduleRow): Promise<EnrichedRow> {
 
 function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
   if (row.status === "SCHEDULED") {
-    return <span className="text-zinc-500">Scheduled</span>;
+    return <span className="text-[var(--ncx-text-muted)]">Scheduled</span>;
   }
   if (row.status === "IN PROGRESS") {
-    return <span className="font-semibold text-yellow-300">In Progress</span>;
+    return (
+      <span className="font-semibold text-[rgb(var(--ncx-highlight-rgb))]">
+        In Progress
+      </span>
+    );
   }
 
   const viewingIsAway = row.away === teamName;
@@ -141,7 +145,7 @@ function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
 
   if (viewingWon) {
     return (
-      <div className="flex items-center justify-end gap-2 text-green-400 font-semibold">
+      <div className="flex items-center justify-end gap-2 text-[rgb(var(--ncx-primary-rgb))] font-semibold">
         <span>Winner</span>
         <Image
           src={`/logos/${teamSlug(teamName)}.webp`}
@@ -156,7 +160,7 @@ function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
   }
   if (viewingLost) {
     return (
-      <div className="flex items-center justify-end gap-2 text-red-400 font-semibold">
+      <div className="flex items-center justify-end gap-2 text-destructive font-semibold">
         <span>Loser</span>
         <Image
           src={`/logos/${teamSlug(teamName)}.webp`}
@@ -169,7 +173,7 @@ function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
       </div>
     );
   }
-  return <span className="text-zinc-400">Final</span>;
+  return <span className="text-[var(--ncx-text-muted)]">Final</span>;
 }
 
 /* ----------------------------- ROSTER TYPES (EXPORTS) ----------------------------- */
@@ -201,7 +205,6 @@ export type TeamRosterPlayer = {
   potato?: string;
   sos?: string;
 };
-
 
 export type TeamAdvStats = {
   team: string;
@@ -258,17 +261,21 @@ export default async function TeamSchedulePanel({
   const [{ teamName, rows }] = await Promise.all([fetchScheduleForTeam(team)]);
 
   return (
-    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-6">
+    <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] space-y-6">
       {!rows.length ? (
         <>
-          <h2 className="text-2xl font-bold">Team Schedule</h2>
-          <p className="mt-2 text-zinc-400">Couldn’t find a schedule for “{team}”.</p>
+          <h2 className="text-2xl font-bold text-[var(--ncx-text-primary)]">
+            Team Schedule
+          </h2>
+          <p className="mt-2 text-[var(--ncx-text-muted)]">
+            Couldn’t find a schedule for “{team}”.
+          </p>
         </>
       ) : (
         <>
           {/* Header */}
           <header className="flex items-center gap-3">
-            <span className="shrink-0 rounded-md overflow-hidden bg-zinc-800 border border-zinc-700 w-[40px] h-[40px] flex items-center justify-center">
+            <span className="shrink-0 rounded-md overflow-hidden bg-[rgb(var(--ncx-primary-rgb)/0.08)] border border-[var(--ncx-border)] w-[40px] h-[40px] flex items-center justify-center">
               <Image
                 src={`/logos/${teamSlug(teamName)}.webp`}
                 alt={`${teamName} logo`}
@@ -280,10 +287,12 @@ export default async function TeamSchedulePanel({
             </span>
             <div>
               <h2 className="text-2xl font-extrabold tracking-wide flex items-center gap-2 flex-wrap">
-                <span className="text-cyan-400">{teamName}</span>{" "}
-                <span className="text-zinc-200">Team Hub</span>
+                <span className="text-[rgb(var(--ncx-primary-rgb))]">
+                  {teamName}
+                </span>{" "}
+                <span className="text-[var(--ncx-text-primary)]">Team Hub</span>
               </h2>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-[var(--ncx-text-muted)]">
                 Roster, factions, and series schedule for the {teamName}.
               </p>
             </div>
@@ -291,49 +300,56 @@ export default async function TeamSchedulePanel({
 
           {/* Optional: team advanced stats summary */}
           {teamAdvStats && (
-            <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 grid gap-3 md:grid-cols-2 text-xs text-zinc-300">
+            <section className="rounded-2xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.06)] p-4 grid gap-3 md:grid-cols-2 text-xs text-[var(--ncx-text-primary)]">
               <div>
-                <h3 className="text-sm font-semibold text-zinc-100 mb-2">
+                <h3 className="text-sm font-semibold text-[var(--ncx-text-primary)] mb-2">
                   Team Performance Snapshot
                 </h3>
-                <div className="space-y-1">
+                <div className="space-y-1 text-[var(--ncx-text-muted)]">
                   <div>
                     Games Played:{" "}
-                    <span className="text-zinc-100">{teamAdvStats.totalGames}</span>
+                    <span className="text-[var(--ncx-text-primary)]">
+                      {teamAdvStats.totalGames}
+                    </span>
                   </div>
                   <div>
                     Avg Wins / Loss:{" "}
-                    <span className="text-zinc-100">
+                    <span className="text-[var(--ncx-text-primary)]">
                       {teamAdvStats.avgWins} / {teamAdvStats.avgLoss}
                     </span>
                   </div>
                   <div>
                     Avg Points:{" "}
-                    <span className="text-zinc-100">{teamAdvStats.avgPoints}</span> • PL/MS:{" "}
-                    <span className="text-zinc-100">{teamAdvStats.avgPlms}</span>
+                    <span className="text-[var(--ncx-text-primary)]">
+                      {teamAdvStats.avgPoints}
+                    </span>{" "}
+                    • PL/MS:{" "}
+                    <span className="text-[var(--ncx-text-primary)]">
+                      {teamAdvStats.avgPlms}
+                    </span>
                   </div>
                 </div>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-100 mb-2">
+                <h3 className="text-sm font-semibold text-[var(--ncx-text-primary)] mb-2">
                   Efficiency & Difficulty
                 </h3>
-                <div className="space-y-1">
+                <div className="space-y-1 text-[var(--ncx-text-muted)]">
                   <div>
                     Win% / PPG:{" "}
-                    <span className="text-zinc-100">
+                    <span className="text-[var(--ncx-text-primary)]">
                       {teamAdvStats.avgWinPct} / {teamAdvStats.avgPpg}
                     </span>
                   </div>
                   <div>
                     Eff / WAR:{" "}
-                    <span className="text-zinc-100">
+                    <span className="text-[var(--ncx-text-primary)]">
                       {teamAdvStats.avgEfficiency} / {teamAdvStats.avgWar}
                     </span>
                   </div>
                   <div>
                     H2H / Potato / SoS:{" "}
-                    <span className="text-zinc-100">
+                    <span className="text-[var(--ncx-text-primary)]">
                       {teamAdvStats.avgH2h} / {teamAdvStats.avgPotato} /{" "}
                       {teamAdvStats.avgSos}
                     </span>
@@ -345,15 +361,15 @@ export default async function TeamSchedulePanel({
 
           {/* ROSTER CARD (if provided) */}
           {roster && roster.length > 0 && (
-            <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 space-y-3">
+            <section className="rounded-2xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.06)] p-4 space-y-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <h3 className="text-lg font-semibold text-zinc-100">
+                <h3 className="text-lg font-semibold text-[var(--ncx-text-primary)]">
                   Team Roster{" "}
-                  <span className="text-xs font-normal text-zinc-400">
+                  <span className="text-xs font-normal text-[var(--ncx-text-muted)]">
                     ({roster.length} player{roster.length === 1 ? "" : "s"})
                   </span>
                 </h3>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-[var(--ncx-text-muted)]">
                   Click a name to open Discord DMs (if linked).
                 </p>
               </div>
@@ -369,12 +385,12 @@ export default async function TeamSchedulePanel({
                   return (
                     <div
                       key={p.ncxid}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2 border border-zinc-800 bg-zinc-950/60"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2 border border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.04)]"
                     >
                       {/* Faction icon */}
                       {factionIcon ? (
                         <div className="relative h-10 w-10 shrink-0 flex items-center justify-center">
-                          <span className="absolute inset-0 rounded-full bg-white/10 blur-sm" />
+                          <span className="absolute inset-0 rounded-full bg-[rgb(var(--ncx-primary-rgb)/0.14)] blur-sm" />
                           <Image
                             src={factionIcon}
                             alt={`${p.faction ?? "Faction"} icon`}
@@ -385,7 +401,7 @@ export default async function TeamSchedulePanel({
                           />
                         </div>
                       ) : (
-                        <div className="h-10 w-10 shrink-0 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center text-xs text-zinc-500">
+                        <div className="h-10 w-10 shrink-0 rounded-full bg-[rgb(var(--ncx-primary-rgb)/0.06)] border border-[var(--ncx-border)] flex items-center justify-center text-xs text-[var(--ncx-text-muted)]">
                           —
                         </div>
                       )}
@@ -396,61 +412,75 @@ export default async function TeamSchedulePanel({
                             name={p.name}
                             discordId={p.discordId}
                             titleSuffix={tooltip}
-                            className="font-semibold text-cyan-200 hover:text-cyan-100"
+                            className="font-semibold text-[rgb(var(--ncx-primary-rgb))] hover:opacity-90"
                           />
                           {isCaptain && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/60 bg-yellow-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-yellow-100">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgb(var(--ncx-highlight-rgb)/0.60)] bg-[rgb(var(--ncx-highlight-rgb)/0.12)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[rgb(var(--ncx-highlight-rgb))]">
                               ★ Captain
                             </span>
                           )}
                         </div>
 
-                        <div className="mt-1 text-xs text-zinc-400 flex flex-wrap gap-x-3 gap-y-1">
+                        <div className="mt-1 text-xs text-[var(--ncx-text-muted)] flex flex-wrap gap-x-3 gap-y-1">
                           {p.faction && (
                             <span>
-                              Faction: <span className="text-zinc-200">{p.faction}</span>
+                              Faction:{" "}
+                              <span className="text-[var(--ncx-text-primary)]">
+                                {p.faction}
+                              </span>
                             </span>
                           )}
                           {p.wins && p.losses && (
                             <span>
                               Record:{" "}
-                              <span className="text-zinc-200">
+                              <span className="text-[var(--ncx-text-primary)]">
                                 {p.wins}-{p.losses}
                               </span>
                             </span>
                           )}
                           {p.points && (
                             <span>
-                              Pts: <span className="text-zinc-200">{p.points}</span>
+                              Pts:{" "}
+                              <span className="text-[var(--ncx-text-primary)]">
+                                {p.points}
+                              </span>
                             </span>
                           )}
                           {p.plms && (
                             <span>
-                              PL/MS: <span className="text-zinc-200">{p.plms}</span>
+                              PL/MS:{" "}
+                              <span className="text-[var(--ncx-text-primary)]">
+                                {p.plms}
+                              </span>
                             </span>
                           )}
                           {p.efficiency && (
                             <span>
-                              Eff: <span className="text-zinc-200">{p.efficiency}</span>
+                              Eff:{" "}
+                              <span className="text-[var(--ncx-text-primary)]">
+                                {p.efficiency}
+                              </span>
                             </span>
                           )}
                           {p.potato && (
                             <span>
-                              Potato: <span className="text-zinc-200">{p.potato}</span>
+                              Potato:{" "}
+                              <span className="text-[var(--ncx-text-primary)]">
+                                {p.potato}
+                              </span>
                             </span>
                           )}
                         </div>
                       </div>
 
                       <div className="shrink-0 flex flex-col items-end gap-1">
-                        <span className="rounded-full bg-zinc-900/90 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono">
+                        <span className="rounded-full bg-[rgb(var(--ncx-primary-rgb)/0.06)] border border-[var(--ncx-border)] px-2 py-0.5 text-[11px] text-[var(--ncx-text-primary)] font-mono">
                           {p.ncxid}
                         </span>
                       </div>
                     </div>
                   );
                 })}
-
               </div>
             </section>
           )}
@@ -478,8 +508,8 @@ async function TeamTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-zinc-200">
-        <thead className="text-sm uppercase text-zinc-400">
+      <table className="w-full text-left text-[var(--ncx-text-primary)]">
+        <thead className="text-sm uppercase text-[var(--ncx-text-muted)]">
           <tr className="[&>th]:py-2 [&>th]:px-2">
             <th className="w-24">Week</th>
             <th className="w-[40%]">Away</th>
@@ -507,23 +537,28 @@ async function TeamTable({
                 (viewingIsAway && r.awayWins < r.homeWins) ||
                 (viewingIsHome && r.homeWins < r.awayWins);
 
-              if (viewingWon) rowTone = "bg-green-900/20 border-green-700/50";
-              else if (viewingLost) rowTone = "bg-red-900/20 border-red-700/50";
+              if (viewingWon) {
+                rowTone =
+                  "bg-[rgb(var(--ncx-primary-rgb)/0.08)] border-[rgb(var(--ncx-primary-rgb)/0.25)]";
+              } else if (viewingLost) {
+                rowTone = "bg-destructive/10 border-destructive/25";
+              }
             } else if (r.status === "IN PROGRESS") {
-              rowTone = "bg-yellow-900/15 border-yellow-700/40";
+              rowTone =
+                "bg-[rgb(var(--ncx-highlight-rgb)/0.08)] border-[rgb(var(--ncx-highlight-rgb)/0.25)]";
             }
 
             return (
               <tr
                 key={`${weekLabel}-${i}`}
-                className={`border-t border-zinc-800 ${rowTone}`}
+                className={`border-t border-[var(--ncx-border)] ${rowTone}`}
               >
                 {/* Week → link to Current Week (desktop) or Mobile Current (mobile) */}
                 <td className="py-2 px-2">
                   <Link
                     href={weekHref}
                     prefetch={false}
-                    className="text-cyan-300 hover:text-cyan-200 underline-offset-2 hover:underline"
+                    className="text-[rgb(var(--ncx-primary-rgb))] hover:opacity-90 underline-offset-2 hover:underline"
                   >
                     {weekLabel}
                   </Link>
@@ -569,9 +604,11 @@ async function TeamTable({
         </tbody>
       </table>
 
-      <div className="mt-6 text-sm text-zinc-400">
-        Click any <span className="text-cyan-300">Week</span> to jump to the{" "}
-        <span className="text-cyan-300">
+      <div className="mt-6 text-sm text-[var(--ncx-text-muted)]">
+        Click any{" "}
+        <span className="text-[rgb(var(--ncx-primary-rgb))]">Week</span> to jump
+        to the{" "}
+        <span className="text-[rgb(var(--ncx-primary-rgb))]">
           {mode === "mobile" ? "Mobile Current Week" : "Current Week"}
         </span>{" "}
         view with that week selected.

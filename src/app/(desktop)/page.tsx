@@ -157,18 +157,6 @@ function mapAdvTable1Row(raw: any[]): TeamAdvStats {
   };
 }
 
-// ✅ TEMP placeholder until you build the real component
-function PrefsPlaceholder() {
-  return (
-    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-200">
-      <h2 className="text-xl font-semibold text-cyan-300">Season 9 Signups</h2>
-      <p className="mt-2 text-sm text-zinc-300">
-        Prefs panel is wired. Now build the real Season 9 preference editor here.
-      </p>
-    </div>
-  );
-}
-
 export default async function HomePage({
   searchParams,
 }: {
@@ -281,19 +269,8 @@ export default async function HomePage({
         </div>
 
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight ncx-hero-title ncx-hero-glow">
-          SEASON 8 CHAMPS • WOLFPACK
+          DRAFT LEAGUE • SEASON 9
         </h1>
-        {/* Logo */}
-        <div className="mt-8 flex justify-center">
-          <Image
-            src="/logos/wolfpack.webp"
-            alt="Wolfpack logo"
-            width={420}
-            height={420}
-            priority
-            className="w-64 md:w-96 lg:w-[420px] h-auto drop-shadow-[0_0_40px_rgba(255,255,255,0.15)]"
-          />
-        </div>
         <div>
           <p className="text-zinc-300 text-lg font-medium">{message}</p>
         </div>

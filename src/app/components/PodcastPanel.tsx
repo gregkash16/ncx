@@ -43,18 +43,18 @@ export default async function PodcastPanel() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="rounded-2xl border border-purple-500/40 bg-zinc-900/70 p-6 md:p-8 shadow-xl">
+      <div className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] p-6 md:p-8 shadow-xl">
         <div className="mb-5">
-          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[var(--ncx-text-primary)]">
             Podcast
           </h2>
-          <p className="mt-1 text-sm text-zinc-300">
+          <p className="mt-1 text-sm text-[var(--ncx-text-primary)]">
             Listen on Spotify or jump into the latest episodes.
           </p>
         </div>
 
         {/* Spotify embed */}
-        <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950/60">
+        <div className="rounded-2xl overflow-hidden border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)]">
           <iframe
             src={SPOTIFY_EMBED_URL}
             width="100%"
@@ -68,7 +68,7 @@ export default async function PodcastPanel() {
         {/* Latest episodes (optional, from RSS) */}
         {episodes.length > 0 && (
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-zinc-300 mb-3">
+            <h3 className="text-sm font-semibold text-[var(--ncx-text-primary)] mb-3">
               Latest Episodes
             </h3>
 
@@ -79,13 +79,15 @@ export default async function PodcastPanel() {
                   href={ep.link}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-4 py-3 hover:bg-zinc-900/60 hover:border-cyan-400 transition"
+                  className="rounded-xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] px-4 py-3 transition hover:bg-[rgb(var(--ncx-primary-rgb)/0.12)] hover:border-[rgb(var(--ncx-primary-rgb)/0.60)]"
                 >
-                  <div className="text-sm font-semibold text-zinc-100">
+                  <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
                     {ep.title}
                   </div>
                   {ep.pubDate && (
-                    <div className="text-xs text-zinc-400 mt-1">{ep.pubDate}</div>
+                    <div className="text-xs text-[var(--ncx-text-muted)] mt-1">
+                      {ep.pubDate}
+                    </div>
                   )}
                 </a>
               ))}
@@ -94,7 +96,7 @@ export default async function PodcastPanel() {
         )}
 
         {episodes.length === 0 && (
-          <div className="mt-6 text-sm text-zinc-400">
+          <div className="mt-6 text-sm text-[var(--ncx-text-muted)]">
             Episodes list couldn’t be loaded right now (RSS fetch/parse). The Spotify
             player above will still work.
           </div>

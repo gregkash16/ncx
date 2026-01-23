@@ -10,48 +10,84 @@ export default function DesktopHeader() {
   const user = data?.user;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
-      {/* Reduce vertical padding to make the bar shorter */}
+    <header
+      className="sticky top-0 z-30 border-b backdrop-blur supports-[backdrop-filter]:backdrop-blur-md"
+      style={{
+        background: "var(--ncx-bg-panel)",
+        borderColor: "var(--ncx-border)",
+      }}
+    >
+      {/* Compact header height */}
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2">
-        {/* Left: hamburger + logo */}
+        {/* Left: menu + logo */}
         <div className="flex items-center gap-3">
           <NotificationsDrawer title="Notifications">
             <button
               aria-label="Open menu"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900/70 hover:bg-neutral-800 active:scale-95"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border transition active:scale-95"
+              style={{
+                background: "rgb(0 0 0 / 0.25)",
+                borderColor: "var(--ncx-border)",
+                color: "var(--ncx-text-primary)",
+              }}
             >
               <Menu className="h-5 w-5" />
             </button>
           </NotificationsDrawer>
 
           <a href="/" className="flex items-center gap-2">
-            <img src="/logo.webp" alt="NCX" className="h-7 w-7 rounded-lg" />
-            <h1 className="text-base font-extrabold tracking-wide bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+            <img
+              src="/logo.webp"
+              alt="NCX"
+              className="h-7 w-7 rounded-lg"
+            />
+            <h1 className="text-base font-extrabold tracking-wide ncx-hero-title">
               Nickel&nbsp;City&nbsp;X-Wing
             </h1>
           </a>
         </div>
 
-        {/* Right: compact “Desktop” label + small Discord pill */}
+        {/* Right: device label + auth */}
         <div className="flex items-center gap-3">
-          <span className="hidden sm:inline text-xs text-neutral-400">Desktop</span>
+          <span
+            className="hidden sm:inline text-xs"
+            style={{ color: "var(--ncx-text-muted)" }}
+          >
+            Desktop
+          </span>
 
-          {/* Compact auth pill */}
           {user ? (
-            <div className="flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900/70 px-2 py-1">
+            <div
+              className="flex items-center gap-2 rounded-full border px-2 py-1"
+              style={{
+                background: "rgb(0 0 0 / 0.25)",
+                borderColor: "var(--ncx-border)",
+              }}
+            >
               {user.image ? (
                 <img
                   src={user.image}
                   alt={user.name ?? "You"}
-                  className="h-6 w-6 rounded-full border border-neutral-700"
+                  className="h-6 w-6 rounded-full border"
+                  style={{ borderColor: "var(--ncx-border)" }}
                 />
               ) : null}
-              <span className="max-w-[10rem] truncate text-xs text-neutral-200">
+
+              <span
+                className="max-w-[10rem] truncate text-xs"
+                style={{ color: "var(--ncx-text-primary)" }}
+              >
                 {user.name ?? "You"}
               </span>
+
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
-                className="rounded-md border border-neutral-800 bg-neutral-900 px-2 py-[2px] text-[10px] text-neutral-300 hover:bg-neutral-800"
+                className="rounded-md border px-2 py-[2px] text-[10px] transition"
+                style={{
+                  background: "rgb(0 0 0 / 0.25)",
+                  borderColor: "var(--ncx-border)",
+                  color: "var(--ncx-text-muted)",
+                }}
               >
                 Sign out
               </button>
@@ -59,7 +95,12 @@ export default function DesktopHeader() {
           ) : (
             <button
               onClick={() => signIn("discord", { callbackUrl: "/" })}
-              className="rounded-full border border-neutral-800 bg-neutral-900/70 px-3 py-1 text-xs font-medium text-neutral-200 hover:bg-neutral-800"
+              className="rounded-full border px-3 py-1 text-xs font-medium transition"
+              style={{
+                background: "rgb(0 0 0 / 0.25)",
+                borderColor: "var(--ncx-border)",
+                color: "var(--ncx-text-primary)",
+              }}
             >
               Sign in
             </button>

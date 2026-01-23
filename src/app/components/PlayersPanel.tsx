@@ -19,7 +19,7 @@ const CHAMPIONS_BY_SEASON: Record<number, string> = {
   5: "ORDER 66",
   6: "MEATBAGS",
   7: "MEATBAGS",
-  8: "WOLFPACK"
+  8: "WOLFPACK",
 };
 
 /**
@@ -64,15 +64,16 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-4">
       {/* LEFT: list */}
-      <aside className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-3">
+      <aside className="rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] p-3">
         <div className="mb-3">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by NCXID, name, or Discord…"
-            className="w-full rounded-lg bg-zinc-950/60 border border-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className="w-full rounded-lg bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] px-3 py-2 text-sm text-[var(--ncx-text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--ncx-primary-rgb)/0.35)]"
           />
         </div>
+
         <ul className="max-h-[68vh] overflow-auto space-y-1 pr-1">
           {filtered.map((p, i) => {
             const active = i === selectedIdx;
@@ -83,22 +84,25 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                   className={[
                     "w-full text-left px-3 py-2 rounded-lg border transition",
                     active
-                      ? "bg-purple-500/15 border-purple-500/50"
-                      : "bg-zinc-950/40 border-zinc-800 hover:border-purple-500/40",
+                      ? "bg-[rgb(var(--ncx-primary-rgb)/0.15)] border-[rgb(var(--ncx-primary-rgb)/0.50)]"
+                      : "bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border-[var(--ncx-border)] hover:border-[rgb(var(--ncx-primary-rgb)/0.40)]",
                   ].join(" ")}
                 >
-                  <div className="text-sm font-semibold text-zinc-100">
+                  <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
                     {p.ncxid} • {fullName(p)}
                   </div>
                   {p.discord && (
-                    <div className="text-xs text-zinc-400">{p.discord}</div>
+                    <div className="text-xs text-[var(--ncx-text-muted)]">
+                      {p.discord}
+                    </div>
                   )}
                 </button>
               </li>
             );
           })}
+
           {!filtered.length && (
-            <li className="text-sm text-zinc-500 italic px-1 py-2">
+            <li className="text-sm text-[var(--ncx-text-muted)] italic px-1 py-2">
               No players found.
             </li>
           )}
@@ -106,19 +110,24 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
       </aside>
 
       {/* RIGHT: player card */}
-      <section className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-5">
+      <section className="rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] p-5">
         {!selected ? (
-          <div className="text-zinc-400">Select a player on the left.</div>
+          <div className="text-[var(--ncx-text-muted)]">
+            Select a player on the left.
+          </div>
         ) : (
           <div className="space-y-5 mx-auto w-full max-w-[1100px]">
             <header className="flex items-center justify-between">
               <h2 className="text-xl font-bold">
-                <span className="text-zinc-100">{selected.ncxid}</span>{" "}
-                <span className="text-zinc-400">•</span>{" "}
-                <span className="text-cyan-400">{fullName(selected)}</span>
+                <span className="text-[var(--ncx-text-primary)]">
+                  {selected.ncxid}
+                </span>{" "}
+                <span className="text-[var(--ncx-text-muted)]">•</span>{" "}
+                <span className="ncx-accent">{fullName(selected)}</span>
               </h2>
+
               {selected.championships && (
-                <span className="text-xs px-3 py-1 rounded-full border border-amber-400/60 bg-amber-500/10 text-amber-300">
+                <span className="text-xs px-3 py-1 rounded-full border border-[rgb(var(--ncx-highlight-rgb)/0.60)] bg-[rgb(var(--ncx-highlight-rgb)/0.12)] text-[rgb(var(--ncx-highlight-rgb))]">
                   Championships: {selected.championships}
                 </span>
               )}
@@ -139,9 +148,7 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
 
                 // 🥚 Insert Smash Count right AFTER "PPG" for NCX94
                 if (selected.ncxid in SMASH_COUNTS) {
-                  const ppgIndex = stats.findIndex(
-                    ([label]) => label === "PPG"
-                  );
+                  const ppgIndex = stats.findIndex(([label]) => label === "PPG");
                   const insertAt = ppgIndex >= 0 ? ppgIndex + 1 : stats.length;
                   stats.splice(insertAt, 0, [
                     "Smash Count",
@@ -152,12 +159,12 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                 return stats.map(([label, value]) => (
                   <div
                     key={label}
-                    className="rounded-lg bg-zinc-950/50 border border-zinc-800 p-3"
+                    className="rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] p-3"
                   >
-                    <div className="text-xs uppercase text-zinc-400">
+                    <div className="text-xs uppercase text-[var(--ncx-text-muted)]">
                       {label}
                     </div>
-                    <div className="text-lg font-mono text-zinc-100">
+                    <div className="text-lg font-mono text-[var(--ncx-text-primary)]">
                       {value || "-"}
                     </div>
                   </div>
@@ -166,49 +173,52 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
             </div>
 
             {/* Seasons table */}
-            <div className="rounded-xl border border-zinc-800 overflow-hidden">
-              <div className="bg-zinc-950/70 px-4 py-2 text-sm font-semibold text-zinc-300">
+            <div className="rounded-xl border border-[var(--ncx-border)] overflow-hidden">
+              <div className="bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] px-4 py-2 text-sm font-semibold text-[var(--ncx-text-primary)]">
                 Season Teams
               </div>
+
               <table className="w-full text-sm">
-                <thead className="bg-zinc-950/50 text-zinc-400">
+                <thead className="bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] text-[var(--ncx-text-muted)]">
                   <tr>
                     <th className="text-left px-3 py-2">Season</th>
                     <th className="text-left px-3 py-2">Team</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+
+                <tbody className="divide-y divide-[var(--ncx-border)]">
                   {selected.seasons.map((team, idx) => {
                     const seasonNum = idx + 1;
                     const isChampion =
                       !!team &&
                       !!CHAMPIONS_BY_SEASON[seasonNum] &&
-                      team.toUpperCase().trim() ===
-                        CHAMPIONS_BY_SEASON[seasonNum];
+                      team.toUpperCase().trim() === CHAMPIONS_BY_SEASON[seasonNum];
+
                     return (
                       <tr
                         key={idx}
                         className={
                           isChampion
-                            ? "border border-amber-400/60 bg-amber-500/5"
+                            ? "border border-[rgb(var(--ncx-highlight-rgb)/0.60)] bg-[rgb(var(--ncx-highlight-rgb)/0.06)]"
                             : ""
                         }
                       >
-                        <td className="px-3 py-2 text-zinc-300">
+                        <td className="px-3 py-2 text-[var(--ncx-text-primary)]">
                           Season {seasonNum}
                         </td>
+
                         <td
                           className={[
                             "px-3 py-2",
                             isChampion
-                              ? "font-semibold text-amber-300"
-                              : "text-zinc-100",
+                              ? "font-semibold text-[rgb(var(--ncx-highlight-rgb))]"
+                              : "text-[var(--ncx-text-primary)]",
                           ].join(" ")}
                         >
                           {team && team.trim() ? (
                             team
                           ) : (
-                            <span className="text-zinc-500">—</span>
+                            <span className="text-[var(--ncx-text-muted)]">—</span>
                           )}
                         </td>
                       </tr>

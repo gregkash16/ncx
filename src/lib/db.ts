@@ -5,7 +5,7 @@ const DB_HOST = process.env.DB_HOST || "metro.proxy.rlwy.net";
 const DB_PORT = Number(process.env.DB_PORT || 47124);
 const DB_USER = process.env.DB_USER || "root";
 const DB_PASSWORD = process.env.MYSQLPASSWORD || "";
-const DB_NAME = process.env.DB_NAME || "S8";
+const DB_NAME = process.env.DB_NAME || "S9";
 
 const globalForDB = globalThis as unknown as {
   mysqlPool: mysql.Pool | undefined;

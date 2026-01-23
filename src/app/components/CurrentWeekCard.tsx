@@ -1,5 +1,6 @@
 // src/app/components/CurrentWeekCard.tsx
 // Server Component: no 'use client'
+
 import type React from "react";
 import Link from "next/link";
 import { teamSlug } from "@/lib/slug";
@@ -30,10 +31,12 @@ function WinBoxes({
   color: string;
 }) {
   const count = Math.max(0, Math.min(4, wins));
+
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: 4 }).map((_, i) => {
         const filled = direction === "left" ? i < count : i >= 4 - count;
+
         return (
           <span
             key={i}
@@ -46,8 +49,8 @@ function WinBoxes({
                     boxShadow: `0 0 6px ${color}66`,
                   }
                 : {
-                    backgroundColor: "#27272a",
-                    borderColor: "#3f3f46",
+                    backgroundColor: "var(--ncx-bg-panel)",
+                    borderColor: "var(--ncx-border)",
                   }
             }
           />
@@ -92,6 +95,7 @@ function parseWeekNum(label?: string): number | null {
   const m = label.trim().match(/week\s*(\d+)/i);
   return m ? parseInt(m[1], 10) : null;
 }
+
 function normalizeWeekTab(label?: string | null) {
   const n = parseWeekNum(label ?? undefined);
   if (n) return `WEEK ${n}`;
@@ -122,6 +126,7 @@ function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
         : gameNum > 0
         ? Math.ceil(gameNum / 7)
         : 0;
+
     if (!seriesNo) continue;
 
     const a = away.localeCompare(home) <= 0 ? away : home;
@@ -136,6 +141,7 @@ function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
 
     const awayPts = Number(String(m.awayPts ?? "").trim() || "NaN");
     const homePts = Number(String(m.homePts ?? "").trim() || "NaN");
+
     if (
       Number.isFinite(awayPts) &&
       Number.isFinite(homePts) &&
@@ -180,13 +186,22 @@ export default async function CurrentWeekCard({
 
   const targetTab = normalizeWeekTab(weekLabelForCard);
   const activeWeekNorm = normalizeWeekTab(activeWeek);
-
   const series = buildSeriesFromMatches(matches);
 
   return (
-    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
-      <h2 className="text-2xl font-extrabold text-center mb-4">
-        {targetTab === activeWeekNorm ? "Current Week" : "Week View"} — {targetTab}
+    <div
+      className="p-6 rounded-2xl border"
+      style={{
+        background: "var(--ncx-bg-panel)",
+        borderColor: "var(--ncx-border)",
+      }}
+    >
+      <h2
+        className="text-2xl font-extrabold text-center mb-4"
+        style={{ color: "var(--ncx-text-primary)" }}
+      >
+        {targetTab === activeWeekNorm ? "Current Week" : "Week View"} —{" "}
+        {targetTab}
       </h2>
 
       <ul className="space-y-3">
@@ -194,10 +209,6 @@ export default async function CurrentWeekCard({
           const gamesPlayed = m.awayWins + m.homeWins;
           const gamesLeft = Math.max(0, 7 - gamesPlayed);
 
-          // ✅ MatchupsPanel expects:
-          //   tab=matchups
-          //   w = week label (e.g. "WEEK 4")
-          //   q = filter text (we want Home Team)
           const href =
             `/?tab=matchups` +
             `&w=${encodeURIComponent(targetTab)}` +
@@ -207,12 +218,23 @@ export default async function CurrentWeekCard({
             <li key={i}>
               <Link
                 href={href}
-                className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400/40"
-                aria-label={`View ${targetTab} matchups filtered to ${m.homeTeam}`}
+                className="block rounded-xl focus:outline-none"
+                style={{
+                  outlineColor: "rgb(var(--ncx-primary) / 0.4)",
+                }}
               >
-                <div className="grid grid-cols-[1fr_260px_1fr] items-center gap-4 border border-zinc-800 rounded-xl px-6 py-4 bg-zinc-950/60 hover:bg-zinc-950/80 transition-colors">
+                <div
+                  className="grid grid-cols-[1fr_260px_1fr] items-center gap-4 rounded-xl px-6 py-4 transition-colors"
+                  style={{
+                    background: "rgb(0 0 0 / 0.25)",
+                    border: "1px solid var(--ncx-border)",
+                  }}
+                >
                   {/* Away */}
-                  <div className="flex items-center text-zinc-300">
+                  <div
+                    className="flex items-center"
+                    style={{ color: "var(--ncx-text-muted)" }}
+                  >
                     <Logo name={m.awayTeam} side="left" />
                     <span className="break-words">{m.awayTeam}</span>
                   </div>
@@ -225,7 +247,10 @@ export default async function CurrentWeekCard({
                         direction="left"
                         color={getTeamPrimaryHex(m.awayTeam) ?? "#0f172a"}
                       />
-                      <div className="font-bold text-xl text-zinc-100">
+                      <div
+                        className="font-bold text-xl"
+                        style={{ color: "var(--ncx-text-primary)" }}
+                      >
                         {m.awayWins} : {m.homeWins}
                       </div>
                       <WinBoxes
@@ -234,13 +259,19 @@ export default async function CurrentWeekCard({
                         color={getTeamPrimaryHex(m.homeTeam) ?? "#0f172a"}
                       />
                     </div>
-                    <div className="text-xs text-zinc-400">
+                    <div
+                      className="text-xs"
+                      style={{ color: "var(--ncx-text-muted)" }}
+                    >
                       {gamesLeft} game{gamesLeft === 1 ? "" : "s"} remaining
                     </div>
                   </div>
 
                   {/* Home */}
-                  <div className="flex items-center justify-end text-zinc-300">
+                  <div
+                    className="flex items-center justify-end"
+                    style={{ color: "var(--ncx-text-muted)" }}
+                  >
                     <span className="break-words">{m.homeTeam}</span>
                     <Logo name={m.homeTeam} side="right" />
                   </div>

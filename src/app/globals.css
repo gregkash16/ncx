@@ -3,84 +3,86 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* =========================================================
+   TAILWIND THEME BRIDGE
+   ========================================================= */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
+
+  --color-border: var(--border);
   --color-ring: var(--ring);
   --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
+
   --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* =========================================================
+   ROOT TOKENS
+   ========================================================= */
 :root {
   --radius: 0.625rem;
+  --ncx-accent: oklch(...);
+  --ncx-accent-soft: oklch(...);
+  --ncx-accent-strong: oklch(...);
+  --ncx-border-accent: oklch(...);
 
   /* =========================================================
-     NCX THEME TOKENS (CHANGE THESE PER SEASON)
-     ---------------------------------------------------------
-     The goal: pages/components reference these variables (or
-     the helper classes below) instead of hardcoding colors.
+     NCX — SEASON 9 BRAND TOKENS
+     (CHANGE THESE PER SEASON)
      ========================================================= */
 
-  /* Overall page gradient */
-  --ncx-bg-start: #0b0b16;
-  --ncx-bg-mid: #1a1033;
+  /* Page gradient (keeps the same palette, slightly tuned for separation) */
+  --ncx-bg-start: #082a5c;
+  --ncx-bg-mid: #0c4698;
 
-  /* Primary/secondary accent used by glow blobs + hero styling.
-     Use RGB triplets so we can do rgb(var(--x) / 0.xx). */
-  --ncx-accent-primary-rgb: 255 0 255;  /* currently magenta */
-  --ncx-accent-secondary-rgb: 0 255 255; /* currently cyan */
+  /* Accent colors (RGB triplets for glow/math) */
+  --ncx-primary-rgb: 63 214 255;   /* cyan */
+  --ncx-secondary-rgb: 242 201 76; /* gold */
 
-  /* Hero title gradient colors (as hex, easier for gradients) */
-  --ncx-hero-from: #ec4899; /* pink-500 */
-  --ncx-hero-via: #a78bfa;  /* purple-400 */
-  --ncx-hero-to: #22d3ee;   /* cyan-400 */
+  /* Hero */
+  --ncx-hero-from: #3fd6ff;
+  --ncx-hero-via: #0c4698;
+  --ncx-hero-to: #f2c94c;
+  --ncx-hero-glow-rgb: 63 214 255;
 
-  /* Hero glow color (RGB triplet) */
-  --ncx-hero-glow-rgb: 255 0 255;
+  /* Panels / borders (more contrast + less "washed into the bg") */
+  --ncx-panel-bg: rgb(12 16 24 / 0.88);
+  --ncx-border: rgb(255 255 255 / 0.14);
+
+  /* Alias for components that reference the older name */
+  --ncx-bg-panel: var(--ncx-panel-bg);
+
+  /* Highlight (best-in-table) */
+  --ncx-highlight-rgb: 242 201 76;
+
+  /* Text (more readable) */
+  --ncx-text-primary: rgb(248 250 252);
+  --ncx-text-muted: rgb(196 201 210);
 
   /* =========================================================
-     TEAM OVERRIDE HOOKS (OPTIONAL)
-     ---------------------------------------------------------
-     If you already have <TeamTheme /> in the future, it can
-     override these two. By default, they mirror ncx accents.
+     TEAM OVERRIDE HOOKS (future-safe)
      ========================================================= */
-  --team-primary-rgb: var(--ncx-accent-primary-rgb);
-  --team-secondary-rgb: var(--ncx-accent-secondary-rgb);
+  --team-primary-rgb: var(--ncx-primary-rgb);
+  --team-secondary-rgb: var(--ncx-secondary-rgb);
 
   /* =========================================================
-     SHADCN / UI TOKENS (LEAVE THESE ALONE UNLESS YOU INTEND TO)
+     SHADCN BASE TOKENS (unchanged)
      ========================================================= */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -100,56 +102,23 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* =========================================================
+   DARK MODE
+   ========================================================= */
 .dark {
-  /* Keep your dark theme mapping exactly as you had it */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* =========================================================
+   BASE
+   ========================================================= */
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -159,25 +128,10 @@
   }
 }
 
-@font-face {
-  font-family: "XWingShips";
-  src: url("/fonts/xwing-miniatures-ships.ttf") format("truetype");
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-.ship-icons {
-  font-family: "XWingShips", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  font-variant-ligatures: none;
-}
-
 /* =========================================================
-   REUSABLE NCX CLASSES (use these instead of hardcoding)
+   NCX UTILITIES (USE THESE IN COMPONENTS)
    ========================================================= */
 
-/* Reusable NCX page background (centralized) */
 .ncx-gradient-bg {
   background: linear-gradient(
     to bottom,
@@ -187,7 +141,6 @@
   );
 }
 
-/* Hero title gradient (drop-in replacement for from-pink/via-purple/to-cyan) */
 .ncx-hero-title {
   background-image: linear-gradient(
     to right,
@@ -195,38 +148,65 @@
     var(--ncx-hero-via),
     var(--ncx-hero-to)
   );
-  -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-/* Hero glow (drop-in replacement for hardcoded drop-shadow rgba) */
 .ncx-hero-glow {
-  filter: drop-shadow(0 0 25px rgb(var(--ncx-hero-glow-rgb) / 0.25));
+  filter: drop-shadow(0 0 25px rgb(var(--ncx-hero-glow-rgb) / 0.35));
 }
 
-/* Reusable “neon” blobs for hero headers */
-.ncx-neon-blob-a {
-  background: radial-gradient(
-    circle at 0% -20%,
-    rgb(var(--team-primary-rgb) / 0.25),
-    transparent 70%
-  );
-  animation: pulse 4s ease-in-out infinite;
+.ncx-accent {
+  color: rgb(var(--ncx-primary-rgb));
 }
-.ncx-neon-blob-b {
-  background: radial-gradient(
-    circle at 120% 20%,
-    rgb(var(--team-secondary-rgb) / 0.15),
-    transparent 65%
-  );
-  animation: pulse 6s ease-in-out infinite;
+.ncx-accent-bg {
+  background-color: rgb(var(--ncx-primary-rgb) / 0.14);
 }
-.ncx-neon-blob-c {
-  background: radial-gradient(
-    circle at 50% 120%,
-    rgb(var(--team-primary-rgb) / 0.25),
-    transparent 60%
-  );
-  animation: pulse 5s ease-in-out infinite;
+.ncx-accent-border {
+  border-color: rgb(var(--ncx-primary-rgb));
+}
+
+.ncx-highlight {
+  border-color: rgb(var(--ncx-highlight-rgb));
+  background-color: rgb(var(--ncx-highlight-rgb) / 0.12);
+}
+
+/* =========================================================
+   SHIP ICON FONT
+   ========================================================= */
+@font-face {
+  font-family: "XWingShips";
+  src: url("/fonts/xwing-miniatures-ships.ttf") format("truetype");
+  font-display: swap;
+}
+.ship-icons {
+  font-family: "XWingShips", system-ui, sans-serif;
+  font-variant-ligatures: none;
+}
+
+/* =========================================================
+   NCX INTERACTIVE TILE (hover-fill behavior)
+   ========================================================= */
+
+.ncx-tile {
+  position: relative;
+  overflow: hidden;
+  background: var(--ncx-bg-panel);
+  border: 1px solid var(--ncx-border);
+}
+
+.ncx-tile-fill {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.ncx-tile:hover .ncx-tile-fill {
+  opacity: 1;
+}
+
+.ncx-tile-content {
+  position: relative;
+  z-index: 1;
 }

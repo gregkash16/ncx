@@ -115,8 +115,8 @@ function RegionCard({ region }: { region: Region }) {
     const homeHref = `/?tab=team&team=${encodeURIComponent(home.slug)}`;
 
     return (
-      <div className="rounded-xl bg-zinc-950/70 border border-zinc-800 px-3 py-2 text-sm">
-        <div className="text-[11px] uppercase text-zinc-400 mb-1 flex justify-between">
+      <div className="rounded-xl bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] border border-[var(--ncx-border)] px-3 py-2 text-sm">
+        <div className="text-[11px] uppercase text-[var(--ncx-text-muted)] mb-1 flex justify-between">
           <span>{label}</span>
           <span>Higher seed is home</span>
         </div>
@@ -126,7 +126,7 @@ function RegionCard({ region }: { region: Region }) {
             href={awayHref}
             className="flex items-center gap-2 min-w-0 hover:underline"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-900 border border-zinc-700 overflow-hidden shrink-0">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.18)] border border-[var(--ncx-border)] overflow-hidden shrink-0">
               <Image
                 src={`/logos/${away.slug}.webp`}
                 alt={away.team}
@@ -136,24 +136,32 @@ function RegionCard({ region }: { region: Region }) {
               />
             </span>
             <span className="truncate">
-              <span className="text-xs text-zinc-400 mr-1">({away.seed})</span>
-              {away.team}
-              <span className="ml-1 text-[11px] text-zinc-500">#{away.rank}</span>
+              <span className="text-xs text-[var(--ncx-text-muted)] mr-1">
+                ({away.seed})
+              </span>
+              <span className="text-[var(--ncx-text-primary)]">{away.team}</span>
+              <span className="ml-1 text-[11px] text-[var(--ncx-text-muted)]">
+                #{away.rank}
+              </span>
             </span>
           </a>
 
-          <span className="mx-1 text-[11px] text-zinc-500">at</span>
+          <span className="mx-1 text-[11px] text-[var(--ncx-text-muted)]">at</span>
 
           <a
             href={homeHref}
             className="flex items-center gap-2 min-w-0 justify-end hover:underline"
           >
             <span className="truncate">
-              <span className="text-xs text-zinc-400 mr-1">({home.seed})</span>
-              {home.team}
-              <span className="ml-1 text-[11px] text-zinc-500">#{home.rank}</span>
+              <span className="text-xs text-[var(--ncx-text-muted)] mr-1">
+                ({home.seed})
+              </span>
+              <span className="text-[var(--ncx-text-primary)]">{home.team}</span>
+              <span className="ml-1 text-[11px] text-[var(--ncx-text-muted)]">
+                #{home.rank}
+              </span>
             </span>
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-900 border border-zinc-700 overflow-hidden shrink-0">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.18)] border border-[var(--ncx-border)] overflow-hidden shrink-0">
               <Image
                 src={`/logos/${home.slug}.webp`}
                 alt={home.team}
@@ -169,9 +177,9 @@ function RegionCard({ region }: { region: Region }) {
   };
 
   return (
-    <section className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 space-y-3">
+    <section className="rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] p-4 space-y-3">
       <header className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-zinc-950 border border-zinc-700 flex items-center justify-center">
+        <div className="h-10 w-10 rounded-xl bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.18)] border border-[var(--ncx-border)] flex items-center justify-center">
           <Image
             src={`/logos/${oneSeed.slug}.webp`}
             alt={topSeedTeam}
@@ -181,10 +189,12 @@ function RegionCard({ region }: { region: Region }) {
           />
         </div>
         <div>
-          <div className="text-xs uppercase text-zinc-400">{regionName}</div>
-          <div className="text-sm font-semibold text-zinc-100">
+          <div className="text-xs uppercase text-[var(--ncx-text-muted)]">
+            {regionName}
+          </div>
+          <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
             Top Seed:{" "}
-            <span className="text-cyan-300">
+            <span className="text-[rgb(var(--ncx-primary-rgb))]">
               {topSeedTeam} (1) – #{oneSeed.rank}
             </span>
           </div>
@@ -215,7 +225,7 @@ export default async function PlayoffsPanel() {
 
   if (errorMsg) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-sm text-amber-300 text-center">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-sm text-[rgb(var(--ncx-highlight-rgb))] text-center">
         {errorMsg}
       </div>
     );
@@ -223,7 +233,7 @@ export default async function PlayoffsPanel() {
 
   if (!data.length) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-sm text-zinc-400 text-center">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-sm text-[var(--ncx-text-muted)] text-center">
         No standings data available.
       </div>
     );
@@ -232,7 +242,7 @@ export default async function PlayoffsPanel() {
   const regions = buildRegions(data);
   if (!regions.length) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-sm text-zinc-400 text-center">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-sm text-[var(--ncx-text-muted)] text-center">
         Need 16 teams for playoffs.
       </div>
     );
@@ -243,10 +253,10 @@ export default async function PlayoffsPanel() {
   const rightRegions = [region2, region3];
 
   return (
-    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
+    <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)]">
       <h2 className="text-2xl font-bold tracking-wide text-center mb-4">
-        <span className="text-pink-400">PLAYOFF</span>{" "}
-        <span className="text-cyan-400">BRACKET</span>
+        <span className="text-[rgb(var(--ncx-highlight-rgb))]">PLAYOFF</span>{" "}
+        <span className="text-[rgb(var(--ncx-primary-rgb))]">BRACKET</span>
       </h2>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.9fr_1.15fr] gap-6 items-stretch">
@@ -257,21 +267,21 @@ export default async function PlayoffsPanel() {
         </div>
 
         <div className="flex flex-col justify-center gap-4">
-          <section className="rounded-2xl bg-zinc-950/80 border border-zinc-800 p-4 text-sm">
-            <h3 className="text-center text-sm font-semibold text-cyan-300 mb-2 uppercase">
+          <section className="rounded-2xl bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] border border-[var(--ncx-border)] p-4 text-sm">
+            <h3 className="text-center text-sm font-semibold text-[rgb(var(--ncx-primary-rgb))] mb-2 uppercase">
               Final Four
             </h3>
-            <div className="space-y-3 text-xs text-zinc-200 text-center">
+            <div className="space-y-3 text-xs text-[var(--ncx-text-primary)] text-center">
               <div>Winner Region 1 vs Winner Region 4</div>
               <div>Winner Region 2 vs Winner Region 3</div>
             </div>
           </section>
 
-          <section className="rounded-2xl bg-zinc-950/90 border border-yellow-500/60 p-4 text-sm">
-            <h3 className="text-center text-sm font-semibold text-yellow-300 mb-2 uppercase">
+          <section className="rounded-2xl bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.14)] border border-[rgb(var(--ncx-highlight-rgb)/0.60)] p-4 text-sm">
+            <h3 className="text-center text-sm font-semibold text-[rgb(var(--ncx-highlight-rgb))] mb-2 uppercase">
               Championship
             </h3>
-            <div className="text-xs text-zinc-100 text-center">
+            <div className="text-xs text-[var(--ncx-text-primary)] text-center">
               Winner Semifinal 1 vs Winner Semifinal 2
             </div>
           </section>
