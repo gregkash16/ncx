@@ -47,38 +47,38 @@
   --ncx-accent-strong: oklch(...);
   --ncx-border-accent: oklch(...);
 
-  /* =========================================================
-     NCX — SEASON 9 BRAND TOKENS
-     (CHANGE THESE PER SEASON)
-     ========================================================= */
+/* =========================================================
+   NCX — SEASON 9 BRAND TOKENS
+   (CHANGE THESE PER SEASON)
+   ========================================================= */
 
-  /* Page gradient (keeps the same palette, slightly tuned for separation) */
-  --ncx-bg-start: #082a5c;
-  --ncx-bg-mid: #0c4698;
+/* Page gradient */
+--ncx-bg-start: #1b0a12;   /* deep garnet-black */
+--ncx-bg-mid:   #3a0f1e;   /* rich garnet */
 
-  /* Accent colors (RGB triplets for glow/math) */
-  --ncx-primary-rgb: 63 214 255;   /* cyan */
-  --ncx-secondary-rgb: 242 201 76; /* gold */
+/* Accent colors (RGB triplets for glow/math) */
+--ncx-primary-rgb: 173 24 55;   /* garnet */
+--ncx-secondary-rgb: 212 175 55; /* gold */
 
-  /* Hero */
-  --ncx-hero-from: #3fd6ff;
-  --ncx-hero-via: #0c4698;
-  --ncx-hero-to: #f2c94c;
-  --ncx-hero-glow-rgb: 63 214 255;
+/* Hero */
+--ncx-hero-from: #ad1837;  /* garnet */
+--ncx-hero-via:  #3a0f1e;  /* dark garnet */
+--ncx-hero-to:   #d4af37;  /* gold */
+--ncx-hero-glow-rgb: 173 24 55;
 
-  /* Panels / borders (more contrast + less "washed into the bg") */
-  --ncx-panel-bg: rgb(12 16 24 / 0.88);
-  --ncx-border: rgb(255 255 255 / 0.14);
+/* Panels / borders */
+--ncx-panel-bg: rgb(12 6 10 / 0.9);
+--ncx-border: rgb(255 255 255 / 0.12);
 
-  /* Alias for components that reference the older name */
-  --ncx-bg-panel: var(--ncx-panel-bg);
+/* Alias */
+--ncx-bg-panel: var(--ncx-panel-bg);
 
-  /* Highlight (best-in-table) */
-  --ncx-highlight-rgb: 242 201 76;
+/* Highlight (best-in-table) */
+--ncx-highlight-rgb: 212 175 55;
 
-  /* Text (more readable) */
-  --ncx-text-primary: rgb(248 250 252);
-  --ncx-text-muted: rgb(196 201 210);
+/* Text */
+--ncx-text-primary: rgb(248 250 252);
+--ncx-text-muted: rgb(190 184 192);
 
   /* =========================================================
      TEAM OVERRIDE HOOKS (future-safe)
