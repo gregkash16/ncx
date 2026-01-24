@@ -50,7 +50,7 @@ const teams: TeamLogo[] = [
   { name: "HOTSHOTS",             logoSrc: "/logos/hotshots.webp",             filterValue: "HOTSHOTS" },
   { name: "JAGGED AXE",           logoSrc: "/logos/jagged-axe.webp",           filterValue: "JAGGED AXE" },
   { name: "KDB",                  logoSrc: "/logos/kdb.webp",                  filterValue: "KDB" },
-  { name: "MAWLERS",              logoSrc: "/logos/mawlers.webp",              filterValue: "MAWLERS" },
+  { name: "KING'S GAMBIT",        logoSrc: "/logos/kings-gambit.webp",         filterValue: "KING'S GAMBIT" },
   { name: "MEATBAGS",             logoSrc: "/logos/meatbags.webp",             filterValue: "MEATBAGS" },
   { name: "MEGA MILK UNION",      logoSrc: "/logos/mega-milk-union.webp",      filterValue: "MEGA MILK UNION" },
   { name: "MISFITS",              logoSrc: "/logos/misfits.webp",              filterValue: "MISFITS" },
