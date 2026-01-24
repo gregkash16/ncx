@@ -6,7 +6,7 @@ export const TEAM_COLOR_MAP: Record<string, string> = {
   DEGENERATES: "#16a34a",
   FIREBIRDS: "#ea580c",
   FOXES: "#a855f7",
-  "GALACTIC WARDENS": "#16a34a",
+  GAMBLERS: "#16a34a",
   HAVOC: "#eab308",
   HEADHUNTERS: "#020617",
   HOTSHOTS: "#facc99",

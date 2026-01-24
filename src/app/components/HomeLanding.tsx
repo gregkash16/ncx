@@ -44,7 +44,7 @@ const teams: TeamLogo[] = [
   { name: "DEGENERATES",          logoSrc: "/logos/degenerates.webp",          filterValue: "DEGENERATES" },
   { name: "FIREBIRDS",            logoSrc: "/logos/firebirds.webp",            filterValue: "FIREBIRDS" },
   { name: "FOXES",                logoSrc: "/logos/foxes.webp",                filterValue: "FOXES" },
-  { name: "GALACTIC WARDENS",     logoSrc: "/logos/galactic-wardens.webp",     filterValue: "GALACTIC WARDENS" },
+  { name: "GAMBLERS",             logoSrc: "/logos/gamblers.webp",             filterValue: "GAMBLERS" },
   { name: "HAVOC",                logoSrc: "/logos/havoc.webp",                filterValue: "HAVOC" },
   { name: "HEADHUNTERS",          logoSrc: "/logos/headhunters.webp",          filterValue: "HEADHUNTERS" },
   { name: "HOTSHOTS",             logoSrc: "/logos/hotshots.webp",             filterValue: "HOTSHOTS" },
