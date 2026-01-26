@@ -8,8 +8,8 @@ export const TEAM_COLOR_MAP: Record<string, string> = {
   FOXES: "#a855f7",
   GAMBLERS: "#d4af37", // gold
   HAVOC: "#eab308",
-  HEADHUNTERS: "#020617",
-  HOTSHOTS: "#facc99",
+  "TRASH PANDAS": "#FFFFFF",
+  "HOTSHOTS": "#facc99",
   "JAGGED AXE": "#f97316",
   KDB: "#14b8a6",
   "KING'S GAMBIT": "#9b111e", // ruby red

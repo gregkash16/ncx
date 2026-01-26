@@ -46,7 +46,6 @@ const teams: TeamLogo[] = [
   { name: "FOXES",                logoSrc: "/logos/foxes.webp",                filterValue: "FOXES" },
   { name: "GAMBLERS",             logoSrc: "/logos/gamblers.webp",             filterValue: "GAMBLERS" },
   { name: "HAVOC",                logoSrc: "/logos/havoc.webp",                filterValue: "HAVOC" },
-  { name: "HEADHUNTERS",          logoSrc: "/logos/headhunters.webp",          filterValue: "HEADHUNTERS" },
   { name: "HOTSHOTS",             logoSrc: "/logos/hotshots.webp",             filterValue: "HOTSHOTS" },
   { name: "JAGGED AXE",           logoSrc: "/logos/jagged-axe.webp",           filterValue: "JAGGED AXE" },
   { name: "KDB",                  logoSrc: "/logos/kdb.webp",                  filterValue: "KDB" },
@@ -62,6 +61,7 @@ const teams: TeamLogo[] = [
   { name: "PUNISHERS",            logoSrc: "/logos/punishers.webp",            filterValue: "PUNISHERS" },
   { name: "RAVE CRAB CHAMPIONS",  logoSrc: "/logos/rave-crab-champions.webp",  filterValue: "RAVE CRAB CHAMPIONS" },
   { name: "STARKILLERS",          logoSrc: "/logos/starkillers.webp",          filterValue: "STARKILLERS" },
+  { name: "TRASH PANDAS",         logoSrc: "/logos/trash-pandas.webp",         filterValue: "TRASH PANDAS" },
   { name: "VOODOO KREWE",         logoSrc: "/logos/voodoo-krewe.webp",         filterValue: "VOODOO KREWE" },
   { name: "WOLFPACK",             logoSrc: "/logos/wolfpack.webp",             filterValue: "WOLFPACK" },
 ];
