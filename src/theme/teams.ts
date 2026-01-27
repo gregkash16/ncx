@@ -21,7 +21,7 @@ export const TEAM_COLOR_MAP: Record<string, string> = {
   "OUTER RIM HEROES": "#2563eb",
   PILLAGERS: "#4b1d6b", // deep purple
   "PUDDLE JUMPERS": "#22c55e",
-  PUNISHERS: "#ef4444",
+  SANDBLASTERS: "#8b5a2b",
   "RAVE CRAB CHAMPIONS": "#fb923c",
   STARKILLERS: "#d97706",
   "VOODOO KREWE": "#1d4ed8",
