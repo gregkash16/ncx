@@ -2,7 +2,6 @@
 // Used for per-team theme overrides (primary color) and thumbnails/accents.
 
 export const TEAM_COLOR_MAP: Record<string, string> = {
-  BERSERKERS: "#8b5a2b",
   DEGENERATES: "#16a34a",
   FIREBIRDS: "#ea580c",
   FOXES: "#a855f7",
@@ -16,6 +15,7 @@ export const TEAM_COLOR_MAP: Record<string, string> = {
   MEATBAGS: "#dc2626",
   "MEGA MILK UNION": "#38bdf8",
   MISFITS: "#ea580c",
+  "NEBULA BORN": "#8b5a2b",
   "NERF HERDERS": "#16a34a",
   "ORDER 66": "#2563eb",
   "OUTER RIM HEROES": "#2563eb",

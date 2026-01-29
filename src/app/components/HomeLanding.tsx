@@ -40,7 +40,6 @@ type HomeLandingProps = {
 };
 
 const teams: TeamLogo[] = [
-  { name: "BERSERKERS",           logoSrc: "/logos/berserkers.webp",           filterValue: "BERSERKERS" },
   { name: "DEGENERATES",          logoSrc: "/logos/degenerates.webp",          filterValue: "DEGENERATES" },
   { name: "FIREBIRDS",            logoSrc: "/logos/firebirds.webp",            filterValue: "FIREBIRDS" },
   { name: "FOXES",                logoSrc: "/logos/foxes.webp",                filterValue: "FOXES" },
@@ -49,10 +48,11 @@ const teams: TeamLogo[] = [
   { name: "HOTSHOTS",             logoSrc: "/logos/hotshots.webp",             filterValue: "HOTSHOTS" },
   { name: "JAGGED AXE",           logoSrc: "/logos/jagged-axe.webp",           filterValue: "JAGGED AXE" },
   { name: "KDB",                  logoSrc: "/logos/kdb.webp",                  filterValue: "KDB" },
-  { name: "KING'S GAMBIT",        logoSrc: "/logos/kings-gambit.webp",         filterValue: "KING'S GAMBIT" },
+  { name: "KING'S GAMBIT",        logoSrc: "/logos/king-s-gambit.webp",        filterValue: "KING'S GAMBIT" },
   { name: "MEATBAGS",             logoSrc: "/logos/meatbags.webp",             filterValue: "MEATBAGS" },
-  { name: "MEGA MILK UNION",      logoSrc: "/logos/mega-milk.webp",            filterValue: "MEGA MILK UNION" },
+  { name: "MEGA MILK UNION",      logoSrc: "/logos/mega-milk-union.webp",      filterValue: "MEGA MILK UNION" },
   { name: "MISFITS",              logoSrc: "/logos/misfits.webp",              filterValue: "MISFITS" },
+  { name: "NEBULA BORN",          logoSrc: "/logos/nebula-born.webp",          filterValue: "NEBULA BORN" },
   { name: "NERF HERDERS",         logoSrc: "/logos/nerf-herders.webp",         filterValue: "NERF HERDERS" },
   { name: "ORDER 66",             logoSrc: "/logos/order-66.webp",             filterValue: "ORDER 66" },
   { name: "OUTER RIM HEROES",     logoSrc: "/logos/outer-rim-heroes.webp",     filterValue: "OUTER RIM HEROES" },
