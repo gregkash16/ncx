@@ -97,7 +97,7 @@ export default function HomeLanding({
           />
           <div className="space-y-1">
             <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-              Season 8 Draft League Hub
+              Season 9 Draft League Hub
             </h2>
             {message && (
               <p className="text-sm md:text-base text-zinc-300">{message}</p>
