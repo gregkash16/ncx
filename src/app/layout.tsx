@@ -3,15 +3,17 @@ import "./globals.css";
 import Providers from "./providers";
 import Script from "next/script";
 import { NCX_BRAND } from "@/theme/base";
-import DesktopHeader from "./components/DesktopHeader";
-import ShowDesktopLoginOnly from "./components/ShowDesktopLoginOnly";
 
 export const metadata = {
   title: "Nickel City X-Wing",
   description: "Track matchups, standings, and stats for the NCX League.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <head>
@@ -39,15 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
 
       <body className="text-[var(--ncx-text-primary)]">
-        <Providers>
-          {/* Header must be ABOVE auth gates */}
-          <DesktopHeader />
-
-          {/* Auth gate can block content, not layout */}
-          <ShowDesktopLoginOnly />
-
-          {children}
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
