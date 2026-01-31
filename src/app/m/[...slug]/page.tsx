@@ -2,15 +2,13 @@
 import Link from "next/link";
 
 export default function MobileUnknownPage() {
-  // This page will be wrapped in src/app/m/layout.tsx
-  // so you'll still see the mobile header + bottom nav.
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 py-10 text-center">
       <div className="space-y-2">
-        <h2 className="text-xl font-semibold text-neutral-100">
+        <h2 className="text-xl font-semibold text-foreground">
           Page not found
         </h2>
-        <p className="text-sm text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           That screen doesn&apos;t exist. Use the tabs below or go back to the
           home screen.
         </p>
@@ -18,7 +16,7 @@ export default function MobileUnknownPage() {
 
       <Link
         href="/m"
-        className="rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm font-medium text-neutral-100 hover:bg-neutral-800"
+        className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
       >
         Go to Home
       </Link>

@@ -40,28 +40,28 @@ type HomeLandingProps = {
 };
 
 const teams: TeamLogo[] = [
-  { name: "BERSERKERS",           logoSrc: "/logos/berserkers.webp",           filterValue: "BERSERKERS" },
   { name: "DEGENERATES",          logoSrc: "/logos/degenerates.webp",          filterValue: "DEGENERATES" },
   { name: "FIREBIRDS",            logoSrc: "/logos/firebirds.webp",            filterValue: "FIREBIRDS" },
   { name: "FOXES",                logoSrc: "/logos/foxes.webp",                filterValue: "FOXES" },
-  { name: "GALACTIC WARDENS",     logoSrc: "/logos/galactic-wardens.webp",     filterValue: "GALACTIC WARDENS" },
+  { name: "GAMBLERS",             logoSrc: "/logos/gamblers.webp",             filterValue: "GAMBLERS" },
   { name: "HAVOC",                logoSrc: "/logos/havoc.webp",                filterValue: "HAVOC" },
-  { name: "HEADHUNTERS",          logoSrc: "/logos/headhunters.webp",          filterValue: "HEADHUNTERS" },
   { name: "HOTSHOTS",             logoSrc: "/logos/hotshots.webp",             filterValue: "HOTSHOTS" },
   { name: "JAGGED AXE",           logoSrc: "/logos/jagged-axe.webp",           filterValue: "JAGGED AXE" },
   { name: "KDB",                  logoSrc: "/logos/kdb.webp",                  filterValue: "KDB" },
-  { name: "MAWLERS",              logoSrc: "/logos/mawlers.webp",              filterValue: "MAWLERS" },
+  { name: "KING'S GAMBIT",        logoSrc: "/logos/king-s-gambit.webp",        filterValue: "KING'S GAMBIT" },
   { name: "MEATBAGS",             logoSrc: "/logos/meatbags.webp",             filterValue: "MEATBAGS" },
   { name: "MEGA MILK UNION",      logoSrc: "/logos/mega-milk-union.webp",      filterValue: "MEGA MILK UNION" },
   { name: "MISFITS",              logoSrc: "/logos/misfits.webp",              filterValue: "MISFITS" },
-  { name: "MON CALA SC",          logoSrc: "/logos/mon-cala-sc.webp",          filterValue: "MON CALA SC" },
+  { name: "NEBULA BORN",          logoSrc: "/logos/nebula-born.webp",          filterValue: "NEBULA BORN" },
   { name: "NERF HERDERS",         logoSrc: "/logos/nerf-herders.webp",         filterValue: "NERF HERDERS" },
   { name: "ORDER 66",             logoSrc: "/logos/order-66.webp",             filterValue: "ORDER 66" },
   { name: "OUTER RIM HEROES",     logoSrc: "/logos/outer-rim-heroes.webp",     filterValue: "OUTER RIM HEROES" },
+  { name: "PILLAGERS",            logoSrc: "/logos/pillagers.webp",            filterValue: "PILLAGERS" },
   { name: "PUDDLE JUMPERS",       logoSrc: "/logos/puddle-jumpers.webp",       filterValue: "PUDDLE JUMPERS" },
-  { name: "PUNISHERS",            logoSrc: "/logos/punishers.webp",            filterValue: "PUNISHERS" },
   { name: "RAVE CRAB CHAMPIONS",  logoSrc: "/logos/rave-crab-champions.webp",  filterValue: "RAVE CRAB CHAMPIONS" },
+  { name: "SANDBLASTERS",         logoSrc: "/logos/sandblasters.webp",         filterValue: "SANDBLASTERS" },
   { name: "STARKILLERS",          logoSrc: "/logos/starkillers.webp",          filterValue: "STARKILLERS" },
+  { name: "TRASH PANDAS",         logoSrc: "/logos/trash-pandas.webp",         filterValue: "TRASH PANDAS" },
   { name: "VOODOO KREWE",         logoSrc: "/logos/voodoo-krewe.webp",         filterValue: "VOODOO KREWE" },
   { name: "WOLFPACK",             logoSrc: "/logos/wolfpack.webp",             filterValue: "WOLFPACK" },
 ];
@@ -97,7 +97,7 @@ export default function HomeLanding({
           />
           <div className="space-y-1">
             <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-              Season 8 Draft League Hub
+              Season 9 Draft League Hub
             </h2>
             {message && (
               <p className="text-sm md:text-base text-zinc-300">{message}</p>

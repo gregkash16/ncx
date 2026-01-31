@@ -15,13 +15,13 @@ import {
 import { useRef, useState } from "react";
 
 const TABS = [
-  { href: "/m",           label: "Home",      icon: HomeIcon },
-  { href: "/m/current",   label: "Current",   icon: CalendarDays },
-  { href: "/m/matchups",  label: "Matchups",  icon: ListIcon },
+  { href: "/m", label: "Home", icon: HomeIcon },
+  { href: "/m/current", label: "Current", icon: CalendarDays },
+  { href: "/m/matchups", label: "Matchups", icon: ListIcon },
   { href: "/m/standings", label: "Standings", icon: TrophyIcon },
   // Special stats tab: tap vs long-press
-  { href: "/m/indstats",  label: "Stats",     icon: BarChart3 },
-  { href: "/m/report",    label: "Report",    icon: ClipboardEdit },
+  { href: "/m/indstats", label: "Stats", icon: BarChart3 },
+  { href: "/m/report", label: "Report", icon: ClipboardEdit },
 ];
 
 export default function MobileBottomNav() {
@@ -67,7 +67,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="relative h-full border-t border-neutral-800 bg-neutral-950/95 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md"
+      className="relative h-full border-t border-[var(--ncx-border)] bg-[rgb(0_0_0/0.45)] backdrop-blur supports-[backdrop-filter]:backdrop-blur-md"
       aria-label="Mobile tabs"
     >
       <ul className="mx-auto flex max-w-screen-sm justify-between px-3">
@@ -84,6 +84,12 @@ export default function MobileBottomNav() {
 
           const Icon = t.icon;
 
+          const activeLabelCls = "font-semibold text-[rgb(var(--ncx-primary-rgb))]";
+          const inactiveLabelCls = "text-[var(--ncx-text-muted)] hover:text-[var(--ncx-text-primary)]";
+
+          const activeIconCls = "text-[rgb(var(--ncx-primary-rgb))]";
+          const inactiveIconCls = "text-[var(--ncx-text-muted)]";
+
           if (isStatsTab) {
             // Special stats tab: tap vs long-press
             return (
@@ -94,9 +100,7 @@ export default function MobileBottomNav() {
                   onPointerUp={endPress}
                   onPointerLeave={cancelPress}
                   className={`flex w-full flex-col items-center justify-center py-3 text-[11px] transition-colors ${
-                    active
-                      ? "font-semibold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400"
-                      : "text-neutral-400 hover:text-neutral-200"
+                    active ? activeLabelCls : inactiveLabelCls
                   }`}
                   aria-current={active ? "page" : undefined}
                 >
@@ -104,7 +108,7 @@ export default function MobileBottomNav() {
                     size={22}
                     strokeWidth={2}
                     className={`mb-0.5 transition-all duration-200 ${
-                      active ? "text-pink-400" : "text-neutral-400"
+                      active ? activeIconCls : inactiveIconCls
                     }`}
                   />
                   {t.label}
@@ -129,7 +133,9 @@ export default function MobileBottomNav() {
             const qs = new URLSearchParams();
             if (w) qs.set("w", w);
             if (q) qs.set("q", q);
-            href = qs.toString() ? `/m/matchups?${qs.toString()}` : "/m/matchups";
+            href = qs.toString()
+              ? `/m/matchups?${qs.toString()}`
+              : "/m/matchups";
           } else if (t.href === "/m") {
             // Home: just go to /m (drop filters)
             href = "/m";
@@ -144,9 +150,7 @@ export default function MobileBottomNav() {
               <Link
                 href={href}
                 className={`flex flex-col items-center justify-center py-3 text-[11px] transition-colors ${
-                  active
-                    ? "font-semibold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400"
-                    : "text-neutral-400 hover:text-neutral-200"
+                  active ? activeLabelCls : inactiveLabelCls
                 }`}
                 aria-current={active ? "page" : undefined}
               >
@@ -154,7 +158,7 @@ export default function MobileBottomNav() {
                   size={22}
                   strokeWidth={2}
                   className={`mb-0.5 transition-all duration-200 ${
-                    active ? "text-pink-400" : "text-neutral-400"
+                    active ? activeIconCls : inactiveIconCls
                   }`}
                 />
                 {t.label}
@@ -167,27 +171,27 @@ export default function MobileBottomNav() {
       {/* Long-press stats menu */}
       {showStatsMenu && (
         <div className="pointer-events-none absolute inset-x-0 -top-2 mb-2 flex justify-center">
-          <div className="pointer-events-auto flex gap-2 rounded-2xl border border-neutral-800 bg-neutral-950/95 px-3 py-2 shadow-lg">
+          <div className="pointer-events-auto flex gap-2 rounded-2xl border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.55)] px-3 py-2 shadow-lg">
             <button
               type="button"
               onClick={() => goStatsRoute("/m/indstats")}
-              className="rounded-lg bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-100 hover:bg-neutral-800"
+              className="rounded-lg border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.28)] px-3 py-1 text-xs font-semibold text-[var(--ncx-text-primary)] hover:bg-[rgb(0_0_0/0.40)]"
             >
               Ind Stats
             </button>
             <button
               type="button"
               onClick={() => goStatsRoute("/m/advstats")}
-              className="rounded-lg bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-100 hover:bg-neutral-800"
+              className="rounded-lg border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.28)] px-3 py-1 text-xs font-semibold text-[var(--ncx-text-primary)] hover:bg-[rgb(0_0_0/0.40)]"
             >
               Adv Stats
             </button>
             <button
               type="button"
               onClick={() => goStatsRoute("/m/players")}
-              className="inline-flex items-center gap-1 rounded-lg bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-100 hover:bg-neutral-800"
+              className="inline-flex items-center gap-1 rounded-lg border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.28)] px-3 py-1 text-xs font-semibold text-[var(--ncx-text-primary)] hover:bg-[rgb(0_0_0/0.40)]"
             >
-              <UsersIcon className="h-3 w-3" />
+              <UsersIcon className="h-3 w-3 text-[rgb(var(--ncx-primary-rgb))]" />
               Players
             </button>
           </div>

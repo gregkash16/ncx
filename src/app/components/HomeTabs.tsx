@@ -12,7 +12,7 @@ export type TabKey =
   | "indstats"
   | "advstats"
   | "players"
-  | "podcast" // ✅ NEW
+  | "podcast"
   | "report"
   | "prefs"
   | "team"
@@ -35,20 +35,12 @@ type HomeTabsProps = {
   indStatsPanel?: React.ReactNode;
   advStatsPanel?: React.ReactNode;
   playersPanel?: React.ReactNode;
-
-  // ✅ NEW: podcast panel
   podcastPanel?: React.ReactNode;
-
   reportPanel?: ReactElement<ReportPanelLikeProps> | null;
-
-  // ✅ Season 9 prefs panel (only shown when enabled)
   prefsPanel?: React.ReactNode;
-
-  teamPanel?: React.ReactNode; // still supported, just hidden
-  playoffsPanel?: React.ReactNode; // secret tab
+  teamPanel?: React.ReactNode;
+  playoffsPanel?: React.ReactNode;
   hideButtons?: boolean;
-
-  // ✅ gate the pill + routing for prefs
   preSeasonEnabled?: boolean;
 };
 
@@ -60,10 +52,7 @@ export default function HomeTabs({
   indStatsPanel,
   advStatsPanel,
   playersPanel,
-
-  // ✅ IMPORTANT: actually destructure it so it's in scope
   podcastPanel,
-
   reportPanel,
   prefsPanel,
   teamPanel,
@@ -77,69 +66,49 @@ export default function HomeTabs({
 
   const hasTeam = !!teamPanel;
   const hasPlayoffs = !!playoffsPanel;
-
-  // Only consider prefs "available" if we're in preseason AND a panel is provided
   const hasPrefs = !!prefsPanel && preSeasonEnabled;
-
-  // Podcast is always allowed if a panel is provided (no preseason gating)
   const hasPodcast = !!podcastPanel;
 
-  // 🔑 Single source of truth: URL `tab` param
   const urlTabRaw = (searchParams.get("tab") as TabKey) || "home";
   let active: TabKey = urlTabRaw;
 
-  // If tab points to something unavailable, fall back to home
   if (active === "team" && !hasTeam) active = "home";
   if (active === "playoffs" && !hasPlayoffs) active = "home";
   if (active === "prefs" && !hasPrefs) active = "home";
   if (active === "podcast" && !hasPodcast) active = "home";
 
+  /* ───────────── Button styling (FIXED) ───────────── */
+
   const btnBase =
-    "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
+    `
+    group relative isolate overflow-hidden
+    rounded-xl border border-purple-500/40
+    bg-zinc-900/60
+    px-6 py-3 font-semibold text-white
+    shadow-lg
+    transition
+    hover:scale-105
+    focus:outline-none focus:ring-2 focus:ring-pink-500/50
+    `;
+
   const gradientLayer =
-    "pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100";
+    `
+    pointer-events-none absolute inset-0 z-0
+    bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500
+    opacity-0 scale-95
+    transition-all duration-300
+    group-hover:opacity-100 group-hover:scale-100
+    `;
+
   const labelLayer = "relative z-10";
 
   const isActive = (key: TabKey) => active === key;
 
   function goToTab(key: TabKey) {
-    // Prevent navigation to prefs when disabled (also cleans URL if someone clicks old link)
-    if (key === "prefs" && !hasPrefs) {
-      const params = new URLSearchParams(Array.from(searchParams.entries()));
-      params.delete("tab");
-      params.delete("q");
-      const href = params.toString() ? `${pathname}?${params}` : pathname;
-      router.replace(href, { scroll: false });
-      return;
-    }
-
-    // Prevent navigation to podcast if panel isn't provided (safety)
-    if (key === "podcast" && !hasPodcast) {
-      const params = new URLSearchParams(Array.from(searchParams.entries()));
-      params.delete("tab");
-      params.delete("q");
-      const href = params.toString() ? `${pathname}?${params}` : pathname;
-      router.replace(href, { scroll: false });
-      return;
-    }
+    if (key === "prefs" && !hasPrefs) return;
+    if (key === "podcast" && !hasPodcast) return;
 
     const params = new URLSearchParams(Array.from(searchParams.entries()));
-
-    if (isMatchups(key)) {
-      params.set("tab", MATCHUPS);
-      const href = params.toString() ? `${pathname}?${params}` : pathname;
-      router.replace(href, { scroll: false });
-      return;
-    }
-
-    if (key === "team") {
-      if (hasTeam) {
-        params.set("tab", "team");
-        const href = params.toString() ? `${pathname}?${params}` : pathname;
-        router.replace(href, { scroll: false });
-      }
-      return;
-    }
 
     if (key === "home") {
       params.delete("tab");
@@ -147,9 +116,7 @@ export default function HomeTabs({
       params.set("tab", key);
     }
 
-    if (!isMatchups(key)) {
-      params.delete("q");
-    }
+    if (!isMatchups(key)) params.delete("q");
 
     const href = params.toString() ? `${pathname}?${params}` : pathname;
     router.replace(href, { scroll: false });
@@ -160,7 +127,6 @@ export default function HomeTabs({
       ? cloneElement(reportPanel, { goToTab })
       : reportPanel;
 
-  // Buttons (prefs only appears when preseason enabled)
   const buttons: Array<{ key: TabKey; label: string }> = [
     { key: "home", label: "Home" },
     { key: "current", label: "Current Week" },
@@ -187,8 +153,8 @@ export default function HomeTabs({
                 className={btnBase}
               >
                 <span
-                  className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
-                    isActive(key) ? "opacity-100" : ""
+                  className={`${gradientLayer} ${
+                    isActive(key) ? "opacity-100 scale-100" : ""
                   }`}
                 />
                 <span className={labelLayer}>{label}</span>
@@ -212,19 +178,10 @@ export default function HomeTabs({
         {active === "indstats" && indStatsPanel}
         {active === "advstats" && advStatsPanel}
         {active === "players" && playersPanel}
-
-        {/* ✅ Podcast */}
         {active === "podcast" && podcastPanel}
-
         {active === "report" && reportWithProp}
-
-        {/* ✅ prefs panel (only when enabled) */}
         {active === "prefs" && hasPrefs && prefsPanel}
-
-        {/* ✅ still render Team panel when tab=team, even without a button */}
         {active === "team" && hasTeam && teamPanel}
-
-        {/* ✅ secret Playoffs tab, only if panel provided */}
         {active === "playoffs" && hasPlayoffs && playoffsPanel}
       </div>
     </div>

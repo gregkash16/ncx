@@ -16,7 +16,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content={NCX_BRAND.themeColor} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta
+          name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent"
+        />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
         {/* Google Analytics – loads globally */}
@@ -34,21 +37,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Script>
       </head>
 
-      <body className="bg-zinc-950 text-zinc-100">
-        <Providers>
-          {children}
-        </Providers>
+      {/* ✅ Use your token-driven theme instead of hardcoded zinc */}
+      <body className="bg-[var(--ncx-bg)] text-[var(--ncx-text-primary)]">
+        <Providers>{children}</Providers>
 
-        {/* Global scripts stay here */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').catch(()=>{});
-              }
-            `,
-          }}
-        />
+        {/* ✅ Remove this if you’re already using <ServiceWorkerBoot /> */}
+        {/* (If you keep ServiceWorkerBoot, do NOT register here too.) */}
       </body>
     </html>
   );

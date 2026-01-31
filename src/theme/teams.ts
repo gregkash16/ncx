@@ -2,27 +2,26 @@
 // Used for per-team theme overrides (primary color) and thumbnails/accents.
 
 export const TEAM_COLOR_MAP: Record<string, string> = {
-  BERSERKERS: "#8b5a2b",
   DEGENERATES: "#16a34a",
   FIREBIRDS: "#ea580c",
   FOXES: "#a855f7",
-  "GALACTIC WARDENS": "#16a34a",
+  GAMBLERS: "#d4af37", // gold
   HAVOC: "#eab308",
-  HEADHUNTERS: "#020617",
-  HOTSHOTS: "#facc99",
+  "TRASH PANDAS": "#FFFFFF",
+  "HOTSHOTS": "#facc99",
   "JAGGED AXE": "#f97316",
   KDB: "#14b8a6",
-  MAWLERS: "#14b8a6",
+  "KING'S GAMBIT": "#9b111e", // ruby red
   MEATBAGS: "#dc2626",
   "MEGA MILK UNION": "#38bdf8",
   MISFITS: "#ea580c",
-  "MON CALA SC": "#5eead4",
+  "NEBULA BORN": "#8b5a2b",
   "NERF HERDERS": "#16a34a",
   "ORDER 66": "#2563eb",
   "OUTER RIM HEROES": "#2563eb",
-  PUDDLEJUMPERS: "#22c55e",
+  PILLAGERS: "#4b1d6b", // deep purple
   "PUDDLE JUMPERS": "#22c55e",
-  PUNISHERS: "#ef4444",
+  SANDBLASTERS: "#8b5a2b",
   "RAVE CRAB CHAMPIONS": "#fb923c",
   STARKILLERS: "#d97706",
   "VOODOO KREWE": "#1d4ed8",

@@ -43,7 +43,7 @@ export async function GET(req: Request) {
         ppg,
         s1, s2, s3, s4, s5, s6, s7, s8,
         championships
-      FROM S8.all_time_stats
+      FROM S9.all_time_stats
       ORDER BY id ASC
       `
     );

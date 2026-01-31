@@ -131,7 +131,7 @@ export default function Season9PrefsPanel() {
 
   if (loading) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)]">
         Loading Season 9 signups…
       </div>
     );
@@ -139,7 +139,7 @@ export default function Season9PrefsPanel() {
 
   if (!data || !data.ok) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)]">
         Could not load. {data && !data.ok ? String(data.reason) : ""}
       </div>
     );
@@ -150,13 +150,15 @@ export default function Season9PrefsPanel() {
 
   if ("found" in data && !data.found) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-200 space-y-4">
-        <h2 className="text-xl font-semibold text-cyan-300">Season 9 Signups</h2>
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)] space-y-4">
+        <h2 className="text-xl font-semibold text-[rgb(var(--ncx-primary-rgb))]">
+          Season 9 Signups
+        </h2>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-300">
+        <div className="rounded-xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] p-4 text-sm text-[var(--ncx-text-primary)]">
           You haven&apos;t signed up for Season 9 yet — please do so here:{" "}
           <a
-            className="text-cyan-300 underline"
+            className="text-[rgb(var(--ncx-primary-rgb))] underline"
             href="https://forms.gle/X7VNuw1jbDp5985g8"
             target="_blank"
             rel="noreferrer"
@@ -166,39 +168,41 @@ export default function Season9PrefsPanel() {
         </div>
 
         {isAdmin && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
-            <div className="text-sm text-zinc-200">
+          <div className="rounded-xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] p-4 space-y-3">
+            <div className="text-sm text-[var(--ncx-text-primary)]">
               Total signups: <span className="font-semibold">{total ?? "—"}</span>
             </div>
             <button
               type="button"
               onClick={adminRefresh}
               disabled={refreshing}
-              className="px-4 py-2 rounded-lg border border-zinc-800 bg-zinc-950/60 text-sm text-zinc-100 hover:border-cyan-400/50 disabled:opacity-50"
+              className="px-4 py-2 rounded-lg border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] text-sm text-[var(--ncx-text-primary)] hover:border-[rgb(var(--ncx-primary-rgb)/0.60)] disabled:opacity-50"
             >
               {refreshing ? "Refreshing…" : "Refresh from Google Sheet"}
             </button>
           </div>
         )}
 
-        {notice && <div className="text-sm text-zinc-300">{notice}</div>}
+        {notice && <div className="text-sm text-[var(--ncx-text-primary)]">{notice}</div>}
       </div>
     );
   }
 
   // found == true
   return (
-    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-200 space-y-6">
+    <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)] space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-cyan-300">Season 9 Signups</h2>
-          <p className="mt-1 text-sm text-zinc-300">
+          <h2 className="text-xl font-semibold text-[rgb(var(--ncx-primary-rgb))]">
+            Season 9 Signups
+          </h2>
+          <p className="mt-1 text-sm text-[var(--ncx-text-primary)]">
             {(data as any).first_name} {(data as any).last_name} • NCX {(data as any).ncxid}
           </p>
         </div>
 
         {isAdmin && (
-          <div className="text-xs text-zinc-300 rounded-full border border-zinc-800 bg-zinc-900/50 px-3 py-1">
+          <div className="text-xs text-[var(--ncx-text-primary)] rounded-full border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] px-3 py-1">
             Admin
           </div>
         )}
@@ -215,24 +219,24 @@ export default function Season9PrefsPanel() {
           type="button"
           onClick={save}
           disabled={!canSave || saving}
-          className="px-6 py-2 rounded-xl bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 text-white font-semibold shadow-lg shadow-pink-600/30 disabled:opacity-50"
+          className="px-6 py-2 rounded-xl bg-[linear-gradient(to_right,var(--ncx-hero-to),var(--ncx-hero-via),var(--ncx-hero-from))] text-white font-semibold shadow-lg disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save Preferences"}
         </button>
 
-        {notice && <span className="text-sm text-zinc-300">{notice}</span>}
+        {notice && <span className="text-sm text-[var(--ncx-text-primary)]">{notice}</span>}
       </div>
 
       {isAdmin && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
-          <div className="text-sm text-zinc-200">
+        <div className="rounded-xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] p-4 space-y-3">
+          <div className="text-sm text-[var(--ncx-text-primary)]">
             Total signups: <span className="font-semibold">{total ?? "—"}</span>
           </div>
           <button
             type="button"
             onClick={adminRefresh}
             disabled={refreshing}
-            className="px-4 py-2 rounded-lg border border-zinc-800 bg-zinc-950/60 text-sm text-zinc-100 hover:border-cyan-400/50 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] text-sm text-[var(--ncx-text-primary)] hover:border-[rgb(var(--ncx-primary-rgb)/0.60)] disabled:opacity-50"
           >
             {refreshing ? "Refreshing…" : "Refresh from Google Sheet"}
           </button>
@@ -253,11 +257,13 @@ function PrefSelect({
 }) {
   return (
     <label className="block">
-      <div className="text-xs font-semibold text-zinc-300 mb-1">{label}</div>
+      <div className="text-xs font-semibold text-[var(--ncx-text-primary)] mb-1">
+        {label}
+      </div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-cyan-400/60"
+        className="w-full rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] px-3 py-2 text-sm text-[var(--ncx-text-primary)] outline-none focus:border-[rgb(var(--ncx-primary-rgb)/0.60)]"
       >
         <option value="" disabled>
           Choose…

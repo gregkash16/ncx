@@ -1828,7 +1828,7 @@ export async function POST(req: Request) {
         // 8) lists (full refresh of URLs)
         await syncLists(sheets, spreadsheetId, conn);
 
-        // 9) For this specific game, resolve XWS + glyph letters into S8.lists
+        // 9) For this specific game, resolve XWS + glyph letters into S9.lists
         if (gameNo) {
           await syncSingleListXwsAndLetters(conn, canonicalWeekLabel, gameNo);
         }

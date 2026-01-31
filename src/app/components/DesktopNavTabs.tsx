@@ -14,7 +14,7 @@ type TabKey =
   | "players"
   | "report"
   | "prefs"
-  | "podcast"; // ✅ add
+  | "podcast";
 
 const tabsBase: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "home", label: "Home", href: "/" },
@@ -32,49 +32,71 @@ export default function DesktopNavTabs() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // ✅ If tab=prefs but preseason is off, we treat it as home for highlighting.
   const rawTab = (searchParams.get("tab") as TabKey | null) ?? "home";
 
-  // ✅ Only show the Season 9 pill when PRE_SEASON is enabled.
-  // IMPORTANT: This must be NEXT_PUBLIC_ to be readable in a client component.
+  // IMPORTANT: must be NEXT_PUBLIC_
   const preSeasonEnabled = process.env.NEXT_PUBLIC_PRE_SEASON === "true";
 
-  const tabs: Array<{ key: TabKey; label: string; href: string }> = preSeasonEnabled
-    ? [
-        ...tabsBase,
-        // ✅ pill comes after Report a Game
-        { key: "prefs", label: "S9 Signups", href: "/?tab=prefs" },
-      ]
+  const tabs = preSeasonEnabled
+    ? [...tabsBase, { key: "prefs", label: "S9 Signups", href: "/?tab=prefs" }]
     : tabsBase;
 
   const active: TabKey | null = pathname === "/" ? rawTab : null;
-
-  const btnBase =
-    "group relative overflow-hidden rounded-xl border border-purple-500/40 bg-zinc-900 px-6 py-3 font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
-
-  const gradientLayer =
-    "pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100";
-
-  const labelLayer = "relative z-10";
 
   return (
     <div className="mt-3 mb-4 flex justify-center">
       <div className="flex flex-wrap items-center justify-center gap-3">
         {tabs.map(({ key, label, href }) => {
-          // If preseason is off and user somehow is on tab=prefs, don't show it as active.
           const isActive =
             pathname === "/" &&
-            ((key === "prefs" && !preSeasonEnabled) ? false : active === key);
+            !(!preSeasonEnabled && key === "prefs") &&
+            active === key;
 
           return (
-            <Link key={key} href={href} scroll={false} className={btnBase}>
+            <Link
+              key={key}
+              href={href}
+              scroll={false}
+              className="group relative overflow-hidden rounded-xl border px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2"
+              style={{
+                background: "var(--ncx-bg-panel)",
+                borderColor: "var(--ncx-border)",
+                color: "var(--ncx-text-primary)",
+              }}
+            >
+              {/* FILL LAYER — this is the missing piece */}
               <span
-                className={`${gradientLayer} bg-gradient-to-r from-pink-600 via-purple-500 to-cyan-500 ${
-                  isActive ? "opacity-100" : ""
-                }`}
+                className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
+                style={{
+                  opacity: isActive ? 1 : 0,
+                  background: `linear-gradient(
+                    to right,
+                    var(--ncx-hero-from),
+                    var(--ncx-hero-via),
+                    var(--ncx-hero-to)
+                  )`,
+                }}
               />
-              <span className={labelLayer}>{label}</span>
+
+              {/* HOVER FILL — kicks in when not active */}
+              {!isActive && (
+                <span
+                  className="pointer-events-none absolute inset-0 z-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  style={{
+                    background: `linear-gradient(
+                      to right,
+                      var(--ncx-hero-from),
+                      var(--ncx-hero-via),
+                      var(--ncx-hero-to)
+                    )`,
+                  }}
+                />
+              )}
+
+              {/* Text */}
+              <span className="relative z-10">{label}</span>
             </Link>
+
           );
         })}
       </div>

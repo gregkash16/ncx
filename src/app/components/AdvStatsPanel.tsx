@@ -3,11 +3,13 @@
 
 import { useState } from "react";
 
+/* ======================= TYPES ======================= */
+
 type Table1Row = {
   team: string;
   totalGames: string;
   avgWins: string;
-  avgLoss: string; // lowest is best
+  avgLoss: string;
   avgPoints: string;
   avgPlms: string;
   avgGames: string;
@@ -78,6 +80,8 @@ type ListAverages = {
   averagePilotInit: number | null;
 };
 
+/* ======================= MAIN ======================= */
+
 export default function AdvStatsPanel({
   table1,
   table2,
@@ -95,7 +99,6 @@ export default function AdvStatsPanel({
   pilotUsageByFaction: PilotUsageByFaction;
   listAverages: ListAverages;
 }) {
-  // Canonical order for factions we expect
   const factionOrder = [
     "galacticrepublic",
     "separatistalliance",
@@ -117,158 +120,131 @@ export default function AdvStatsPanel({
   };
 
   const allFactions = Object.keys(pilotUsageByFaction ?? {});
-
-  // Sort factions so known ones are first, unknown ones (if any) follow
   const sortedFactions = [
     ...factionOrder.filter((f) => allFactions.includes(f)),
     ...allFactions.filter((f) => !factionOrder.includes(f)),
   ];
 
   const [selectedFaction, setSelectedFaction] = useState<string | null>(null);
-
   const activeFaction =
-    (selectedFaction && sortedFactions.includes(selectedFaction)
+    selectedFaction && sortedFactions.includes(selectedFaction)
       ? selectedFaction
-      : sortedFactions[0]) || "";
+      : sortedFactions[0] ?? "";
 
-  const currentRows: PilotUsageRow[] =
-    (activeFaction && pilotUsageByFaction?.[activeFaction]) || [];
+  const currentRows = pilotUsageByFaction?.[activeFaction] ?? [];
 
-  const hasShip = listAverages?.averageShipCount != null;
-  const hasInit = listAverages?.averagePilotInit != null;
-
-  const avgShip = hasShip
-    ? listAverages.averageShipCount!.toFixed(1)
-    : "—";
-  const avgInit = hasInit
-    ? listAverages.averagePilotInit!.toFixed(1)
-    : "—";
+  const avgShip =
+    listAverages?.averageShipCount != null
+      ? listAverages.averageShipCount.toFixed(1)
+      : "—";
+  const avgInit =
+    listAverages?.averagePilotInit != null
+      ? listAverages.averagePilotInit.toFixed(1)
+      : "—";
 
   return (
     <div className="space-y-8">
-      {/* TABLE 1 */}
-      <section className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-        <h3 className="text-lg font-semibold text-cyan-400 mb-3">
-          Team Averages
-        </h3>
+      <Section title="Team Averages">
         <Table1 rows={table1} />
-      </section>
+      </Section>
 
-      {/* TABLES 2–5: responsive grid; will stack on small screens */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-cyan-400 mb-3">
-            Scenario Averages
-          </h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Section title="Scenario Averages">
           <Table2 rows={table2} />
-        </div>
-
-        <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-cyan-400 mb-3">
-            Scenario × Factions
-          </h3>
+        </Section>
+        <Section title="Scenario × Factions">
           <Table3 rows={table3} />
-        </div>
-
-        <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-cyan-400 mb-3">
-            Faction vs Faction
-          </h3>
+        </Section>
+        <Section title="Faction vs Faction">
           <Table4 rows={table4} />
-        </div>
-
-        <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-          <h3 className="text-lg font-semibold text-cyan-400 mb-3">
-            Faction Performance
-          </h3>
+        </Section>
+        <Section title="Faction Performance">
           <Table5 rows={table5} />
-        </div>
-      </section>
+        </Section>
+      </div>
 
-      {/* Pilot usage by faction + List averages */}
-      <section className="w-full lg:w-1/2 mx-auto rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 md:p-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
-          <h3 className="text-lg font-semibold text-cyan-400">
-            Pilot Usage by Faction
-          </h3>
-          <div className="flex flex-wrap gap-2 text-xs">
-            {sortedFactions.length === 0 && (
-              <span className="text-zinc-400">
-                No pilot usage data yet.
-              </span>
-            )}
-            {sortedFactions.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setSelectedFaction(f)}
-                className={cx(
-                  "px-3 py-1.5 rounded-full border transition",
-                  activeFaction === f
-                    ? "border-cyan-400 bg-cyan-500/10 text-cyan-200"
-                    : "border-zinc-700 bg-zinc-800/60 text-zinc-300 hover:border-cyan-400/60"
-                )}
-              >
-                {factionLabelMap[f] ?? f}
-              </button>
-            ))}
-          </div>
+      <Section title="Pilot Usage by Faction" className="lg:w-1/2 mx-auto">
+        <div className="flex flex-wrap gap-2 mb-4">
+          {sortedFactions.map((f) => (
+            <button
+              key={f}
+              onClick={() => setSelectedFaction(f)}
+              className={cx(
+                "px-3 py-1.5 rounded-full border text-xs transition",
+                activeFaction === f
+                  ? "border-[rgb(var(--ncx-primary))] bg-[rgb(var(--ncx-primary)/0.12)] text-[rgb(var(--ncx-primary))]"
+                  : "border-[var(--ncx-border)] text-[var(--ncx-text-muted)] hover:border-[rgb(var(--ncx-primary)/0.6)]"
+              )}
+            >
+              {factionLabelMap[f] ?? f}
+            </button>
+          ))}
         </div>
 
-        {/* NEW: List Averages box (desktop) */}
-        {(hasShip || hasInit) && (
-          <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
-            <div className="mb-2 text-[11px] uppercase tracking-wide text-zinc-400">
-              List Averages
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg bg-zinc-900/70 px-3 py-2">
-                <div className="text-[11px] uppercase tracking-wide text-zinc-400">
-                  Avg Ship Count
-                </div>
-                <div className="mt-1 font-semibold tabular-nums text-zinc-100">
-                  {avgShip}
-                </div>
-              </div>
-              <div className="rounded-lg bg-zinc-900/70 px-3 py-2">
-                <div className="text-[11px] uppercase tracking-wide text-zinc-400">
-                  Avg Pilot Init
-                </div>
-                <div className="mt-1 font-semibold tabular-nums text-zinc-100">
-                  {avgInit}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="mb-4 grid grid-cols-2 gap-3">
+          <StatBox label="Avg Ship Count" value={avgShip} />
+          <StatBox label="Avg Pilot Init" value={avgInit} />
+        </div>
 
         <PilotUsageTable rows={currentRows} />
-      </section>
+      </Section>
     </div>
   );
 }
 
-/* ------------------------ helpers ------------------------ */
+/* ======================= UI HELPERS ======================= */
 
-function toNum(x: string): number | null {
-  if (!x) return null;
-  const cleaned = x.replace(/[%+,]/g, "").trim();
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+function Section({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cx(
+        "rounded-2xl bg-[var(--ncx-bg-panel)] border border-[var(--ncx-border)] p-4 md:p-6",
+        className
+      )}
+    >
+      <h3 className="text-lg font-semibold text-[rgb(var(--ncx-primary))] mb-3">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-[rgb(24_24_27/0.6)] px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-[var(--ncx-text-muted)]">
+        {label}
+      </div>
+      <div className="mt-1 font-semibold tabular-nums text-[var(--ncx-text-primary)]">
+        {value}
+      </div>
+    </div>
+  );
 }
 
 function cx(...args: (string | false | undefined)[]) {
   return args.filter(Boolean).join(" ");
 }
 
+/* ======================= TABLES ======================= */
+
 function Td({
   children,
-  highlight,
   align = "right",
+  highlight,
 }: {
   children: React.ReactNode;
-  highlight?: boolean;
   align?: "left" | "right" | "center";
+  highlight?: boolean;
 }) {
   return (
     <td
@@ -279,8 +255,8 @@ function Td({
           : align === "center"
           ? "text-center"
           : "text-right",
-        "text-zinc-200",
-        highlight && "border border-amber-400/70 bg-amber-500/10 rounded"
+        highlight &&
+          "border border-[rgb(var(--ncx-highlight))] bg-[rgb(var(--ncx-highlight)/0.12)] rounded"
       )}
     >
       {children ?? "—"}
@@ -288,356 +264,187 @@ function Td({
   );
 }
 
-/* ------------------------ Table 1 ------------------------ */
-
-// (rest of the tables unchanged – this is just your existing code)
-
 function Table1({ rows }: { rows: Table1Row[] }) {
-  const numericCols = [
-    "totalGames",
-    "avgWins",
-    "avgLoss",
-    "avgPoints",
-    "avgPlms",
-    "avgGames",
-    "avgWinPct",
-    "avgPpg",
-    "avgEfficiency",
-    "avgWar",
-    "avgH2h",
-    "avgPotato",
-    "avgSos",
-  ] as const;
-
-  const maxima = new Map<string, number>();
-  const minima = new Map<string, number>();
-
-  for (const key of numericCols) {
-    const nums = rows
-      .map((r) => toNum(r[key as keyof Table1Row] as string))
-      .filter((n): n is number => n !== null);
-    if (!nums.length) continue;
-    if (key === "avgLoss") minima.set(key, Math.min(...nums));
-    else maxima.set(key, Math.max(...nums));
-  }
-
   return (
-    <div className="overflow-x-auto rounded-xl border border-zinc-800">
-      <table className="w-full table-auto">
-        <thead className="sticky top-0 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 text-xs uppercase text-zinc-300">
-          <tr>
-            <th className="px-3 py-2 text-left">Team</th>
-            <th className="px-3 py-2">Total Games</th>
-            <th className="px-3 py-2">Avg Wins</th>
-            <th className="px-3 py-2">Avg Loss</th>
-            <th className="px-3 py-2">Avg Points</th>
-            <th className="px-3 py-2">Avg PL/MS</th>
-            <th className="px-3 py-2">Avg Games</th>
-            <th className="px-3 py-2">Avg Win %</th>
-            <th className="px-3 py-2">Avg PPG</th>
-            <th className="px-3 py-2">Avg Efficiency</th>
-            <th className="px-3 py-2">Avg WAR</th>
-            <th className="px-3 py-2">Avg H2H</th>
-            <th className="px-3 py-2">Avg Potato</th>
-            <th className="px-3 py-2">Avg SOS</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-800">
-          {rows.map((r, i) => (
-            <tr key={`${r.team}-${i}`} className="odd:bg-zinc-900/30">
-              <Td align="left">{r.team}</Td>
-              <Td highlight={toNum(r.totalGames) === maxima.get("totalGames")}>
-                {r.totalGames}
-              </Td>
-              <Td highlight={toNum(r.avgWins) === maxima.get("avgWins")}>
-                {r.avgWins}
-              </Td>
-              <Td highlight={toNum(r.avgLoss) === minima.get("avgLoss")}>
-                {r.avgLoss}
-              </Td>
-              <Td highlight={toNum(r.avgPoints) === maxima.get("avgPoints")}>
-                {r.avgPoints}
-              </Td>
-              <Td highlight={toNum(r.avgPlms) === maxima.get("avgPlms")}>
-                {r.avgPlms}
-              </Td>
-              <Td highlight={toNum(r.avgGames) === maxima.get("avgGames")}>
-                {r.avgGames}
-              </Td>
-              <Td highlight={toNum(r.avgWinPct) === maxima.get("avgWinPct")}>
-                {r.avgWinPct}
-              </Td>
-              <Td highlight={toNum(r.avgPpg) === maxima.get("avgPpg")}>
-                {r.avgPpg}
-              </Td>
-              <Td
-                highlight={
-                  toNum(r.avgEfficiency) === maxima.get("avgEfficiency")
-                }
-              >
-                {r.avgEfficiency}
-              </Td>
-              <Td highlight={toNum(r.avgWar) === maxima.get("avgWar")}>
-                {r.avgWar}
-              </Td>
-              <Td highlight={toNum(r.avgH2h) === maxima.get("avgH2h")}>
-                {r.avgH2h}
-              </Td>
-              <Td highlight={toNum(r.avgPotato) === maxima.get("avgPotato")}>
-                {r.avgPotato}
-              </Td>
-              <Td highlight={toNum(r.avgSos) === maxima.get("avgSos")}>
-                {r.avgSos}
-              </Td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <TableWrapper headers={[
+      "Team","Total Games","Avg Wins","Avg Loss","Avg Points","Avg PL/MS",
+      "Avg Games","Avg Win %","Avg PPG","Avg Efficiency","Avg WAR","Avg H2H",
+      "Avg Potato","Avg SOS"
+    ]}>
+      {rows.map((r, i) => (
+        <tr key={i}>
+          <Td align="left">{r.team}</Td>
+          <Td>{r.totalGames}</Td>
+          <Td>{r.avgWins}</Td>
+          <Td>{r.avgLoss}</Td>
+          <Td>{r.avgPoints}</Td>
+          <Td>{r.avgPlms}</Td>
+          <Td>{r.avgGames}</Td>
+          <Td>{r.avgWinPct}</Td>
+          <Td>{r.avgPpg}</Td>
+          <Td>{r.avgEfficiency}</Td>
+          <Td>{r.avgWar}</Td>
+          <Td>{r.avgH2h}</Td>
+          <Td>{r.avgPotato}</Td>
+          <Td>{r.avgSos}</Td>
+        </tr>
+      ))}
+    </TableWrapper>
   );
 }
-
-/* Table2, Table3, Table4, Table5, PilotUsageTable remain exactly as you pasted */
-/* ------------------------ Table 2 ------------------------ */
 
 function Table2({ rows }: { rows: Table2Row[] }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-zinc-800">
-      <table className="w-full table-auto">
-        <thead className="sticky top-0 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 text-xs uppercase text-zinc-300">
-          <tr>
-            <th className="px-3 py-2 text-left">Scenario</th>
-            <th className="px-3 py-2">Avg Home Pts</th>
-            <th className="px-3 py-2">Avg Away Pts</th>
-            <th className="px-3 py-2">Avg Total Pts</th>
-            <th className="px-3 py-2">Avg W Pts</th>
-            <th className="px-3 py-2">Avg L Pts</th>
-            <th className="px-3 py-2">&lt; 20</th>
-            <th className="px-3 py-2">&gt;= 20</th>
-            <th className="px-3 py-2">Total Games</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-800">
-          {rows.map((r, i) => (
-            <tr key={`${r.scenario}-${i}`} className="odd:bg-zinc-900/30">
-              <Td align="left">{r.scenario}</Td>
-              <Td>{r.avgHomePts}</Td>
-              <Td>{r.avgAwayPts}</Td>
-              <Td>{r.avgTotalPts}</Td>
-              <Td>{r.avgWpts}</Td>
-              <Td>{r.avgLpts}</Td>
-              <Td>{r.lt20}</Td>
-              <Td>{r.gte20}</Td>
-              <Td>{r.totalGames}</Td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <TableWrapper headers={[
+      "Scenario","Avg Home","Avg Away","Avg Total","Avg W","Avg L","<20",">=20","Games"
+    ]}>
+      {rows.map((r, i) => (
+        <tr key={i}>
+          <Td align="left">{r.scenario}</Td>
+          <Td>{r.avgHomePts}</Td>
+          <Td>{r.avgAwayPts}</Td>
+          <Td>{r.avgTotalPts}</Td>
+          <Td>{r.avgWpts}</Td>
+          <Td>{r.avgLpts}</Td>
+          <Td>{r.lt20}</Td>
+          <Td>{r.gte20}</Td>
+          <Td>{r.totalGames}</Td>
+        </tr>
+      ))}
+    </TableWrapper>
   );
 }
-
-/* ------------------------ Table 3 ------------------------ */
 
 function Table3({ rows }: { rows: Table3Row[] }) {
-  const heads = [
-    "Scenario",
-    "Republic",
-    "CIS",
-    "Rebels",
-    "Empire",
-    "Resistance",
-    "First Order",
-    "Scum",
-  ] as const;
   return (
-    <div className="overflow-x-auto rounded-xl border border-zinc-800">
-      <table className="w-full table-auto">
-        <thead className="sticky top-0 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 text-xs uppercase text-zinc-300">
-          <tr>
-            {heads.map((h) => (
-              <th
-                key={h}
-                className={h === "Scenario" ? "px-3 py-2 text-left" : "px-3 py-2"}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-800">
-          {rows.map((r, i) => (
-            <tr key={`${r.scenario}-${i}`} className="odd:bg-zinc-900/30">
-              <Td align="left">{r.scenario}</Td>
-              <Td>{r.republic}</Td>
-              <Td>{r.cis}</Td>
-              <Td>{r.rebels}</Td>
-              <Td>{r.empire}</Td>
-              <Td>{r.resistance}</Td>
-              <Td>{r.firstOrder}</Td>
-              <Td>{r.scum}</Td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <TableWrapper headers={[
+      "Scenario","Republic","CIS","Rebels","Empire","Resistance","First Order","Scum"
+    ]}>
+      {rows.map((r, i) => (
+        <tr key={i}>
+          <Td align="left">{r.scenario}</Td>
+          <Td>{r.republic}</Td>
+          <Td>{r.cis}</Td>
+          <Td>{r.rebels}</Td>
+          <Td>{r.empire}</Td>
+          <Td>{r.resistance}</Td>
+          <Td>{r.firstOrder}</Td>
+          <Td>{r.scum}</Td>
+        </tr>
+      ))}
+    </TableWrapper>
   );
 }
-
-/* ------------------------ Table 4 ------------------------ */
 
 function Table4({ rows }: { rows: Table4Row[] }) {
-  const heads = [
-    "Faction Vs",
-    "Republic",
-    "CIS",
-    "Rebels",
-    "Empire",
-    "Resistance",
-    "First Order",
-    "Scum",
-  ] as const;
   return (
-    <div className="overflow-x-auto rounded-xl border border-zinc-800">
-      <table className="w-full table-auto">
-        <thead className="sticky top-0 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 text-xs uppercase text-zinc-300">
-          <tr>
-            {heads.map((h) => (
-              <th
-                key={h}
-                className={h === "Faction Vs" ? "px-3 py-2 text-left" : "px-3 py-2"}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-800">
-          {rows.map((r, i) => (
-            <tr key={`${r.factionVs}-${i}`} className="odd:bg-zinc-900/30">
-              <Td align="left">{r.factionVs}</Td>
-              <Td>{r.republic}</Td>
-              <Td>{r.cis}</Td>
-              <Td>{r.rebels}</Td>
-              <Td>{r.empire}</Td>
-              <Td>{r.resistance}</Td>
-              <Td>{r.firstOrder}</Td>
-              <Td>{r.scum}</Td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <TableWrapper headers={[
+      "Faction vs","Republic","CIS","Rebels","Empire","Resistance","First Order","Scum"
+    ]}>
+      {rows.map((r, i) => (
+        <tr key={i}>
+          <Td align="left">{r.factionVs}</Td>
+          <Td>{r.republic}</Td>
+          <Td>{r.cis}</Td>
+          <Td>{r.rebels}</Td>
+          <Td>{r.empire}</Td>
+          <Td>{r.resistance}</Td>
+          <Td>{r.firstOrder}</Td>
+          <Td>{r.scum}</Td>
+        </tr>
+      ))}
+    </TableWrapper>
   );
 }
-
-/* ------------------------ Table 5 ------------------------ */
 
 function Table5({ rows }: { rows: Table5Row[] }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-zinc-800">
-      <table className="w-full table-auto">
-        <thead className="sticky top-0 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 text-xs uppercase text-zinc-300">
+    <TableWrapper headers={[
+      "Faction","Wins","Losses","Win %","Avg Draft","Expected %","Perf +/-"
+    ]}>
+      {rows.map((r, i) => (
+        <tr key={i}>
+          <Td align="left">{r.faction}</Td>
+          <Td>{r.wins}</Td>
+          <Td>{r.losses}</Td>
+          <Td>{r.winPct}</Td>
+          <Td>{r.avgDraft}</Td>
+          <Td>{r.expectedWinPct}</Td>
+          <Td>{r.perfPlusMinus}</Td>
+        </tr>
+      ))}
+    </TableWrapper>
+  );
+}
+
+function TableWrapper({
+  headers,
+  children,
+}: {
+  headers: string[];
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-[var(--ncx-border)]">
+      <table className="w-full table-auto text-sm">
+        <thead className="sticky top-0 bg-[rgb(24_24_27/0.9)] text-xs uppercase text-[var(--ncx-text-muted)]">
           <tr>
-            <th className="px-3 py-2 text-left">Faction</th>
-            <th className="px-3 py-2">Wins</th>
-            <th className="px-3 py-2">Losses</th>
-            <th className="px-3 py-2">Win %</th>
-            <th className="px-3 py-2">Avg Draft</th>
-            <th className="px-3 py-2">Expected Win %</th>
-            <th className="px-3 py-2">Perf +/-</th>
+            {headers.map((h) => (
+              <th key={h} className="px-3 py-2 text-left">
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-800">
-          {rows.map((r, i) => (
-            <tr key={`${r.faction}-${i}`} className="odd:bg-zinc-900/30">
-              <Td align="left">{r.faction}</Td>
-              <Td>{r.wins}</Td>
-              <Td>{r.losses}</Td>
-              <Td>{r.winPct}</Td>
-              <Td>{r.avgDraft}</Td>
-              <Td>{r.expectedWinPct}</Td>
-              <Td>{r.perfPlusMinus}</Td>
-            </tr>
-          ))}
-        </tbody>
+        <tbody className="divide-y divide-[var(--ncx-border)]">{children}</tbody>
       </table>
     </div>
   );
 }
 
-/* ------------------------ Pilot Usage Table ------------------------ */
+/* ======================= PILOT USAGE ======================= */
 
 function PilotUsageTable({ rows }: { rows: PilotUsageRow[] }) {
-  // For bar graph scale
-  const maxUses = rows.length
-    ? Math.max(...rows.map((r) => r.uses ?? 0))
-    : 0;
+  const maxUses = rows.length ? Math.max(...rows.map((r) => r.uses)) : 0;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-zinc-800">
-      <div className="max-h-[520px] overflow-y-auto pr-2">
-      <table className="min-w-full text-sm">
-
-        <thead className="sticky top-0 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 text-xs uppercase text-zinc-300">
+    <div className="rounded-xl border border-[var(--ncx-border)] overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-[rgb(24_24_27/0.9)] text-xs uppercase text-[var(--ncx-text-muted)]">
           <tr>
             <th className="px-3 py-2 text-left">Pilot</th>
             <th className="px-3 py-2 text-right">Uses</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-800">
-          {rows.length === 0 && (
-            <tr>
-              <td
-                colSpan={2}
-                className="px-3 py-4 text-sm text-zinc-400 text-center"
-              >
-                No lists recorded for this faction yet.
-              </td>
+        <tbody className="divide-y divide-[var(--ncx-border)]">
+          {rows.map((r, i) => (
+            <tr key={i}>
+              <Td align="left">
+                <div className="flex items-center gap-3">
+                  <span className="ship-icons text-xl">{r.shipGlyph}</span>
+                  {r.pilotName}
+                </div>
+              </Td>
+              <Td>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 rounded bg-zinc-800">
+                    <div
+                      className="h-2 rounded bg-[rgb(var(--ncx-primary))]"
+                      style={{
+                        width: `${Math.max(
+                          5,
+                          (r.uses / maxUses) * 100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="tabular-nums">{r.uses}</span>
+                </div>
+              </Td>
             </tr>
-          )}
-
-          {rows.map((r, i) => {
-            const ratio =
-              maxUses > 0 ? Math.max(0.05, r.uses / maxUses) : 0; // min bar width
-
-            return (
-              <tr
-                key={`${r.pilotId}-${i}`}
-                className="odd:bg-zinc-900/30"
-              >
-                {/* Pilot name + ship glyph */}
-                <Td align="left">
-                  <div className="flex items-center gap-3">
-                    {r.shipGlyph && (
-                      <span className="ship-icons text-xl leading-none">
-                        {r.shipGlyph}
-                      </span>
-                    )}
-                    <span>{r.pilotName}</span>
-                  </div>
-                </Td>
-
-                {/* Uses with horizontal bar graph */}
-                <Td align="right">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
-                      <div
-                        className="h-2 rounded-full bg-cyan-500/80"
-                        style={{ width: `${ratio * 100}%` }}
-                      />
-                    </div>
-                    <span className="tabular-nums text-sm text-zinc-100 min-w-[2ch] text-right">
-                      {r.uses}
-                    </span>
-                  </div>
-                </Td>
-              </tr>
-            );
-          })}
+          ))}
         </tbody>
       </table>
-      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // =============== CONFIG ===============
 
 const NCX_LEAGUE_SHEET_ID =
-  process.env.NCX_LEAGUE_SHEET_ID ?? "19sTVWOsDcq9b2rBh2Duj0LFwIkWY4P7_fA6tTg2bkeA";
+  process.env.NCX_LEAGUE_SHEET_ID ?? "1x4_rfPq-fPnJ2IT6WbNzBxVmomqU36fU24pnKuPaObw";
 const NCX_STATS_SHEET_ID =
   process.env.NCX_STATS_SHEET_ID ?? "1Lg7rEXmizuQHlFQqtREKclSrbIdWnKa8KIfdsLy0FLs";
 const STREAM_SCHEDULE_SHEET_ID =

@@ -1,7 +1,7 @@
 // src/app/m/advstats/MobileAdvStats.tsx
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 type ListAverages = {
   averageShipCount: number | null;
@@ -78,6 +78,35 @@ type PilotUsageRow = {
 
 type PilotUsageByFaction = Record<string, PilotUsageRow[]>;
 
+type TabId = "t1" | "t2" | "t3" | "t4" | "t5" | "pilots";
+
+const TAB_DEFS: Array<{ id: TabId; label: string }> = [
+  { id: "t1", label: "Teams" },
+  { id: "t2", label: "Scen Avg" },
+  { id: "t3", label: "Scen×Fact" },
+  { id: "t4", label: "FvF" },
+  { id: "t5", label: "Perf" },
+  { id: "pilots", label: "Pilots" },
+];
+
+const PANEL =
+  "rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-bg-elev)] shadow-[0_4px_20px_rgba(0,0,0,0.25)]";
+
+const CARD =
+  "rounded-xl border border-[var(--ncx-border)] bg-[color:color-mix(in_oklab,var(--ncx-bg)_70%,transparent)]";
+
+const SOFT =
+  "bg-[color:color-mix(in_oklab,var(--ncx-bg-elev)_75%,transparent)]";
+
+const CHIP =
+  "inline-flex items-center rounded-md border border-[var(--ncx-border)] px-2 py-1 text-[11px]";
+
+const TITLE =
+  "text-xl font-extrabold tracking-wide text-[var(--ncx-text-primary)]";
+
+const SUBTLE =
+  "text-[11px] uppercase tracking-wide text-[var(--ncx-text-muted)]";
+
 export default function MobileAdvStats({
   table1,
   table2,
@@ -95,48 +124,48 @@ export default function MobileAdvStats({
   pilotUsage: PilotUsageByFaction;
   listAverages: ListAverages;
 }) {
-  const [tab, setTab] = useState<"t1" | "t2" | "t3" | "t4" | "t5" | "pilots">(
-    "t1"
-  );
+  const [tab, setTab] = useState<TabId>("t1");
 
-  const avgShip =
-    listAverages?.averageShipCount != null
-      ? listAverages.averageShipCount.toFixed(1)
-      : undefined;
-  const avgInit =
-    listAverages?.averagePilotInit != null
-      ? listAverages.averagePilotInit.toFixed(1)
-      : undefined;
+  const avgShip = useMemo(() => {
+    const v = listAverages?.averageShipCount;
+    return v != null ? v.toFixed(1) : undefined;
+  }, [listAverages]);
+
+  const avgInit = useMemo(() => {
+    const v = listAverages?.averagePilotInit;
+    return v != null ? v.toFixed(1) : undefined;
+  }, [listAverages]);
 
   return (
     <section className="w-full">
-      <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-3 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
-        <h2 className="mb-3 text-xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400">
-          Advanced Stats
-        </h2>
+      <div className={`${PANEL} p-3`}>
+        <h2 className={TITLE}>Advanced Stats</h2>
 
         {/* Tabs */}
-        <div className="grid grid-cols-6 gap-1 rounded-xl border border-neutral-800 bg-neutral-950 p-1">
-          {[
-            { id: "t1", label: "Teams" },
-            { id: "t2", label: "Scen Avg" },
-            { id: "t3", label: "Scen×Fact" },
-            { id: "t4", label: "FvF" },
-            { id: "t5", label: "Perf" },
-            { id: "pilots", label: "Pilots" },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id as any)}
-              className={`rounded-lg px-2 py-1.5 text-[11px] ${
-                tab === t.id
-                  ? "bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 text-black font-semibold"
-                  : "text-neutral-300 hover:text-white"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div
+          className={[
+            "mt-3 grid grid-cols-6 gap-1 rounded-xl border border-[var(--ncx-border)]",
+            "bg-[var(--ncx-bg)] p-1",
+          ].join(" ")}
+        >
+          {TAB_DEFS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={[
+                  "rounded-lg px-2 py-1.5 text-[11px] transition",
+                  active
+                    ? "bg-[var(--ncx-accent)] text-[var(--ncx-accent-contrast)] font-semibold"
+                    : "text-[var(--ncx-text-secondary)] hover:text-[var(--ncx-text-primary)]",
+                ].join(" ")}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Content */}
@@ -149,18 +178,15 @@ export default function MobileAdvStats({
 
           {tab === "pilots" && (
             <div className="space-y-3">
-              {/* NEW: List averages box inside pilots tab */}
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-2">
-                <div className="mb-1 text-[11px] uppercase tracking-wide text-neutral-400">
-                  List Averages
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+              {/* List averages box */}
+              <div className={`${CARD} p-2`}>
+                <div className={SUBTLE}>List Averages</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                   <Stat k="Avg Ship Count" v={avgShip} />
                   <Stat k="Avg Pilot Init" v={avgInit} />
                 </div>
               </div>
 
-              {/* Then pilot usage list */}
               <MobilePilotUsage pilotUsage={pilotUsage} />
             </div>
           )}
@@ -174,11 +200,11 @@ export default function MobileAdvStats({
 
 function Stat({ k, v }: { k: string; v?: string }) {
   return (
-    <div className="rounded-lg bg-neutral-900/60 px-2 py-1 text-center">
-      <div className="uppercase text-[10px] tracking-wide text-neutral-400">
+    <div className={`rounded-lg ${SOFT} px-2 py-1 text-center`}>
+      <div className="uppercase text-[10px] tracking-wide text-[var(--ncx-text-muted)]">
         {k}
       </div>
-      <div className="font-semibold tabular-nums text-neutral-200">
+      <div className="font-semibold tabular-nums text-[var(--ncx-text-primary)]">
         {v ?? "—"}
       </div>
     </div>
@@ -187,7 +213,9 @@ function Stat({ k, v }: { k: string; v?: string }) {
 
 function Empty() {
   return (
-    <div className="mt-4 text-center text-sm text-neutral-400">No data.</div>
+    <div className="mt-4 text-center text-sm text-[var(--ncx-text-muted)]">
+      No data.
+    </div>
   );
 }
 
@@ -213,15 +241,12 @@ function Table1Cards({ rows }: { rows: Table1Row[] }) {
   return (
     <ul className="space-y-2">
       {rows.map((r, i) => (
-        <li
-          key={`${r.team}-${i}`}
-          className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3"
-        >
+        <li key={`${r.team}-${i}`} className={`${CARD} p-3`}>
           <div className="flex items-center justify-between gap-3">
-            <div className="truncate text-sm font-semibold text-neutral-200">
+            <div className="truncate text-sm font-semibold text-[var(--ncx-text-primary)]">
               {r.team}
             </div>
-            <div className="text-xs text-neutral-400">
+            <div className="text-xs text-[var(--ncx-text-muted)]">
               Games: {r.totalGames || "—"}
             </div>
           </div>
@@ -250,12 +275,14 @@ function Table2Cards({ rows }: { rows: Table2Row[] }) {
   return (
     <ul className="space-y-2">
       {rows.map((r, i) => (
-        <li
-          key={`${r.scenario}-${i}`}
-          className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3"
-        >
-          <div className="text-sm font-semibold text-neutral-200">
-            {r.scenario}
+        <li key={`${r.scenario}-${i}`} className={`${CARD} p-3`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
+              {r.scenario}
+            </div>
+            <span className={`${CHIP} text-[var(--ncx-text-secondary)]`}>
+              Games: {r.totalGames || "—"}
+            </span>
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
             <Stat k="Home" v={r.avgHomePts} />
@@ -275,6 +302,7 @@ function Table2Cards({ rows }: { rows: Table2Row[] }) {
 
 function Table3Cards({ rows }: { rows: Table3Row[] }) {
   if (!rows?.length) return <Empty />;
+
   const order: Array<keyof Table3Row> = [
     "republic",
     "cis",
@@ -297,23 +325,17 @@ function Table3Cards({ rows }: { rows: Table3Row[] }) {
   return (
     <ul className="space-y-2">
       {rows.map((r, i) => (
-        <li
-          key={`${r.scenario}-${i}`}
-          className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3"
-        >
-          <div className="text-sm font-semibold text-neutral-200">
+        <li key={`${r.scenario}-${i}`} className={`${CARD} p-3`}>
+          <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
             {r.scenario}
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
             {order.map((k) => (
-              <div
-                key={String(k)}
-                className="rounded-lg bg-neutral-900/60 px-2 py-1"
-              >
-                <div className="text-[10px] uppercase tracking-wide text-neutral-400">
+              <div key={String(k)} className={`rounded-lg ${SOFT} px-2 py-1`}>
+                <div className="text-[10px] uppercase tracking-wide text-[var(--ncx-text-muted)]">
                   {labels[k]}
                 </div>
-                <div className="font-semibold tabular-nums text-neutral-200">
+                <div className="font-semibold tabular-nums text-[var(--ncx-text-primary)]">
                   {(r[k] as string) || "—"}
                 </div>
               </div>
@@ -327,6 +349,7 @@ function Table3Cards({ rows }: { rows: Table3Row[] }) {
 
 function Table4Cards({ rows }: { rows: Table4Row[] }) {
   if (!rows?.length) return <Empty />;
+
   const order: Array<keyof Table4Row> = [
     "republic",
     "cis",
@@ -349,23 +372,17 @@ function Table4Cards({ rows }: { rows: Table4Row[] }) {
   return (
     <ul className="space-y-2">
       {rows.map((r, i) => (
-        <li
-          key={`${r.factionVs}-${i}`}
-          className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3"
-        >
-          <div className="text-sm font-semibold text-neutral-200">
+        <li key={`${r.factionVs}-${i}`} className={`${CARD} p-3`}>
+          <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
             {r.factionVs}
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
             {order.map((k) => (
-              <div
-                key={String(k)}
-                className="rounded-lg bg-neutral-900/60 px-2 py-1"
-              >
-                <div className="text-[10px] uppercase tracking-wide text-neutral-400">
+              <div key={String(k)} className={`rounded-lg ${SOFT} px-2 py-1`}>
+                <div className="text-[10px] uppercase tracking-wide text-[var(--ncx-text-muted)]">
                   {labels[k]}
                 </div>
-                <div className="font-semibold tabular-nums text-neutral-200">
+                <div className="font-semibold tabular-nums text-[var(--ncx-text-primary)]">
                   {(r[k] as string) || "—"}
                 </div>
               </div>
@@ -382,12 +399,14 @@ function Table5Cards({ rows }: { rows: Table5Row[] }) {
   return (
     <ul className="space-y-2">
       {rows.map((r, i) => (
-        <li
-          key={`${r.faction}-${i}`}
-          className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-3"
-        >
-          <div className="text-sm font-semibold text-neutral-200">
-            {r.faction}
+        <li key={`${r.faction}-${i}`} className={`${CARD} p-3`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
+              {r.faction}
+            </div>
+            <span className={`${CHIP} text-[var(--ncx-text-secondary)]`}>
+              Win%: {r.winPct || "—"}
+            </span>
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
             <Stat k="W" v={r.wins} />
@@ -405,19 +424,23 @@ function Table5Cards({ rows }: { rows: Table5Row[] }) {
 
 /* ------------------- Mobile Pilot Usage ------------------- */
 
-function MobilePilotUsage({
-  pilotUsage,
-}: {
-  pilotUsage: PilotUsageByFaction;
-}) {
-  const factionKeys = Object.keys(pilotUsage || {});
+function MobilePilotUsage({ pilotUsage }: { pilotUsage: PilotUsageByFaction }) {
+  const factionKeys = useMemo(() => Object.keys(pilotUsage || {}), [pilotUsage]);
+  const [selected, setSelected] = useState<string>(() => factionKeys[0] ?? "");
+
+  // keep selected valid if data changes
+  useMemo(() => {
+    if (!selected && factionKeys[0]) setSelected(factionKeys[0]);
+    if (selected && factionKeys.length && !factionKeys.includes(selected)) {
+      setSelected(factionKeys[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [factionKeys.join("|")]);
+
   if (!factionKeys.length) return <Empty />;
 
-  const [selected, setSelected] = useState<string>(factionKeys[0]);
   const rows = pilotUsage[selected] ?? [];
-  const maxUses = rows.length
-    ? Math.max(...rows.map((r) => r.uses ?? 0))
-    : 0;
+  const maxUses = rows.length ? Math.max(...rows.map((r) => r.uses ?? 0)) : 0;
 
   return (
     <div className="space-y-3">
@@ -426,15 +449,18 @@ function MobilePilotUsage({
         {factionKeys.map((key) => {
           const label = factionDisplayLabel(key);
           const isActive = key === selected;
+
           return (
             <button
               key={key}
+              type="button"
               onClick={() => setSelected(key)}
-              className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs ${
+              className={[
+                "whitespace-nowrap rounded-full border px-3 py-1 text-xs transition",
                 isActive
-                  ? "border-cyan-400 bg-cyan-500/10 text-cyan-200"
-                  : "border-neutral-700 bg-neutral-900 text-neutral-300 hover:border-cyan-400/60 hover:text-cyan-100"
-              }`}
+                  ? "border-[var(--ncx-accent)] bg-[var(--ncx-accent-soft)] text-[var(--ncx-text-primary)]"
+                  : "border-[var(--ncx-border)] bg-[var(--ncx-bg)] text-[var(--ncx-text-secondary)] hover:text-[var(--ncx-text-primary)] hover:border-[var(--ncx-accent)]",
+              ].join(" ")}
             >
               {label}
             </button>
@@ -443,42 +469,42 @@ function MobilePilotUsage({
       </div>
 
       {/* list with internal scroll */}
-      <div className="max-h-[420px] overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950/60">
+      <div className="max-h-[420px] overflow-y-auto rounded-xl border border-[var(--ncx-border)] bg-[color:color-mix(in_oklab,var(--ncx-bg)_65%,transparent)]">
         {rows.length === 0 ? (
-          <div className="py-4 text-center text-sm text-neutral-400">
+          <div className="py-4 text-center text-sm text-[var(--ncx-text-muted)]">
             No lists recorded for this faction yet.
           </div>
         ) : (
-          <ul className="divide-y divide-neutral-800">
+          <ul className="divide-y divide-[var(--ncx-border)]">
             {rows.map((r, idx) => {
-              const ratio =
-                maxUses > 0 ? Math.max(0.05, r.uses / maxUses) : 0;
+              const ratio = maxUses > 0 ? Math.max(0.05, r.uses / maxUses) : 0;
 
               return (
-                <li
-                  key={`${r.pilotId}-${idx}`}
-                  className="px-3 py-2 flex items-center gap-3"
-                >
-                  {r.shipGlyph && (
-                    <span className="ship-icons text-xl leading-none">
+                <li key={`${r.pilotId}-${idx}`} className="px-3 py-2 flex items-center gap-3">
+                  {r.shipGlyph ? (
+                    <span className="ship-icons text-xl leading-none text-[var(--ncx-text-secondary)]">
                       {r.shipGlyph}
+                    </span>
+                  ) : (
+                    <span className="ship-icons text-xl leading-none text-[var(--ncx-text-muted)]">
+                      —
                     </span>
                   )}
 
                   <div className="flex-1 min-w-0">
-                    <div className="truncate text-sm text-neutral-100">
+                    <div className="truncate text-sm text-[var(--ncx-text-primary)]">
                       {r.pilotName}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 w-28">
-                    <div className="flex-1 h-1.5 rounded-full bg-neutral-800 overflow-hidden">
+                    <div className="flex-1 h-1.5 rounded-full bg-[color:color-mix(in_oklab,var(--ncx-border)_60%,transparent)] overflow-hidden">
                       <div
-                        className="h-1.5 rounded-full bg-cyan-500/80"
+                        className="h-1.5 rounded-full bg-[var(--ncx-accent)]"
                         style={{ width: `${ratio * 100}%` }}
                       />
                     </div>
-                    <span className="tabular-nums text-xs text-neutral-100">
+                    <span className="tabular-nums text-xs text-[var(--ncx-text-primary)]">
                       {r.uses}
                     </span>
                   </div>

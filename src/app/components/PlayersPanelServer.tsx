@@ -61,7 +61,7 @@ export default async function PlayersPanelServer() {
         ppg,
         s1, s2, s3, s4, s5, s6, s7, s8, s9,
         championships
-      FROM S8.all_time_stats
+      FROM S9.all_time_stats
       ORDER BY id ASC
     `
     );
@@ -103,7 +103,7 @@ export default async function PlayersPanelServer() {
     return <PlayersPanel data={data} />;
   } catch (err: any) {
     return (
-      <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800 text-zinc-300">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-[var(--ncx-text-primary)]">
         Failed to load Player Stats. {String(err?.message ?? "")}
       </div>
     );

@@ -203,11 +203,11 @@ export default function NotificationsDrawer({
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent
         side="left"
-        className="w-[92vw] sm:w-96 bg-neutral-950 text-neutral-100 border-neutral-800 p-0"
+        className="w-[92vw] sm:w-96 bg-[var(--ncx-bg-start)] text-[var(--ncx-text-primary)] border-[var(--ncx-border)] p-0"
       >
         <div className="flex h-[100dvh] flex-col">
           {/* Sticky header */}
-          <div className="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950/90 backdrop-blur">
+          <div className="sticky top-0 z-10 border-b border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.90)] backdrop-blur">
             <SheetHeader>
               <SheetTitle>{title}</SheetTitle>
             </SheetHeader>
@@ -217,13 +217,13 @@ export default function NotificationsDrawer({
           <div className="flex-1 overflow-y-auto px-3 py-3 pb-[env(safe-area-inset-bottom)]">
             {/* OPTIONAL NAV (for Desktop) */}
             {navLinks?.length ? (
-              <nav className="mb-4 rounded-xl border border-neutral-800 bg-neutral-900/60 p-2 text-sm">
+              <nav className="mb-4 rounded-xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] p-2 text-sm">
                 <ul className="grid gap-1">
                   {navLinks.map((l) => (
                     <li key={l.href}>
                       <a
                         href={l.href}
-                        className="block rounded-lg px-2 py-1 hover:bg-neutral-800"
+                        className="block rounded-lg px-2 py-1 hover:bg-[rgb(var(--ncx-primary-rgb)/0.12)]"
                       >
                         {l.label}
                       </a>
@@ -234,11 +234,11 @@ export default function NotificationsDrawer({
             ) : null}
 
             {/* Subscribe/Unsubscribe */}
-            <div className="mt-1 space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/60 p-3">
+            <div className="mt-1 space-y-3 rounded-xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold">Push notifications</div>
-                  <div className="text-xs text-neutral-400">
+                  <div className="text-xs text-[var(--ncx-text-muted)]">
                     {supported
                       ? permission === "granted"
                         ? "Enabled in browser"
@@ -251,8 +251,8 @@ export default function NotificationsDrawer({
                   disabled={!supported || loading}
                   className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium border transition ${
                     subscribed
-                      ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20"
-                      : "border-neutral-700 bg-neutral-800 hover:bg-neutral-700"
+                      ? "border-[rgb(var(--ncx-highlight-rgb)/0.60)] bg-[rgb(var(--ncx-highlight-rgb)/0.12)] hover:bg-[rgb(var(--ncx-highlight-rgb)/0.20)]"
+                      : "border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.10)] hover:bg-[rgb(var(--ncx-primary-rgb)/0.16)]"
                   }`}
                 >
                   {subscribed ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
@@ -263,7 +263,7 @@ export default function NotificationsDrawer({
               {permission !== "granted" && supported && (
                 <button
                   onClick={requestPermission}
-                  className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-left text-xs text-neutral-300 hover:bg-neutral-700"
+                  className="w-full rounded-lg border border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.10)] px-3 py-2 text-left text-xs text-[var(--ncx-text-primary)] hover:bg-[rgb(var(--ncx-primary-rgb)/0.16)]"
                 >
                   Grant browser permission
                 </button>
@@ -271,13 +271,13 @@ export default function NotificationsDrawer({
             </div>
 
             {/* Team Filters */}
-            <div className="mt-4 space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/60 p-3">
+            <div className="mt-4 space-y-3 rounded-xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] p-3">
               <div className="text-sm font-semibold">Teams to notify</div>
 
               <label className="flex items-center gap-3 text-sm">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-neutral-700 bg-neutral-900"
+                  className="h-4 w-4 rounded border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]"
                   checked={prefs.allTeams}
                   onChange={(e) => onToggleAllTeams(e.target.checked)}
                 />
@@ -291,7 +291,7 @@ export default function NotificationsDrawer({
                     return (
                       <label
                         key={team}
-                        className="flex items-center justify-between rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2 text-sm"
+                        className="flex items-center justify-between rounded-lg border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] px-3 py-2 text-sm"
                       >
                         <div className="truncate pr-3">{team}</div>
                         <button
@@ -299,8 +299,8 @@ export default function NotificationsDrawer({
                           onClick={() => onToggleTeam(team)}
                           className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${
                             selected
-                              ? "border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20"
-                              : "border-neutral-700 bg-neutral-800 hover:bg-neutral-700"
+                              ? "border-[rgb(var(--ncx-primary-rgb)/0.60)] bg-[rgb(var(--ncx-primary-rgb)/0.12)] hover:bg-[rgb(var(--ncx-primary-rgb)/0.20)]"
+                              : "border-[var(--ncx-border)] bg-[rgb(var(--ncx-primary-rgb)/0.10)] hover:bg-[rgb(var(--ncx-primary-rgb)/0.16)]"
                           }`}
                         >
                           {selected && <Check className="h-3.5 w-3.5" />}
@@ -313,7 +313,7 @@ export default function NotificationsDrawer({
               )}
 
               {!subscribed && (
-                <div className="text-xs text-neutral-400">
+                <div className="text-xs text-[var(--ncx-text-muted)]">
                   Tip: subscribe first, then your preferences will be saved.
                 </div>
               )}
