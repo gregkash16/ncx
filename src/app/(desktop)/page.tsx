@@ -260,7 +260,7 @@ export default async function HomePage({
   }
 
   return (
-    <main className="min-h-screen overflow-visible ncx-gradient-bg text-zinc-100">
+    <div className="min-h-screen overflow-visible ncx-gradient-bg text-zinc-100">
       <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-6 text-center">
         <div className="absolute inset-0 -z-10">
           <div className="absolute inset-0 ncx-neon-blob-a" />
@@ -336,6 +336,6 @@ export default async function HomePage({
           />
         </div>
       </section>
-    </main>
+    </div>
   );
 }

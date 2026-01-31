@@ -36,65 +36,56 @@
    ROOT TOKENS
    ========================================================= */
 :root {
-
-  /* Status colors (for tables/rows) */
+  /* Status colors */
   --ncx-success-rgb: 34 197 94;
   --ncx-danger-rgb: 239 68 68;
 
   --radius: 0.625rem;
-  --ncx-accent: oklch(...);
-  --ncx-accent-soft: oklch(...);
-  --ncx-accent-strong: oklch(...);
-  --ncx-border-accent: oklch(...);
-
-/* =========================================================
-   NCX — SEASON 9 BRAND TOKENS
-   (CHANGE THESE PER SEASON)
-   ========================================================= */
-
-/* Page gradient */
---ncx-bg-start: #1b0a12;   /* deep garnet-black */
---ncx-bg-mid:   #3a0f1e;   /* rich garnet */
-
-/* Accent colors (RGB triplets for glow/math) */
---ncx-primary-rgb: 173 24 55;   /* garnet */
---ncx-secondary-rgb: 212 175 55; /* gold */
-
-/* Hero */
---ncx-hero-from: #ad1837;  /* garnet */
---ncx-hero-via:  #3a0f1e;  /* dark garnet */
---ncx-hero-to:   #d4af37;  /* gold */
---ncx-hero-glow-rgb: 173 24 55;
-
-/* Panels / borders */
---ncx-panel-bg: rgb(12 6 10 / 0.9);
---ncx-border: rgb(255 255 255 / 0.12);
-
-/* Alias */
---ncx-bg-panel: var(--ncx-panel-bg);
-
-/* Highlight (best-in-table) */
---ncx-highlight-rgb: 212 175 55;
-
-/* Text */
---ncx-text-primary: rgb(248 250 252);
---ncx-text-muted: rgb(190 184 192);
 
   /* =========================================================
-     TEAM OVERRIDE HOOKS (future-safe)
+     NCX — SEASON 9 BRAND TOKENS
      ========================================================= */
+
+  /* Page gradient */
+  --ncx-bg-start: #1b0a12;
+  --ncx-bg-mid:   #3a0f1e;
+
+  /* Accent colors */
+  --ncx-primary-rgb: 173 24 55;
+  --ncx-secondary-rgb: 212 175 55;
+
+  /* Hero */
+  --ncx-hero-from: #ad1837;
+  --ncx-hero-via:  #3a0f1e;
+  --ncx-hero-to:   #d4af37;
+  --ncx-hero-glow-rgb: 173 24 55;
+
+  /* Panels / borders */
+  --ncx-panel-bg: rgb(12 6 10 / 0.9);
+  --ncx-border: rgb(255 255 255 / 0.12);
+  --ncx-bg-panel: var(--ncx-panel-bg);
+
+  /* Highlight */
+  --ncx-highlight-rgb: 212 175 55;
+
+  /* Text */
+  --ncx-text-primary: rgb(248 250 252);
+  --ncx-text-muted: rgb(190 184 192);
+
+  /* Team override hooks */
   --team-primary-rgb: var(--ncx-primary-rgb);
   --team-secondary-rgb: var(--ncx-secondary-rgb);
 
   /* =========================================================
-     SHADCN BASE TOKENS (unchanged)
+     SHADCN BASE TOKENS (DARK-SAFE)
+     IMPORTANT: background is NOT white
      ========================================================= */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --background: rgb(12 6 10);
+  --foreground: oklch(0.985 0 0);
+  --card: rgb(12 6 10);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: rgb(12 6 10);
+  --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
@@ -104,21 +95,51 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.708 0 0);
 }
 
 /* =========================================================
-   DARK MODE
+   DARK MODE (NO WHITE FALLBACKS)
    ========================================================= */
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: rgb(12 6 10);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: rgb(12 6 10);
   --card-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+}
+
+/* =========================================================
+   GLOBAL BACKGROUND + HEIGHT FIX
+   (ELIMINATES WHITE BAND / FLASH)
+   ========================================================= */
+html,
+body {
+  height: 100%;
+  min-height: 100%;
+  background: linear-gradient(
+    to bottom,
+    var(--ncx-bg-start),
+    var(--ncx-bg-mid),
+    var(--ncx-bg-start)
+  );
+  background-attachment: fixed;
+}
+
+/* Prevent Tailwind body bg from painting */
+body {
+  background-color: transparent !important;
+  color: var(--ncx-text-primary);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  background-clip: padding-box;
+}
+
+/* Next.js root safety */
+#__next {
+  min-height: 100%;
+  background: transparent;
 }
 
 /* =========================================================
@@ -128,15 +149,11 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
 }
 
 /* =========================================================
-   NCX UTILITIES (USE THESE IN COMPONENTS)
+   NCX UTILITIES
    ========================================================= */
-
 .ncx-gradient-bg {
   background: linear-gradient(
     to bottom,
@@ -164,9 +181,11 @@
 .ncx-accent {
   color: rgb(var(--ncx-primary-rgb));
 }
+
 .ncx-accent-bg {
   background-color: rgb(var(--ncx-primary-rgb) / 0.14);
 }
+
 .ncx-accent-border {
   border-color: rgb(var(--ncx-primary-rgb));
 }
@@ -184,15 +203,15 @@
   src: url("/fonts/xwing-miniatures-ships.ttf") format("truetype");
   font-display: swap;
 }
+
 .ship-icons {
   font-family: "XWingShips", system-ui, sans-serif;
   font-variant-ligatures: none;
 }
 
 /* =========================================================
-   NCX INTERACTIVE TILE (hover-fill behavior)
+   NCX INTERACTIVE TILE
    ========================================================= */
-
 .ncx-tile {
   position: relative;
   overflow: hidden;

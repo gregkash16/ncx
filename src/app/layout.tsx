@@ -3,6 +3,8 @@ import "./globals.css";
 import Providers from "./providers";
 import Script from "next/script";
 import { NCX_BRAND } from "@/theme/base";
+import DesktopHeader from "./components/DesktopHeader";
+import ShowDesktopLoginOnly from "./components/ShowDesktopLoginOnly";
 
 export const metadata = {
   title: "Nickel City X-Wing",
@@ -22,7 +24,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
-        {/* Google Analytics – loads globally */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-1BC1MGNQSV"
           strategy="afterInteractive"
@@ -37,12 +38,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Script>
       </head>
 
-      {/* ✅ Use your token-driven theme instead of hardcoded zinc */}
-      <body className="bg-[var(--ncx-bg)] text-[var(--ncx-text-primary)]">
-        <Providers>{children}</Providers>
+      <body className="text-[var(--ncx-text-primary)]">
+        <Providers>
+          {/* Header must be ABOVE auth gates */}
+          <DesktopHeader />
 
-        {/* ✅ Remove this if you’re already using <ServiceWorkerBoot /> */}
-        {/* (If you keep ServiceWorkerBoot, do NOT register here too.) */}
+          {/* Auth gate can block content, not layout */}
+          <ShowDesktopLoginOnly />
+
+          {children}
+        </Providers>
       </body>
     </html>
   );
