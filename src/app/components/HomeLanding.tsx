@@ -147,7 +147,7 @@ export default function HomeLanding({
 
           {/* NEW — Streamer Kit */}
           <a
-            href="https://drive.google.com/drive/folders/1cJHX4xa8I-QtRqle-IvWWdOFbnlNGIfp?usp=drive_link"
+            href="https://drive.google.com/drive/folders/1gkSjUgjlYVYdcJN91fY0652bcLUwCQVO?usp=drive_link"
             target="_blank"
             rel="noreferrer"
             className="flex items-center justify-center rounded-xl border border-yellow-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold hover:bg-yellow-500/20 hover:border-yellow-400 transition"
