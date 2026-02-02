@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import MobileBottomNav from "./mobile/MobileBottomNav";
 import MobileNavButton from "./mobile/MobileNavButton";
 import NotificationsDrawer from "../components/NotificationsDrawer";
+import AuthStatus from "./components/AuthStatus";
+
 import { Settings } from "lucide-react";
 
 import { getServerSession } from "next-auth";
@@ -30,9 +32,7 @@ export default async function MobileLayout({
   return (
     <div className="min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
       {/* Top Bar */}
-      <header
-        className="sticky top-0 z-20 border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] backdrop-blur supports-[backdrop-filter]:backdrop-blur-md"
-      >
+      <header className="sticky top-0 z-20 border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
         {/* Status-bar fill */}
         <div
           className="w-full"
@@ -41,6 +41,7 @@ export default async function MobileLayout({
 
         {/* Actual header content */}
         <div className="flex items-center justify-between gap-3 p-3">
+          {/* Left */}
           <div className="flex items-center gap-3">
             <MobileNavButton />
             <img src="/logo.webp" alt="NCX" className="h-7 w-7 rounded-lg" />
@@ -49,8 +50,29 @@ export default async function MobileLayout({
             </h1>
           </div>
 
+          {/* Right */}
           <div className="flex items-center gap-2">
-            {/* existing auth UI unchanged */}
+            {/* Notifications */}
+            <NotificationsDrawer>
+              <button
+                aria-label="Notifications"
+                className="
+                  relative
+                  rounded-lg
+                  border border-[var(--ncx-border)]
+                  bg-[var(--ncx-bg-elev)]
+                  p-2
+                  hover:bg-[var(--ncx-bg-elev-hover)]
+                  active:scale-[0.97]
+                  transition
+                "
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+            </NotificationsDrawer>
+
+            {/* Auth status */}
+            <AuthStatus />
           </div>
         </div>
       </header>
