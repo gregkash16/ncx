@@ -96,12 +96,13 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
 
       {/* TOP HALF: navigation panel */}
       <aside
-        className="absolute inset-x-0 top-0 h-[50svh] border-b border-[var(--ncx-border)] bg-[var(--ncx-bg-panel)]"
+        className="absolute inset-0 flex flex-col bg-[var(--ncx-bg-panel)]"
         role="dialog"
         aria-modal="true"
         aria-label="Navigation"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--ncx-border)] p-3">
           <div className="flex items-center gap-2">
@@ -121,7 +122,8 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
         </div>
 
         {/* Scrollable content inside the top half */}
-        <nav className="h-[calc(50svh-56px)] overflow-y-auto p-2">
+        <nav className="flex-1 overscroll-contain overflow-y-auto p-2">
+
           {/* Primary links */}
           <div className="space-y-1">
             {links.primary.map((l) => {
@@ -176,13 +178,6 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
           </div>
         </nav>
       </aside>
-
-      {/* BOTTOM HALF: tap anywhere to close (still opaque) */}
-      <button
-        aria-label="Close navigation"
-        onClick={onClose}
-        className="absolute inset-x-0 bottom-0 h-[50svh] bg-[var(--ncx-bg-start)]"
-      />
     </div>
   );
 
