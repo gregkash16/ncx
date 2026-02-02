@@ -29,7 +29,11 @@ export default async function MobileLayout({
 
   return (
     <div className="min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
-      <header className="sticky z-20 pt-[env(safe-area-inset-top)] border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/70 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
+      {/* Top Bar */}
+      <header
+        className="sticky z-20 border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/70 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md"
+        style={{ top: "env(safe-area-inset-top)" }}
+      >
         <div className="flex items-center justify-between gap-3 p-3">
           <div className="flex items-center gap-3">
             <MobileNavButton />
@@ -42,13 +46,13 @@ export default async function MobileLayout({
           <div className="flex items-center gap-2">
             {user ? (
               <div className="flex items-center gap-2">
-                {user.image ? (
+                {user.image && (
                   <img
                     src={user.image}
                     alt={user.name ?? "You"}
                     className="h-7 w-7 rounded-full border border-[var(--ncx-border)]"
                   />
-                ) : null}
+                )}
 
                 <NotificationsDrawer>
                   <button
@@ -81,6 +85,7 @@ export default async function MobileLayout({
         </div>
       </header>
 
+      {/* Main Content */}
       <main
         className="flex-1"
         style={{
@@ -90,15 +95,8 @@ export default async function MobileLayout({
         <div className="mx-auto max-w-screen-sm px-3">{children}</div>
       </main>
 
-      <div
-        className="fixed inset-x-0 bottom-0 z-30"
-        style={{
-          height: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
-          paddingBottom: "env(safe-area-inset-bottom)",
-        }}
-      >
-        <MobileBottomNav />
-      </div>
+      {/* Bottom Nav (single fixed owner) */}
+      <MobileBottomNav />
     </div>
   );
 }
