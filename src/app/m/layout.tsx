@@ -28,8 +28,8 @@ export default async function MobileLayout({
   const NAV_PX = 64;
 
   return (
-    <div className="min-h-[100svh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
-      <header className="sticky top-0 z-20 border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/70 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
+    <div className="min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
+      <header className="sticky z-20 pt-[env(safe-area-inset-top)] border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/70 backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
         <div className="flex items-center justify-between gap-3 p-3">
           <div className="flex items-center gap-3">
             <MobileNavButton />

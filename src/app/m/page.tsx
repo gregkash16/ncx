@@ -48,7 +48,7 @@ export default async function MobileHomePage() {
   const factionMap = await fetchFactionMapCached();
 
   return (
-    <div className="space-y-8 py-4 px-3">
+    <div className="space-y-8 py-4">
       <HomeLanding
         message={message}
         rulesHref="/m/rules"
