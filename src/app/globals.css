@@ -36,50 +36,35 @@
    ROOT TOKENS
    ========================================================= */
 :root {
-  /* Status colors */
   --ncx-success-rgb: 34 197 94;
   --ncx-danger-rgb: 239 68 68;
 
   --radius: 0.625rem;
 
-  /* =========================================================
-     NCX — SEASON 9 BRAND TOKENS
-     ========================================================= */
-
   /* Page gradient */
   --ncx-bg-start: #1b0a12;
-  --ncx-bg-mid:   #3a0f1e;
+  --ncx-bg-mid: #3a0f1e;
 
-  /* Accent colors */
+  /* Accents */
   --ncx-primary-rgb: 173 24 55;
   --ncx-secondary-rgb: 212 175 55;
 
   /* Hero */
   --ncx-hero-from: #ad1837;
-  --ncx-hero-via:  #3a0f1e;
-  --ncx-hero-to:   #d4af37;
+  --ncx-hero-via: #3a0f1e;
+  --ncx-hero-to: #d4af37;
   --ncx-hero-glow-rgb: 173 24 55;
 
-  /* Panels / borders */
+  /* Panels */
   --ncx-panel-bg: rgb(12 6 10 / 0.9);
   --ncx-border: rgb(255 255 255 / 0.12);
   --ncx-bg-panel: var(--ncx-panel-bg);
-
-  /* Highlight */
-  --ncx-highlight-rgb: 212 175 55;
 
   /* Text */
   --ncx-text-primary: rgb(248 250 252);
   --ncx-text-muted: rgb(190 184 192);
 
-  /* Team override hooks */
-  --team-primary-rgb: var(--ncx-primary-rgb);
-  --team-secondary-rgb: var(--ncx-secondary-rgb);
-
-  /* =========================================================
-     SHADCN BASE TOKENS (DARK-SAFE)
-     IMPORTANT: background is NOT white
-     ========================================================= */
+  /* ShadCN base (dark-safe) */
   --background: rgb(12 6 10);
   --foreground: oklch(0.985 0 0);
   --card: rgb(12 6 10);
@@ -101,23 +86,14 @@
 }
 
 /* =========================================================
-   DARK MODE (NO WHITE FALLBACKS)
-   ========================================================= */
-.dark {
-  --background: rgb(12 6 10);
-  --foreground: oklch(0.985 0 0);
-  --card: rgb(12 6 10);
-  --card-foreground: oklch(0.985 0 0);
-}
-
-/* =========================================================
-   GLOBAL BACKGROUND + HEIGHT FIX
-   (ELIMINATES WHITE BAND / FLASH)
+   DOCUMENT ROOT — CRITICAL FOR iOS / PWA
    ========================================================= */
 html,
 body {
-  height: 100%;
-  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100svh;
   background: linear-gradient(
     to bottom,
     var(--ncx-bg-start),
@@ -127,16 +103,14 @@ body {
   background-attachment: fixed;
 }
 
-/* Prevent Tailwind body bg from painting */
+/* Body must NOT paint safe-area */
 body {
-  background-color: transparent !important;
+  background: transparent;
   color: var(--ncx-text-primary);
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  background-clip: padding-box;
+  overscroll-behavior: none;
 }
 
-/* Next.js root safety */
+/* Next.js root */
 #__next {
   min-height: 100%;
   background: transparent;
@@ -190,11 +164,6 @@ body {
   border-color: rgb(var(--ncx-primary-rgb));
 }
 
-.ncx-highlight {
-  border-color: rgb(var(--ncx-highlight-rgb));
-  background-color: rgb(var(--ncx-highlight-rgb) / 0.12);
-}
-
 /* =========================================================
    SHIP ICON FONT
    ========================================================= */
@@ -210,7 +179,7 @@ body {
 }
 
 /* =========================================================
-   NCX INTERACTIVE TILE
+   NCX TILE
    ========================================================= */
 .ncx-tile {
   position: relative;
