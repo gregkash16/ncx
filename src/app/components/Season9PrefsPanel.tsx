@@ -1,4 +1,3 @@
-// src/app/components/Season9PrefsPanel.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -15,17 +14,20 @@ const FACTIONS = [
 
 const CARD_BACKGROUNDS = [
   {
-    id: "ncx",
-    name: "NCX Gradient",
-    draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-      const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, "#5b2cff");
-      g.addColorStop(0.5, "#ff2fb3");
-      g.addColorStop(1, "#00e5ff");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-    },
+  id: "ncx",
+  name: "Season 9 – Garnet & Gold",
+  draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const g = ctx.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, "#4b1024");   // deep garnet
+    g.addColorStop(0.45, "#7a1f3d"); // garnet
+    g.addColorStop(0.75, "#c98b2f"); // warm gold
+    g.addColorStop(1, "#f2c14e");    // bright gold
+
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
   },
+},
+
   {
     id: "dark",
     name: "Dark Steel",
@@ -53,8 +55,10 @@ type PlayerHistory = {
   games: number;
   winPct: number;
   championships: string;
-  seasons: (string | null)[];
+  seasons: string[];
 };
+
+type HistoryState = PlayerHistory | "ROOKIE" | null;
 
 type PrefsPayload =
   | {
@@ -89,11 +93,10 @@ export default function Season9PrefsPanel() {
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState("");
 
-  // Draft card state
-  const [showCard, setShowCard] = useState(false);
+  const [draftOpen, setDraftOpen] = useState(false);
   const [bgId, setBgId] = useState("ncx");
   const [quote, setQuote] = useState("");
-  const [history, setHistory] = useState<PlayerHistory | null>(null);
+  const [history, setHistory] = useState<HistoryState>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -103,8 +106,7 @@ export default function Season9PrefsPanel() {
     return Boolean(p1 && p2 && p3);
   }, [data, p1, p2, p3]);
 
-  const canMakeCard =
-    data && data.ok && "found" in data && data.found && p1 && p2 && p3;
+  const canMakeCard = canSave;
 
   async function load() {
     setLoading(true);
@@ -146,13 +148,11 @@ export default function Season9PrefsPanel() {
       });
       const json = await res.json();
       if (!res.ok || !json?.ok) {
-        setNotice(json?.error ?? json?.reason ?? "Failed to save.");
+        setNotice(json?.reason ?? "Failed to save.");
         return;
       }
       setNotice("✅ Preferences saved!");
       await load();
-    } catch {
-      setNotice("Failed to save.");
     } finally {
       setSaving(false);
     }
@@ -165,114 +165,199 @@ export default function Season9PrefsPanel() {
       const res = await fetch("/api/s9/refresh", { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json?.ok) {
-        setNotice(json?.error ?? json?.reason ?? "Refresh failed.");
+        setNotice(json?.reason ?? "Refresh failed.");
         return;
       }
       setNotice("✅ Refreshed signups.");
       await load();
-    } catch {
-      setNotice("Refresh failed.");
     } finally {
       setRefreshing(false);
     }
   }
 
   async function openDraftCard() {
-    if (!data || !data.ok || !("found" in data) || !data.found) return;
+    setDraftOpen(true);
+    setHistory(null);
+
+    if (!data || !data.ok || !("found" in data) || !data.found) {
+      setHistory("ROOKIE");
+      return;
+    }
 
     const res = await fetch(
       `/api/players?q=${encodeURIComponent(data.ncxid)}&limit=1`
     );
     const json = await res.json();
-    const player = json?.items?.[0];
-    if (player) {
-      player.seasons = (player.seasons || []).filter(Boolean);
-      setHistory(player);
-      setShowCard(true);
+    const raw = json?.items?.[0];
+
+    if (!raw) {
+      setHistory("ROOKIE");
+      return;
     }
+
+    const games = Number(raw.games ?? 0);
+    if (games === 0) {
+      setHistory("ROOKIE");
+      return;
+    }
+
+    setHistory({
+      ncxid: raw.ncxid,
+      first: raw.first,
+      last: raw.last,
+      wins: Number(raw.wins ?? 0),
+      losses: Number(raw.losses ?? 0),
+      games,
+      winPct: Number(raw.winPct ?? 0),
+      championships: raw.championships ?? "",
+      seasons: (raw.seasons || []).filter(Boolean),
+    });
   }
 
-  function drawCard() {
-    if (!canvasRef.current || !history || !data) return;
+  // =================================== DRAFT CARD RENDERING =================
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+function drawCard() {
+  if (!canvasRef.current || !data || !data.ok) return;
+  if (!("found" in data) || !data.found) return;
 
-    const W = 1920;
-    const H = 1080;
-    canvas.width = W;
-    canvas.height = H;
+  const canvas = canvasRef.current;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
 
-    const bg = CARD_BACKGROUNDS.find((b) => b.id === bgId);
-    bg?.draw(ctx, W, H);
+  const W = 1920;
+  const H = 1080;
+  canvas.width = W;
+  canvas.height = H;
 
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fillRect(80, 80, W - 160, H - 160);
+  const bg = CARD_BACKGROUNDS.find((b) => b.id === bgId);
+  bg?.draw(ctx, W, H);
 
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 64px system-ui";
-    ctx.fillText(`${history.first} ${history.last}`, 140, 200);
+  // ===== INNER PANEL =====
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(80, 80, W - 160, H - 160);
 
+  ctx.fillStyle = "#ffffff";
+
+  // ===== LEFT COLUMN =====
+  const LEFT_X = 140;
+  let y = 170;
+
+  ctx.font = "bold 48px system-ui";
+  ctx.fillText("SEASON 9", LEFT_X, y);
+
+  y += 90;
+  ctx.font = "bold 72px system-ui";
+  ctx.fillText(`${data.first_name} ${data.last_name}`, LEFT_X, y);
+
+  y += 55;
+  ctx.font = "36px system-ui";
+  ctx.fillText(`NCX ${data.ncxid}`, LEFT_X, y);
+
+  y += 90;
+  ctx.font = "bold 36px system-ui";
+  ctx.fillText("FACTION PREFERENCES", LEFT_X, y);
+
+  // ===== FACTION ICON ROW =====
+  const factions = [p1, p2, p3].filter(Boolean);
+  const ICON_SIZE = 96;
+  const ICON_GAP = 64;
+
+  const rowWidth =
+    factions.length * ICON_SIZE +
+    (factions.length - 1) * ICON_GAP;
+
+  let startX = LEFT_X;
+  let iconY = y + 30;
+
+  factions.forEach((faction, index) => {
+    const x =
+      startX + index * (ICON_SIZE + ICON_GAP);
+
+    const img = new Image();
+    img.src = `/factions/${faction}.webp`;
+    img.onload = () => {
+      ctx.drawImage(img, x, iconY, ICON_SIZE, ICON_SIZE);
+
+      ctx.font = "28px system-ui";
+      const label = faction;
+      const textWidth = ctx.measureText(label).width;
+
+      ctx.fillText(
+        label,
+        x + ICON_SIZE / 2 - textWidth / 2,
+        iconY + ICON_SIZE + 34
+      );
+    };
+  });
+
+  // ===== RIGHT COLUMN =====
+  const RIGHT_X = 1000;
+  let ry = 260;
+
+  if (history === "ROOKIE" || history === null) {
+    ctx.font = "bold 48px system-ui";
+    ctx.fillText("ROOKIE SEASON", RIGHT_X, ry);
+  } else {
+    ctx.font = "bold 42px system-ui";
+    ctx.fillText("NCX HISTORY", RIGHT_X, ry);
+
+    ry += 60;
     ctx.font = "32px system-ui";
-    ctx.fillText(`NCX ${history.ncxid}`, 140, 250);
-
-    ctx.font = "bold 36px system-ui";
-    ctx.fillText("Faction Preferences", 140, 340);
-
-    ctx.font = "30px system-ui";
-    ctx.fillText(`1. ${p1}`, 160, 390);
-    ctx.fillText(`2. ${p2}`, 160, 430);
-    ctx.fillText(`3. ${p3}`, 160, 470);
-
-    ctx.font = "bold 36px system-ui";
-    ctx.fillText("NCX History", 140, 560);
-
-    ctx.font = "30px system-ui";
     ctx.fillText(
       `${history.wins}-${history.losses} (${history.winPct.toFixed(
         1
       )}%) • ${history.games} games`,
-      160,
-      610
+      RIGHT_X,
+      ry
     );
 
     if (history.seasons.length) {
-      ctx.fillText(`Seasons: ${history.seasons.join(", ")}`, 160, 650);
-    }
-
-    if (history.championships) {
+      ry += 44;
       ctx.fillText(
-        `Championships: ${history.championships}`,
-        160,
-        690
+        `Seasons: ${history.seasons.join(", ")}`,
+        RIGHT_X,
+        ry
       );
     }
 
-    if (quote) {
-      ctx.font = "italic 32px system-ui";
-      ctx.fillText(`“${quote}”`, 140, 820);
+    if (history.championships) {
+      ry += 44;
+      ctx.fillText(
+        `Championships: ${history.championships}`,
+        RIGHT_X,
+        ry
+      );
     }
-
-    const logo = new Image();
-    logo.src = "/logo.webp";
-    logo.onload = () => {
-      ctx.drawImage(logo, W - 420, H - 320, 300, 300);
-    };
   }
+
+  // ===== QUOTE =====
+  if (quote) {
+    ctx.font = "italic 32px system-ui";
+    ctx.fillText(`“${quote}”`, LEFT_X, H - 220);
+  }
+
+  // ===== LOGO =====
+  const logo = new Image();
+  logo.src = "/logo.webp";
+  logo.onload = () => {
+    ctx.drawImage(logo, W - 420, H - 320, 300, 300);
+  };
+}
+
+// ============================================================
 
   function download() {
     drawCard();
     if (!canvasRef.current) return;
-    const link = document.createElement("a");
-    link.download = `ncx_s9_draft_${(data as any).ncxid}.png`;
-    link.href = canvasRef.current.toDataURL("image/png");
-    link.click();
+    const a = document.createElement("a");
+    a.download = `ncx_s9_draft_${(data as any).ncxid}.png`;
+    a.href = canvasRef.current.toDataURL("image/png");
+    a.click();
   }
 
   if (loading) {
     return (
-      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)]">
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border">
         Loading Season 9 signups…
       </div>
     );
@@ -280,24 +365,22 @@ export default function Season9PrefsPanel() {
 
   if (!data || !data.ok) {
     return (
-      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)]">
-        Could not load. {data && !data.ok ? String(data.reason) : ""}
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border">
+        Could not load.
       </div>
     );
   }
 
-  const isAdmin = data.isAdmin === true;
-  const total = (data as any).totalSignups as number | undefined;
+  const isAdmin = data.isAdmin;
+  const total = (data as any).totalSignups;
 
   if ("found" in data && !data.found) {
     return (
-      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] space-y-4">
-        <h2 className="text-xl font-semibold text-[rgb(var(--ncx-primary-rgb))]">
-          Season 9 Signups
-        </h2>
+      <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border space-y-4">
+        <h2 className="text-xl font-semibold">Season 9 Signups</h2>
 
-        <div className="rounded-xl border p-4 text-sm">
-          You haven&apos;t signed up for Season 9 yet —{" "}
+        <div className="border p-4 text-sm">
+          You haven&apos;t signed up yet —{" "}
           <a
             className="underline"
             href="https://forms.gle/X7VNuw1jbDp5985g8"
@@ -309,15 +392,12 @@ export default function Season9PrefsPanel() {
         </div>
 
         {isAdmin && (
-          <div className="rounded-xl border p-4 space-y-3">
-            <div className="text-sm">
-              Total signups:{" "}
-              <span className="font-semibold">{total ?? "—"}</span>
-            </div>
+          <div className="border p-4 space-y-3">
+            <div>Total signups: {total ?? "—"}</div>
             <button
               onClick={adminRefresh}
               disabled={refreshing}
-              className="px-4 py-2 rounded-lg border disabled:opacity-50"
+              className="border px-3 py-1"
             >
               {refreshing ? "Refreshing…" : "Refresh from Google Sheet"}
             </button>
@@ -330,21 +410,8 @@ export default function Season9PrefsPanel() {
   }
 
   return (
-    <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-[rgb(var(--ncx-primary-rgb))]">
-            Season 9 Signups
-          </h2>
-          <p className="text-sm">
-            {(data as any).first_name} {(data as any).last_name} • NCX{" "}
-            {(data as any).ncxid}
-          </p>
-        </div>
-        {isAdmin && (
-          <div className="text-xs rounded-full border px-3 py-1">Admin</div>
-        )}
-      </div>
+    <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border space-y-6">
+      <h2 className="text-xl font-semibold">Season 9 Signups</h2>
 
       <div className="grid sm:grid-cols-3 gap-4">
         <PrefSelect label="FACTION PREFERENCE 1" value={p1} onChange={setP1} />
@@ -352,19 +419,21 @@ export default function Season9PrefsPanel() {
         <PrefSelect label="FACTION PREFERENCE 3" value={p3} onChange={setP3} />
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex gap-3">
         <button
+          type="button"
           onClick={save}
           disabled={!canSave || saving}
-          className="px-6 py-2 rounded-xl bg-[linear-gradient(to_right,var(--ncx-hero-to),var(--ncx-hero-via),var(--ncx-hero-from))] text-white font-semibold disabled:opacity-50"
+          className="px-6 py-2 rounded-xl bg-purple-600 text-white"
         >
-          {saving ? "Saving…" : "Save Preferences"}
+          Save Preferences
         </button>
 
         {canMakeCard && (
           <button
+            type="button"
             onClick={openDraftCard}
-            className="px-4 py-2 rounded-lg border"
+            className="px-4 py-2 border cursor-pointer"
           >
             Create Draft Card
           </button>
@@ -372,62 +441,67 @@ export default function Season9PrefsPanel() {
       </div>
 
       {isAdmin && (
-        <div className="rounded-xl border p-4 space-y-3">
-          <div className="text-sm">
-            Total signups: <span className="font-semibold">{total ?? "—"}</span>
-          </div>
+        <div className="border p-4 space-y-3">
+          <div>Total signups: {total ?? "—"}</div>
           <button
             onClick={adminRefresh}
             disabled={refreshing}
-            className="px-4 py-2 rounded-lg border disabled:opacity-50"
+            className="border px-3 py-1"
           >
-            {refreshing ? "Refreshing…" : "Refresh from Google Sheet"}
+            Refresh
           </button>
         </div>
       )}
 
-      {showCard && history && (
-        <div className="rounded-xl border p-4 space-y-4">
-          <div className="flex gap-4">
-            <select
-              value={bgId}
-              onChange={(e) => setBgId(e.target.value)}
-              className="border px-2 py-1"
-            >
-              {CARD_BACKGROUNDS.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+      {draftOpen && (
+        <div className="border p-4 space-y-4">
+          {history === null ? (
+            <div>Loading player history…</div>
+          ) : (
+            <>
+              <select
+                value={bgId}
+                onChange={(e) => setBgId(e.target.value)}
+                className="border bg-white text-black px-2 py-1"
+              >
+                {CARD_BACKGROUNDS.map((b) => (
+                  <option key={b.id} value={b.id} className="text-black">
+                    {b.name}
+                  </option>
+                ))}
+              </select>
 
-            <input
-              value={quote}
-              onChange={(e) => setQuote(e.target.value)}
-              placeholder="Optional quote"
-              className="flex-1 border px-2 py-1"
-            />
-          </div>
+              <input
+                value={quote}
+                onChange={(e) => setQuote(e.target.value)}
+                placeholder="Optional quote"
+                className="border px-2 py-1 w-full"
+              />
 
-          <canvas ref={canvasRef} className="w-full max-w-3xl border" />
+              <canvas ref={canvasRef} className="border w-full max-w-3xl" />
 
-          <div className="flex gap-3">
-            <button onClick={drawCard} className="px-4 py-2 border rounded">
-              Preview
-            </button>
-            <button
-              onClick={download}
-              className="px-4 py-2 rounded bg-purple-600 text-white"
-            >
-              Download 1920×1080
-            </button>
-            <button
-              onClick={() => setShowCard(false)}
-              className="px-4 py-2 border rounded"
-            >
-              Close
-            </button>
-          </div>
+              <div className="flex gap-3">
+                <button onClick={drawCard} className="border px-3 py-1">
+                  Preview
+                </button>
+                <button
+                  onClick={download}
+                  className="bg-purple-600 text-white px-3 py-1"
+                >
+                  Download
+                </button>
+                <button
+                  onClick={() => {
+                    setDraftOpen(false);
+                    setHistory(null);
+                  }}
+                  className="border px-3 py-1"
+                >
+                  Close
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -449,7 +523,7 @@ function PrefSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border px-3 py-2 text-sm"
+        className="w-full rounded-lg border px-3 py-2 bg-white text-black"
       >
         <option value="" disabled>
           Choose…
