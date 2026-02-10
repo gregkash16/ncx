@@ -81,20 +81,37 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                     <button
                       onClick={() => setSelectedIdx(i)}
                       className={[
-                        "w-full text-left px-3 py-2 rounded-lg border transition",
+                        "w-full px-3 py-2 rounded-lg border transition",
                         active
                           ? "bg-[rgb(var(--ncx-primary-rgb)/0.15)] border-[rgb(var(--ncx-primary-rgb)/0.50)]"
                           : "bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border-[var(--ncx-border)] hover:border-[rgb(var(--ncx-primary-rgb)/0.40)]",
                       ].join(" ")}
                     >
-                      <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
-                        {p.ncxid} • {fullName(p)}
-                      </div>
-                      {p.discord && (
-                        <div className="text-xs text-[var(--ncx-text-muted)]">
-                          {p.discord}
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Left: name + discord */}
+                        <div className="min-w-0 text-left">
+                          <div className="truncate text-sm font-semibold text-[var(--ncx-text-primary)]">
+                            {p.ncxid} • {fullName(p)}
+                          </div>
+                          {p.discord && (
+                            <div className="truncate text-xs text-[var(--ncx-text-muted)]">
+                              {p.discord}
+                            </div>
+                          )}
                         </div>
-                      )}
+
+                        {/* Right: championship trophy */}
+                        {Number(p.championships) > 0 && (
+                          <div
+                            className="flex items-center gap-1 text-xs font-semibold
+                              text-[rgb(var(--ncx-gold-rgb))]"
+                            title={`${p.championships} Championship${Number(p.championships) > 1 ? "s" : ""}`}
+                          >
+                            <span>🏆</span>
+                            {Number(p.championships) > 1 && <span>{p.championships}</span>}
+                          </div>
+                        )}
+                      </div>
                     </button>
                   </li>
                 );
@@ -126,9 +143,9 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                   </h2>
 
                   {selected.championships && (
-                    <span className="text-xs px-3 py-1 rounded-full border border-[rgb(var(--ncx-highlight-rgb)/0.60)] bg-[rgb(var(--ncx-highlight-rgb)/0.12)] text-[rgb(var(--ncx-highlight-rgb))]">
+                    <span className="inline-flex items-center px-3 py-1 text-xs rounded-full ncx-championship">
                       Championships: {selected.championships}
-                    </span>
+                    </span> 
                   )}
                 </header>
 
@@ -196,34 +213,32 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                             CHAMPIONS_BY_SEASON[seasonNum];
 
                         return (
-                          <tr
-                            key={idx}
-                            className={
-                              isChampion
-                                ? "border border-[rgb(var(--ncx-highlight-rgb)/0.60)] bg-[rgb(var(--ncx-highlight-rgb)/0.06)]"
-                                : ""
-                            }
-                          >
-                            <td className="px-3 py-2 text-[var(--ncx-text-primary)]">
-                              Season {seasonNum}
-                            </td>
+                          <tr key={idx}>
                             <td
                               className={[
                                 "px-3 py-2",
                                 isChampion
-                                  ? "font-semibold text-[rgb(var(--ncx-highlight-rgb))]"
+                                  ? "bg-[rgb(var(--ncx-gold-rgb)/0.10)] text-[var(--ncx-text-primary)]"
                                   : "text-[var(--ncx-text-primary)]",
                               ].join(" ")}
                             >
-                              {team && team.trim() ? (
-                                team
-                              ) : (
-                                <span className="text-[var(--ncx-text-muted)]">
-                                  —
-                                </span>
+                              Season {seasonNum}
+                            </td>
+
+                            <td
+                              className={[
+                                "px-3 py-2",
+                                isChampion
+                                  ? "bg-[rgb(var(--ncx-gold-rgb)/0.10)] font-semibold text-[rgb(var(--ncx-gold-rgb))]"
+                                  : "text-[var(--ncx-text-primary)]",
+                              ].join(" ")}
+                            >
+                              {team && team.trim() ? team : (
+                                <span className="text-[var(--ncx-text-muted)]">—</span>
                               )}
                             </td>
                           </tr>
+
                         );
                       })}
                     </tbody>

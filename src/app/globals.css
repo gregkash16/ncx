@@ -41,6 +41,9 @@
 
   --radius: 0.625rem;
 
+  /* Prestige / awards */
+  --ncx-gold-rgb: 212 175 55;
+
   /* Page gradient */
   --ncx-bg-start: #1b0a12;
   --ncx-bg-mid: #3a0f1e;
@@ -120,10 +123,11 @@ body {
    BASE
    ========================================================= */
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+  :where(*, *::before, *::after) {
+    @apply outline-ring/50;
   }
 }
+
 
 /* =========================================================
    NCX UTILITIES
@@ -135,6 +139,12 @@ body {
     var(--ncx-bg-mid),
     var(--ncx-bg-start)
   );
+}
+
+.ncx-championship {
+  border: 1px solid rgb(var(--ncx-gold-rgb) / 0.75);
+  background-color: rgb(var(--ncx-gold-rgb) / 0.18);
+  color: rgb(var(--ncx-gold-rgb));
 }
 
 .ncx-hero-title {
