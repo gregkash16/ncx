@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const FACTIONS = [
   "REPUBLIC",
@@ -82,6 +83,7 @@ type PrefsPayload =
   | { ok: false; reason: string };
 
 export default function Season9PrefsPanel() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<PrefsPayload | null>(null);
 
@@ -116,11 +118,16 @@ export default function Season9PrefsPanel() {
       const json = (await res.json()) as PrefsPayload;
       setData(json);
 
-      if (json.ok && "found" in json && json.found) {
-        setP1(json.pref_one || "");
-        setP2(json.pref_two || "");
-        setP3(json.pref_three || "");
-      }
+      function normFaction(v: string) {
+        return v?.trim().toUpperCase() ?? "";
+        }
+
+        if (json.ok && "found" in json && json.found) {
+          setP1(normFaction(json.pref_one));
+          setP2(normFaction(json.pref_two));
+          setP3(normFaction(json.pref_three));
+        }
+
     } catch {
       setData({ ok: false, reason: "Failed to load." });
     } finally {
@@ -153,6 +160,7 @@ export default function Season9PrefsPanel() {
       }
       setNotice("✅ Preferences saved!");
       await load();
+      router.refresh();
     } finally {
       setSaving(false);
     }
@@ -424,10 +432,25 @@ function drawCard() {
           type="button"
           onClick={save}
           disabled={!canSave || saving}
-          className="px-6 py-2 rounded-xl bg-purple-600 text-white"
+          className={`
+            px-6 py-2 rounded-xl text-white
+            transition
+            ${!canSave || saving
+              ? "bg-purple-400 opacity-60 cursor-not-allowed"
+              : "bg-purple-600 hover:bg-purple-700 cursor-pointer"}
+          `}
         >
-          Save Preferences
+          {saving ? (
+            <span className="flex items-center gap-2">
+              <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              Saving…
+            </span>
+          ) : (
+            "Save Preferences"
+          )}
+
         </button>
+
 
         {canMakeCard && (
           <button
