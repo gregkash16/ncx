@@ -197,12 +197,18 @@ export default function Season9PrefsPanel() {
     });
   }
 
-  function loadImage(src: string): Promise<HTMLImageElement> {
+function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
     img.src = src;
-    img.onload = () => resolve(img);
+    img.decoding = "sync";
+    img.onload = async () => {
+      try {
+        // Ensure image is fully decoded before drawImage
+        if ("decode" in img) await img.decode();
+      } catch {}
+      resolve(img);
+    };
     img.onerror = reject;
   });
 }
@@ -247,27 +253,31 @@ async function drawCard() {
   ctx.font = "bold 36px system-ui";
   ctx.fillText("FACTION PREFERENCES", LEFT_X, y);
 
-  // ===== FACTION ICONS (FIXED) =====
-  const factions = [p1, p2, p3].filter(Boolean);
-  const ICON = 96;
-  const GAP = 64;
-  const iconY = y + 30;
+  // ===== FACTION ICONS (PROD SAFE) =====
+const factions = [p1, p2, p3].filter(Boolean);
+const ICON = 96;
+const GAP = 64;
+const iconY = y + 30;
 
-  const factionImages = await Promise.all(
-    factions.map((f) =>
-      loadImage(`${window.location.origin}/factions/${f}.webp`)
-    )
-  );
-
-  factionImages.forEach((img, i) => {
+for (let i = 0; i < factions.length; i++) {
+  const faction = factions[i];
+  try {
+    const img = await loadImage(`/factions/${faction}.webp`);
     const x = LEFT_X + i * (ICON + GAP);
+
     ctx.drawImage(img, x, iconY, ICON, ICON);
 
     ctx.font = "28px system-ui";
-    const label = factions[i];
-    const w = ctx.measureText(label).width;
-    ctx.fillText(label, x + ICON / 2 - w / 2, iconY + ICON + 34);
-  });
+    const w = ctx.measureText(faction).width;
+    ctx.fillText(
+      faction,
+      x + ICON / 2 - w / 2,
+      iconY + ICON + 34
+    );
+  } catch {
+    // silent fail — card still renders
+  }
+}
 
   // ===== RIGHT COLUMN =====
   const RIGHT_X = 1000;
