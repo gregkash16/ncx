@@ -67,7 +67,8 @@ type PlayerHistory = {
   plms: number;
   ppg: number;
   championships: string;
-  seasons: string[];
+  seasons: { season: number; team: string }[];
+
 };
 
 type HistoryState = PlayerHistory | "ROOKIE" | null;
@@ -188,12 +189,12 @@ export default function Season9PrefsPanel() {
     }
 
     const res = await fetch(
-      `/api/players?q=${encodeURIComponent(data.ncxid)}&limit=1`
+      `/api/player-history?ncxid=${encodeURIComponent(data.ncxid)}`
     );
-    const json = await res.json();
-    const raw = json?.items?.[0];
 
-    if (!raw || Number(raw.games ?? 0) === 0) {
+    const raw = await res.json();
+
+    if (!raw.ok || raw.games === 0) {
       setHistory("ROOKIE");
       return;
     }
@@ -210,8 +211,9 @@ export default function Season9PrefsPanel() {
       plms: raw.plms,
       ppg: raw.ppg,
       championships: raw.championships,
-      seasons: (raw.seasons || []).filter(Boolean),
+      seasons: raw.seasons, // <-- now structured
     });
+
   }
 
   function wrapText(
@@ -345,22 +347,11 @@ export default function Season9PrefsPanel() {
         const maxWidth = 800;
         const lineHeight = 42;
 
-        history.seasons.forEach((seasonEntry: string) => {
-          // Try to extract season number (handles S6, SEASON 6, etc.)
-          const match = seasonEntry.match(/S(?:EASON)?\s*(\d+)/i);
-          const seasonNumber = match ? match[1] : "?";
-
-          // Remove season text from team name if it's embedded
-          const teamName = seasonEntry
-            .replace(/S(?:EASON)?\s*\d+/i, "")
-            .replace(/[-:]/g, "")
-            .trim();
-
-          const label = `S${seasonNumber}: ${teamName || seasonEntry}`;
+        history.seasons.forEach((entry) => {
+          const label = `S${entry.season}: ${entry.team}`;
           ry = wrapText(ctx, label, RIGHT_X, ry, maxWidth, lineHeight);
         });
-      }
-
+    }
 
       if (history.championships) {
         ry += 44;
