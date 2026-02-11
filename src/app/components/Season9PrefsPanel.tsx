@@ -15,20 +15,18 @@ const FACTIONS = [
 
 const CARD_BACKGROUNDS = [
   {
-  id: "ncx",
-  name: "Season 9 – Garnet & Gold",
-  draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const g = ctx.createLinearGradient(0, 0, w, h);
-    g.addColorStop(0, "#4b1024");   // deep garnet
-    g.addColorStop(0.45, "#7a1f3d"); // garnet
-    g.addColorStop(0.75, "#c98b2f"); // warm gold
-    g.addColorStop(1, "#f2c14e");    // bright gold
-
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
+    id: "ncx",
+    name: "Season 9 – Garnet & Gold",
+    draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+      const g = ctx.createLinearGradient(0, 0, w, h);
+      g.addColorStop(0, "#4b1024");
+      g.addColorStop(0.45, "#7a1f3d");
+      g.addColorStop(0.75, "#c98b2f");
+      g.addColorStop(1, "#f2c14e");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    },
   },
-},
-
   {
     id: "dark",
     name: "Dark Steel",
@@ -55,6 +53,9 @@ type PlayerHistory = {
   losses: number;
   games: number;
   winPct: number;
+  points: number;
+  plms: number;
+  ppg: number;
   championships: string;
   seasons: string[];
 };
@@ -108,8 +109,6 @@ export default function Season9PrefsPanel() {
     return Boolean(p1 && p2 && p3);
   }, [data, p1, p2, p3]);
 
-  const canMakeCard = canSave;
-
   async function load() {
     setLoading(true);
     setNotice("");
@@ -118,16 +117,12 @@ export default function Season9PrefsPanel() {
       const json = (await res.json()) as PrefsPayload;
       setData(json);
 
-      function normFaction(v: string) {
-        return v?.trim().toUpperCase() ?? "";
-        }
-
-        if (json.ok && "found" in json && json.found) {
-          setP1(normFaction(json.pref_one));
-          setP2(normFaction(json.pref_two));
-          setP3(normFaction(json.pref_three));
-        }
-
+      const norm = (v: string) => v?.trim().toUpperCase() ?? "";
+      if (json.ok && "found" in json && json.found) {
+        setP1(norm(json.pref_one));
+        setP2(norm(json.pref_two));
+        setP3(norm(json.pref_three));
+      }
     } catch {
       setData({ ok: false, reason: "Failed to load." });
     } finally {
@@ -166,23 +161,6 @@ export default function Season9PrefsPanel() {
     }
   }
 
-  async function adminRefresh() {
-    setRefreshing(true);
-    setNotice("");
-    try {
-      const res = await fetch("/api/s9/refresh", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok || !json?.ok) {
-        setNotice(json?.reason ?? "Refresh failed.");
-        return;
-      }
-      setNotice("✅ Refreshed signups.");
-      await load();
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
   async function openDraftCard() {
     setDraftOpen(true);
     setHistory(null);
@@ -198,13 +176,7 @@ export default function Season9PrefsPanel() {
     const json = await res.json();
     const raw = json?.items?.[0];
 
-    if (!raw) {
-      setHistory("ROOKIE");
-      return;
-    }
-
-    const games = Number(raw.games ?? 0);
-    if (games === 0) {
+    if (!raw || Number(raw.games ?? 0) === 0) {
       setHistory("ROOKIE");
       return;
     }
@@ -213,149 +185,142 @@ export default function Season9PrefsPanel() {
       ncxid: raw.ncxid,
       first: raw.first,
       last: raw.last,
-      wins: Number(raw.wins ?? 0),
-      losses: Number(raw.losses ?? 0),
-      games,
-      winPct: Number(raw.winPct ?? 0),
-      championships: raw.championships ?? "",
+      wins: raw.wins,
+      losses: raw.losses,
+      games: raw.games,
+      winPct: raw.winPct,
+      points: raw.points,
+      plms: raw.plms,
+      ppg: raw.ppg,
+      championships: raw.championships,
       seasons: (raw.seasons || []).filter(Boolean),
     });
   }
 
-  // =================================== DRAFT CARD RENDERING =================
+  async function drawCard(): Promise<void> {
+    if (!canvasRef.current || !data || !data.ok) return;
+    if (!("found" in data) || !data.found) return;
 
-function drawCard() {
-  if (!canvasRef.current || !data || !data.ok) return;
-  if (!("found" in data) || !data.found) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  const canvas = canvasRef.current;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+    const W = 1920;
+    const H = 1080;
+    canvas.width = W;
+    canvas.height = H;
 
-  const W = 1920;
-  const H = 1080;
-  canvas.width = W;
-  canvas.height = H;
+    const bg = CARD_BACKGROUNDS.find((b) => b.id === bgId);
+    bg?.draw(ctx, W, H);
 
-  const bg = CARD_BACKGROUNDS.find((b) => b.id === bgId);
-  bg?.draw(ctx, W, H);
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(60, 60, W - 120, H - 120);
 
-  // ===== INNER PANEL =====
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.fillRect(80, 80, W - 160, H - 160);
+    ctx.fillStyle = "#fff";
 
-  ctx.fillStyle = "#ffffff";
+    const LEFT_X = 120;
+    const RIGHT_X = 1040;
+    let y = 150;
 
-  // ===== LEFT COLUMN =====
-  const LEFT_X = 140;
-  let y = 170;
-
-  ctx.font = "bold 48px system-ui";
-  ctx.fillText("SEASON 9", LEFT_X, y);
-
-  y += 90;
-  ctx.font = "bold 72px system-ui";
-  ctx.fillText(`${data.first_name} ${data.last_name}`, LEFT_X, y);
-
-  y += 55;
-  ctx.font = "36px system-ui";
-  ctx.fillText(`NCX ${data.ncxid}`, LEFT_X, y);
-
-  y += 90;
-  ctx.font = "bold 36px system-ui";
-  ctx.fillText("FACTION PREFERENCES", LEFT_X, y);
-
-  // ===== FACTION ICON ROW =====
-  const factions = [p1, p2, p3].filter(Boolean);
-  const ICON_SIZE = 96;
-  const ICON_GAP = 64;
-
-  const rowWidth =
-    factions.length * ICON_SIZE +
-    (factions.length - 1) * ICON_GAP;
-
-  let startX = LEFT_X;
-  let iconY = y + 30;
-
-  factions.forEach((faction, index) => {
-    const x =
-      startX + index * (ICON_SIZE + ICON_GAP);
-
-    const img = new Image();
-    img.src = `/factions/${faction}.webp`;
-    img.onload = () => {
-      ctx.drawImage(img, x, iconY, ICON_SIZE, ICON_SIZE);
-
-      ctx.font = "28px system-ui";
-      const label = faction;
-      const textWidth = ctx.measureText(label).width;
-
-      ctx.fillText(
-        label,
-        x + ICON_SIZE / 2 - textWidth / 2,
-        iconY + ICON_SIZE + 34
-      );
-    };
-  });
-
-  // ===== RIGHT COLUMN =====
-  const RIGHT_X = 1000;
-  let ry = 260;
-
-  if (history === "ROOKIE" || history === null) {
     ctx.font = "bold 48px system-ui";
-    ctx.fillText("ROOKIE SEASON", RIGHT_X, ry);
-  } else {
-    ctx.font = "bold 42px system-ui";
-    ctx.fillText("NCX HISTORY", RIGHT_X, ry);
+    ctx.fillText("SEASON 9", LEFT_X, y);
 
-    ry += 60;
-    ctx.font = "32px system-ui";
-    ctx.fillText(
-      `${history.wins}-${history.losses} (${history.winPct.toFixed(
-        1
-      )}%) • ${history.games} games`,
-      RIGHT_X,
-      ry
-    );
+    y += 70;
+    ctx.font = "bold 72px system-ui";
+    ctx.fillText(`${data.first_name} ${data.last_name}`, LEFT_X, y);
 
-    if (history.seasons.length) {
-      ry += 44;
+    y += 52;
+    ctx.font = "36px system-ui";
+    ctx.fillText(data.ncxid, LEFT_X, y);
+
+    y += 70;
+    ctx.font = "bold 36px system-ui";
+    ctx.fillText("FACTION PREFERENCES", LEFT_X, y);
+
+    const factions = [p1, p2, p3].filter(Boolean);
+    const ICON = 96;
+    const GAP = 48;
+    const iconY = y + 24;
+
+    const iconPromises = factions.map((f, i) => {
+      return new Promise<void>((resolve) => {
+        const img = new Image();
+        img.src = `/factions/${f}.webp`;
+        img.onload = () => {
+          const x = LEFT_X + i * (ICON + GAP);
+          ctx.drawImage(img, x, iconY, ICON, ICON);
+          ctx.font = "26px system-ui";
+          const w = ctx.measureText(f).width;
+          ctx.fillText(f, x + ICON / 2 - w / 2, iconY + ICON + 28);
+          resolve();
+        };
+        img.onerror = () => resolve();
+      });
+    });
+
+    let ry = 200;
+    if (history === "ROOKIE" || history === null) {
+      ctx.font = "bold 48px system-ui";
+      ctx.fillText("ROOKIE SEASON", RIGHT_X, ry);
+    } else {
+      ctx.font = "bold 42px system-ui";
+      ctx.fillText("NCX HISTORY", RIGHT_X, ry);
+
+      ry += 60;
+      ctx.font = "32px system-ui";
       ctx.fillText(
-        `Seasons: ${history.seasons.join(", ")}`,
+        `${history.wins}-${history.losses} (${history.winPct.toFixed(
+          1
+        )}%) • ${history.games} games`,
         RIGHT_X,
         ry
       );
-    }
 
-    if (history.championships) {
-      ry += 44;
+      ry += 42;
       ctx.fillText(
-        `Championships: ${history.championships}`,
+        `Points: ${history.points} • PL/MS: ${history.plms}`,
         RIGHT_X,
         ry
       );
+
+      ry += 42;
+      ctx.fillText(`PPG: ${history.ppg.toFixed(2)}`, RIGHT_X, ry);
+
+      if (history.seasons.length) {
+        ry += 42;
+        ctx.fillText(`Seasons: ${history.seasons.join(", ")}`, RIGHT_X, ry);
+      }
+
+      if (history.championships) {
+        ry += 42;
+        ctx.fillText(
+          `Championships: ${history.championships}`,
+          RIGHT_X,
+          ry
+        );
+      }
     }
+
+    if (quote) {
+      ctx.font = "italic 30px system-ui";
+      ctx.fillText(`“${quote}”`, LEFT_X, H - 200);
+    }
+
+    const logoPromise = new Promise<void>((resolve) => {
+      const logo = new Image();
+      logo.src = "/logo.webp";
+      logo.onload = () => {
+        ctx.drawImage(logo, W - 420, H - 360, 320, 320);
+        resolve();
+      };
+      logo.onerror = () => resolve();
+    });
+
+    await Promise.all([...iconPromises, logoPromise]);
   }
 
-  // ===== QUOTE =====
-  if (quote) {
-    ctx.font = "italic 32px system-ui";
-    ctx.fillText(`“${quote}”`, LEFT_X, H - 220);
-  }
-
-  // ===== LOGO =====
-  const logo = new Image();
-  logo.src = "/logo.webp";
-  logo.onload = () => {
-    ctx.drawImage(logo, W - 420, H - 320, 300, 300);
-  };
-}
-
-// ============================================================
-
-  function download() {
-    drawCard();
+  async function download() {
+    await drawCard();
     if (!canvasRef.current) return;
     const a = document.createElement("a");
     a.download = `ncx_s9_draft_${(data as any).ncxid}.png`;
@@ -379,14 +344,10 @@ function drawCard() {
     );
   }
 
-  const isAdmin = data.isAdmin;
-  const total = (data as any).totalSignups;
-
   if ("found" in data && !data.found) {
     return (
       <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border space-y-4">
         <h2 className="text-xl font-semibold">Season 9 Signups</h2>
-
         <div className="border p-4 text-sm">
           You haven&apos;t signed up yet —{" "}
           <a
@@ -398,21 +359,6 @@ function drawCard() {
             Sign up here
           </a>
         </div>
-
-        {isAdmin && (
-          <div className="border p-4 space-y-3">
-            <div>Total signups: {total ?? "—"}</div>
-            <button
-              onClick={adminRefresh}
-              disabled={refreshing}
-              className="border px-3 py-1"
-            >
-              {refreshing ? "Refreshing…" : "Refresh from Google Sheet"}
-            </button>
-          </div>
-        )}
-
-        {notice && <div className="text-sm">{notice}</div>}
       </div>
     );
   }
@@ -432,27 +378,16 @@ function drawCard() {
           type="button"
           onClick={save}
           disabled={!canSave || saving}
-          className={`
-            px-6 py-2 rounded-xl text-white
-            transition
-            ${!canSave || saving
+          className={`px-6 py-2 rounded-xl text-white transition ${
+            !canSave || saving
               ? "bg-purple-400 opacity-60 cursor-not-allowed"
-              : "bg-purple-600 hover:bg-purple-700 cursor-pointer"}
-          `}
+              : "bg-purple-600 hover:bg-purple-700 cursor-pointer"
+          }`}
         >
-          {saving ? (
-            <span className="flex items-center gap-2">
-              <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-              Saving…
-            </span>
-          ) : (
-            "Save Preferences"
-          )}
-
+          {saving ? "Saving…" : "Save Preferences"}
         </button>
 
-
-        {canMakeCard && (
+        {canSave && (
           <button
             type="button"
             onClick={openDraftCard}
@@ -463,68 +398,49 @@ function drawCard() {
         )}
       </div>
 
-      {isAdmin && (
-        <div className="border p-4 space-y-3">
-          <div>Total signups: {total ?? "—"}</div>
-          <button
-            onClick={adminRefresh}
-            disabled={refreshing}
-            className="border px-3 py-1"
-          >
-            Refresh
-          </button>
-        </div>
-      )}
-
       {draftOpen && (
         <div className="border p-4 space-y-4">
-          {history === null ? (
-            <div>Loading player history…</div>
-          ) : (
-            <>
-              <select
-                value={bgId}
-                onChange={(e) => setBgId(e.target.value)}
-                className="border bg-white text-black px-2 py-1"
-              >
-                {CARD_BACKGROUNDS.map((b) => (
-                  <option key={b.id} value={b.id} className="text-black">
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+          <select
+            value={bgId}
+            onChange={(e) => setBgId(e.target.value)}
+            className="border bg-white text-black px-2 py-1"
+          >
+            {CARD_BACKGROUNDS.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
 
-              <input
-                value={quote}
-                onChange={(e) => setQuote(e.target.value)}
-                placeholder="Optional quote"
-                className="border px-2 py-1 w-full"
-              />
+          <input
+            value={quote}
+            onChange={(e) => setQuote(e.target.value)}
+            placeholder="Optional quote"
+            className="border px-2 py-1 w-full"
+          />
 
-              <canvas ref={canvasRef} className="border w-full max-w-3xl" />
+          <canvas ref={canvasRef} className="border w-full max-w-3xl" />
 
-              <div className="flex gap-3">
-                <button onClick={drawCard} className="border px-3 py-1">
-                  Preview
-                </button>
-                <button
-                  onClick={download}
-                  className="bg-purple-600 text-white px-3 py-1"
-                >
-                  Download
-                </button>
-                <button
-                  onClick={() => {
-                    setDraftOpen(false);
-                    setHistory(null);
-                  }}
-                  className="border px-3 py-1"
-                >
-                  Close
-                </button>
-              </div>
-            </>
-          )}
+          <div className="flex gap-3">
+            <button onClick={drawCard} className="border px-3 py-1">
+              Preview
+            </button>
+            <button
+              onClick={download}
+              className="bg-purple-600 text-white px-3 py-1"
+            >
+              Download
+            </button>
+            <button
+              onClick={() => {
+                setDraftOpen(false);
+                setHistory(null);
+              }}
+              className="border px-3 py-1"
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>
