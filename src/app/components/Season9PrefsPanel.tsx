@@ -83,20 +83,13 @@ type PrefsPayload =
     }
   | { ok: false; reason: string };
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.src = src;
-    img.decoding = "sync";
-    img.onload = async () => {
-      try {
-        if ("decode" in img) await img.decode();
-      } catch {}
-      resolve(img);
-    };
-    img.onerror = reject;
-  });
+async function loadBitmap(src: string): Promise<ImageBitmap> {
+  const res = await fetch(src, { cache: "force-cache" });
+  if (!res.ok) throw new Error("Image fetch failed");
+  const blob = await res.blob();
+  return await createImageBitmap(blob);
 }
+
 
 export default function Season9PrefsPanel() {
   const router = useRouter();
@@ -250,17 +243,20 @@ export default function Season9PrefsPanel() {
     ctx.font = "bold 36px system-ui";
     ctx.fillText("FACTION PREFERENCES", LEFT_X, y);
 
+    // ===== FACTION ICONS (PROD-SAFE, VERCEL-SAFE) =====
     const factions = [p1, p2, p3].filter(Boolean);
     const ICON = 96;
     const GAP = 64;
     const iconY = y + 30;
 
     for (let i = 0; i < factions.length; i++) {
+      const faction = factions[i];
       try {
-        const faction = factions[i];
-        const img = await loadImage(`/factions/${faction}.webp`);
+        const bmp = await loadBitmap(`/factions/${faction}.webp`);
         const x = LEFT_X + i * (ICON + GAP);
-        ctx.drawImage(img, x, iconY, ICON, ICON);
+
+        ctx.drawImage(bmp, x, iconY, ICON, ICON);
+
         ctx.font = "28px system-ui";
         const w = ctx.measureText(faction).width;
         ctx.fillText(
@@ -268,7 +264,9 @@ export default function Season9PrefsPanel() {
           x + ICON / 2 - w / 2,
           iconY + ICON + 34
         );
-      } catch {}
+      } catch {
+        // silent fail — layout still renders
+      }
     }
 
     const RIGHT_X = 1000;
@@ -318,7 +316,7 @@ export default function Season9PrefsPanel() {
     }
 
     try {
-      const logo = await loadImage("/logo.webp");
+      const logo = await loadBitmap("/logo.webp");
       ctx.drawImage(logo, W - 420, H - 320, 300, 300);
     } catch {}
   }
