@@ -342,14 +342,25 @@ export default function Season9PrefsPanel() {
         ry += 44;
         ctx.font = "32px system-ui";
 
-        const maxWidth = 800;   // keeps it safely inside panel
+        const maxWidth = 800;
         const lineHeight = 42;
 
-        history.seasons.forEach((team: string, index: number) => {
-          const label = `S${index + 1}: ${team}`;
+        history.seasons.forEach((seasonEntry: string) => {
+          // Try to extract season number (handles S6, SEASON 6, etc.)
+          const match = seasonEntry.match(/S(?:EASON)?\s*(\d+)/i);
+          const seasonNumber = match ? match[1] : "?";
+
+          // Remove season text from team name if it's embedded
+          const teamName = seasonEntry
+            .replace(/S(?:EASON)?\s*\d+/i, "")
+            .replace(/[-:]/g, "")
+            .trim();
+
+          const label = `S${seasonNumber}: ${teamName || seasonEntry}`;
           ry = wrapText(ctx, label, RIGHT_X, ry, maxWidth, lineHeight);
         });
       }
+
 
       if (history.championships) {
         ry += 44;
