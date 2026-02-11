@@ -197,136 +197,157 @@ export default function Season9PrefsPanel() {
     });
   }
 
-  async function drawCard(): Promise<void> {
-    if (!canvasRef.current || !data || !data.ok) return;
-    if (!("found" in data) || !data.found) return;
+  function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = src;
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+  });
+}
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+async function drawCard() {
+  if (!canvasRef.current || !data || !data.ok) return;
+  if (!("found" in data) || !data.found) return;
 
-    const W = 1920;
-    const H = 1080;
-    canvas.width = W;
-    canvas.height = H;
+  const canvas = canvasRef.current;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
 
-    const bg = CARD_BACKGROUNDS.find((b) => b.id === bgId);
-    bg?.draw(ctx, W, H);
+  const W = 1920;
+  const H = 1080;
+  canvas.width = W;
+  canvas.height = H;
 
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.fillRect(60, 60, W - 120, H - 120);
+  const bg = CARD_BACKGROUNDS.find((b) => b.id === bgId);
+  bg?.draw(ctx, W, H);
 
-    ctx.fillStyle = "#fff";
+  // ===== INNER PANEL =====
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(80, 80, W - 160, H - 160);
+  ctx.fillStyle = "#fff";
 
-    const LEFT_X = 120;
-    const RIGHT_X = 1040;
-    let y = 150;
+  // ===== LEFT COLUMN =====
+  const LEFT_X = 140;
+  let y = 170;
 
+  ctx.font = "bold 48px system-ui";
+  ctx.fillText("SEASON 9", LEFT_X, y);
+
+  y += 90;
+  ctx.font = "bold 72px system-ui";
+  ctx.fillText(`${data.first_name} ${data.last_name}`, LEFT_X, y);
+
+  y += 55;
+  ctx.font = "36px system-ui";
+  ctx.fillText(data.ncxid, LEFT_X, y);
+
+  y += 90;
+  ctx.font = "bold 36px system-ui";
+  ctx.fillText("FACTION PREFERENCES", LEFT_X, y);
+
+  // ===== FACTION ICONS (FIXED) =====
+  const factions = [p1, p2, p3].filter(Boolean);
+  const ICON = 96;
+  const GAP = 64;
+  const iconY = y + 30;
+
+  const factionImages = await Promise.all(
+    factions.map((f) =>
+      loadImage(`${window.location.origin}/factions/${f}.webp`)
+    )
+  );
+
+  factionImages.forEach((img, i) => {
+    const x = LEFT_X + i * (ICON + GAP);
+    ctx.drawImage(img, x, iconY, ICON, ICON);
+
+    ctx.font = "28px system-ui";
+    const label = factions[i];
+    const w = ctx.measureText(label).width;
+    ctx.fillText(label, x + ICON / 2 - w / 2, iconY + ICON + 34);
+  });
+
+  // ===== RIGHT COLUMN =====
+  const RIGHT_X = 1000;
+  let ry = 260;
+
+  if (history === "ROOKIE" || history === null) {
     ctx.font = "bold 48px system-ui";
-    ctx.fillText("SEASON 9", LEFT_X, y);
+    ctx.fillText("ROOKIE SEASON", RIGHT_X, ry);
+  } else {
+    ctx.font = "bold 42px system-ui";
+    ctx.fillText("NCX HISTORY", RIGHT_X, ry);
 
-    y += 70;
-    ctx.font = "bold 72px system-ui";
-    ctx.fillText(`${data.first_name} ${data.last_name}`, LEFT_X, y);
+    ry += 60;
+    ctx.font = "32px system-ui";
+    ctx.fillText(
+      `${history.wins}-${history.losses} (${history.winPct.toFixed(
+        1
+      )}%) • ${history.games} games`,
+      RIGHT_X,
+      ry
+    );
 
-    y += 52;
-    ctx.font = "36px system-ui";
-    ctx.fillText(data.ncxid, LEFT_X, y);
+    ry += 44;
+    ctx.fillText(
+      `Points: ${history.points} • PL/MS: ${history.plms}`,
+      RIGHT_X,
+      ry
+    );
 
-    y += 70;
-    ctx.font = "bold 36px system-ui";
-    ctx.fillText("FACTION PREFERENCES", LEFT_X, y);
+    ry += 44;
+    ctx.fillText(`PPG: ${history.ppg.toFixed(2)}`, RIGHT_X, ry);
 
-    const factions = [p1, p2, p3].filter(Boolean);
-    const ICON = 96;
-    const GAP = 48;
-    const iconY = y + 24;
+    if (history.seasons.length) {
+      ry += 44;
+      ctx.fillText(`Seasons: ${history.seasons.join(", ")}`, RIGHT_X, ry);
+    }
 
-    const iconPromises = factions.map((f, i) => {
-      return new Promise<void>((resolve) => {
-        const img = new Image();
-        img.src = `/factions/${f}.webp`;
-        img.onload = () => {
-          const x = LEFT_X + i * (ICON + GAP);
-          ctx.drawImage(img, x, iconY, ICON, ICON);
-          ctx.font = "26px system-ui";
-          const w = ctx.measureText(f).width;
-          ctx.fillText(f, x + ICON / 2 - w / 2, iconY + ICON + 28);
-          resolve();
-        };
-        img.onerror = () => resolve();
-      });
-    });
-
-    let ry = 200;
-    if (history === "ROOKIE" || history === null) {
-      ctx.font = "bold 48px system-ui";
-      ctx.fillText("ROOKIE SEASON", RIGHT_X, ry);
-    } else {
-      ctx.font = "bold 42px system-ui";
-      ctx.fillText("NCX HISTORY", RIGHT_X, ry);
-
-      ry += 60;
-      ctx.font = "32px system-ui";
+    if (history.championships) {
+      ry += 44;
       ctx.fillText(
-        `${history.wins}-${history.losses} (${history.winPct.toFixed(
-          1
-        )}%) • ${history.games} games`,
+        `Championships: ${history.championships}`,
         RIGHT_X,
         ry
       );
-
-      ry += 42;
-      ctx.fillText(
-        `Points: ${history.points} • PL/MS: ${history.plms}`,
-        RIGHT_X,
-        ry
-      );
-
-      ry += 42;
-      ctx.fillText(`PPG: ${history.ppg.toFixed(2)}`, RIGHT_X, ry);
-
-      if (history.seasons.length) {
-        ry += 42;
-        ctx.fillText(`Seasons: ${history.seasons.join(", ")}`, RIGHT_X, ry);
-      }
-
-      if (history.championships) {
-        ry += 42;
-        ctx.fillText(
-          `Championships: ${history.championships}`,
-          RIGHT_X,
-          ry
-        );
-      }
     }
-
-    if (quote) {
-      ctx.font = "italic 30px system-ui";
-      ctx.fillText(`“${quote}”`, LEFT_X, H - 200);
-    }
-
-    const logoPromise = new Promise<void>((resolve) => {
-      const logo = new Image();
-      logo.src = "/logo.webp";
-      logo.onload = () => {
-        ctx.drawImage(logo, W - 420, H - 360, 320, 320);
-        resolve();
-      };
-      logo.onerror = () => resolve();
-    });
-
-    await Promise.all([...iconPromises, logoPromise]);
   }
 
-  async function download() {
-    await drawCard();
-    if (!canvasRef.current) return;
-    const a = document.createElement("a");
-    a.download = `ncx_s9_draft_${(data as any).ncxid}.png`;
-    a.href = canvasRef.current.toDataURL("image/png");
-    a.click();
+  // ===== QUOTE =====
+  if (quote) {
+    ctx.font = "italic 32px system-ui";
+    ctx.fillText(`“${quote}”`, LEFT_X, H - 220);
   }
+
+  // ===== LOGO (FIXED) =====
+  try {
+    const logo = await loadImage(
+      `${window.location.origin}/logo.webp`
+    );
+    ctx.drawImage(logo, W - 420, H - 320, 300, 300);
+  } catch {}
+}
+
+// =======================
+// REPLACE Preview BUTTON HANDLER
+// =======================
+<button onClick={() => drawCard()} className="border px-3 py-1">
+  Preview
+</button>
+
+// =======================
+// REPLACE download() WITH THIS
+// =======================
+async function download() {
+  await drawCard();
+  if (!canvasRef.current) return;
+  const a = document.createElement("a");
+  a.download = `ncx_s9_draft_${(data as any).ncxid}.png`;
+  a.href = canvasRef.current.toDataURL("image/png");
+  a.click();
+}
 
   if (loading) {
     return (
