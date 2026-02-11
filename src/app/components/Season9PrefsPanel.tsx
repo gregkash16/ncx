@@ -395,6 +395,57 @@ export default function Season9PrefsPanel() {
     );
   }
 
+  // ===== ADMIN VIEW =====
+if ("isAdmin" in data && data.isAdmin) {
+  return (
+    <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border space-y-6">
+      <h2 className="text-xl font-semibold">Season 9 Admin</h2>
+
+      <div className="border p-4 space-y-4 text-sm">
+        <div>
+          <span className="font-semibold">Total Signups:</span>{" "}
+          {data.totalSignups ?? "—"}
+        </div>
+
+        <button
+          onClick={async () => {
+            setRefreshing(true);
+            setNotice("");
+
+            const res = await fetch("/api/s9/refresh", {
+              method: "POST",
+            });
+
+            const json = await res.json();
+
+            if (!res.ok || !json?.ok) {
+              setNotice(json?.reason ?? "Seed failed.");
+            } else {
+              setNotice("✅ Signups refreshed.");
+              await load();
+              router.refresh();
+            }
+
+            setRefreshing(false);
+          }}
+          disabled={refreshing}
+          className={`px-5 py-2 rounded-xl text-white ${
+            refreshing
+              ? "bg-purple-400 cursor-not-allowed"
+              : "bg-purple-600 hover:bg-purple-700 cursor-pointer"
+          }`}
+        >
+          {refreshing ? "Refreshing…" : "Refresh Signups"}
+        </button>
+
+        {notice && <div>{notice}</div>}
+      </div>
+    </div>
+  );
+}
+
+
+
   if ("found" in data && !data.found) {
     return (
       <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border space-y-4">
