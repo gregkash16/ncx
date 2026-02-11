@@ -83,6 +83,21 @@ type PrefsPayload =
     }
   | { ok: false; reason: string };
 
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = src;
+    img.decoding = "sync";
+    img.onload = async () => {
+      try {
+        if ("decode" in img) await img.decode();
+      } catch {}
+      resolve(img);
+    };
+    img.onerror = reject;
+  });
+}
+
 export default function Season9PrefsPanel() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -197,167 +212,125 @@ export default function Season9PrefsPanel() {
     });
   }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.src = src;
-    img.decoding = "sync";
-    img.onload = async () => {
-      try {
-        // Ensure image is fully decoded before drawImage
-        if ("decode" in img) await img.decode();
-      } catch {}
-      resolve(img);
-    };
-    img.onerror = reject;
-  });
-}
+  async function drawCard() {
+    if (!canvasRef.current || !data || !data.ok) return;
+    if (!("found" in data) || !data.found) return;
 
-async function drawCard() {
-  if (!canvasRef.current || !data || !data.ok) return;
-  if (!("found" in data) || !data.found) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  const canvas = canvasRef.current;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+    const W = 1920;
+    const H = 1080;
+    canvas.width = W;
+    canvas.height = H;
 
-  const W = 1920;
-  const H = 1080;
-  canvas.width = W;
-  canvas.height = H;
+    const bg = CARD_BACKGROUNDS.find((b) => b.id === bgId);
+    bg?.draw(ctx, W, H);
 
-  const bg = CARD_BACKGROUNDS.find((b) => b.id === bgId);
-  bg?.draw(ctx, W, H);
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(80, 80, W - 160, H - 160);
+    ctx.fillStyle = "#fff";
 
-  // ===== INNER PANEL =====
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.fillRect(80, 80, W - 160, H - 160);
-  ctx.fillStyle = "#fff";
+    const LEFT_X = 140;
+    let y = 170;
 
-  // ===== LEFT COLUMN =====
-  const LEFT_X = 140;
-  let y = 170;
-
-  ctx.font = "bold 48px system-ui";
-  ctx.fillText("SEASON 9", LEFT_X, y);
-
-  y += 90;
-  ctx.font = "bold 72px system-ui";
-  ctx.fillText(`${data.first_name} ${data.last_name}`, LEFT_X, y);
-
-  y += 55;
-  ctx.font = "36px system-ui";
-  ctx.fillText(data.ncxid, LEFT_X, y);
-
-  y += 90;
-  ctx.font = "bold 36px system-ui";
-  ctx.fillText("FACTION PREFERENCES", LEFT_X, y);
-
-  // ===== FACTION ICONS (PROD SAFE) =====
-const factions = [p1, p2, p3].filter(Boolean);
-const ICON = 96;
-const GAP = 64;
-const iconY = y + 30;
-
-for (let i = 0; i < factions.length; i++) {
-  const faction = factions[i];
-  try {
-    const img = await loadImage(`/factions/${faction}.webp`);
-    const x = LEFT_X + i * (ICON + GAP);
-
-    ctx.drawImage(img, x, iconY, ICON, ICON);
-
-    ctx.font = "28px system-ui";
-    const w = ctx.measureText(faction).width;
-    ctx.fillText(
-      faction,
-      x + ICON / 2 - w / 2,
-      iconY + ICON + 34
-    );
-  } catch {
-    // silent fail — card still renders
-  }
-}
-
-  // ===== RIGHT COLUMN =====
-  const RIGHT_X = 1000;
-  let ry = 260;
-
-  if (history === "ROOKIE" || history === null) {
     ctx.font = "bold 48px system-ui";
-    ctx.fillText("ROOKIE SEASON", RIGHT_X, ry);
-  } else {
-    ctx.font = "bold 42px system-ui";
-    ctx.fillText("NCX HISTORY", RIGHT_X, ry);
+    ctx.fillText("SEASON 9", LEFT_X, y);
 
-    ry += 60;
-    ctx.font = "32px system-ui";
-    ctx.fillText(
-      `${history.wins}-${history.losses} (${history.winPct.toFixed(
-        1
-      )}%) • ${history.games} games`,
-      RIGHT_X,
-      ry
-    );
+    y += 90;
+    ctx.font = "bold 72px system-ui";
+    ctx.fillText(`${data.first_name} ${data.last_name}`, LEFT_X, y);
 
-    ry += 44;
-    ctx.fillText(
-      `Points: ${history.points} • PL/MS: ${history.plms}`,
-      RIGHT_X,
-      ry
-    );
+    y += 55;
+    ctx.font = "36px system-ui";
+    ctx.fillText(data.ncxid, LEFT_X, y);
 
-    ry += 44;
-    ctx.fillText(`PPG: ${history.ppg.toFixed(2)}`, RIGHT_X, ry);
+    y += 90;
+    ctx.font = "bold 36px system-ui";
+    ctx.fillText("FACTION PREFERENCES", LEFT_X, y);
 
-    if (history.seasons.length) {
-      ry += 44;
-      ctx.fillText(`Seasons: ${history.seasons.join(", ")}`, RIGHT_X, ry);
+    const factions = [p1, p2, p3].filter(Boolean);
+    const ICON = 96;
+    const GAP = 64;
+    const iconY = y + 30;
+
+    for (let i = 0; i < factions.length; i++) {
+      try {
+        const faction = factions[i];
+        const img = await loadImage(`/factions/${faction}.webp`);
+        const x = LEFT_X + i * (ICON + GAP);
+        ctx.drawImage(img, x, iconY, ICON, ICON);
+        ctx.font = "28px system-ui";
+        const w = ctx.measureText(faction).width;
+        ctx.fillText(
+          faction,
+          x + ICON / 2 - w / 2,
+          iconY + ICON + 34
+        );
+      } catch {}
     }
 
-    if (history.championships) {
-      ry += 44;
+    const RIGHT_X = 1000;
+    let ry = 260;
+
+    if (history === "ROOKIE" || history === null) {
+      ctx.font = "bold 48px system-ui";
+      ctx.fillText("ROOKIE SEASON", RIGHT_X, ry);
+    } else {
+      ctx.font = "bold 42px system-ui";
+      ctx.fillText("NCX HISTORY", RIGHT_X, ry);
+
+      ry += 60;
+      ctx.font = "32px system-ui";
       ctx.fillText(
-        `Championships: ${history.championships}`,
+        `${history.wins}-${history.losses} (${history.winPct.toFixed(
+          1
+        )}%) • ${history.games} games`,
         RIGHT_X,
         ry
       );
+
+      ry += 44;
+      ctx.fillText(
+        `Points: ${history.points} • PL/MS: ${history.plms}`,
+        RIGHT_X,
+        ry
+      );
+
+      ry += 44;
+      ctx.fillText(`PPG: ${history.ppg.toFixed(2)}`, RIGHT_X, ry);
+
+      if (history.seasons.length) {
+        ry += 44;
+        ctx.fillText(`Seasons: ${history.seasons.join(", ")}`, RIGHT_X, ry);
+      }
+
+      if (history.championships) {
+        ry += 44;
+        ctx.fillText(`Championships: ${history.championships}`, RIGHT_X, ry);
+      }
     }
+
+    if (quote) {
+      ctx.font = "italic 32px system-ui";
+      ctx.fillText(`“${quote}”`, LEFT_X, H - 220);
+    }
+
+    try {
+      const logo = await loadImage("/logo.webp");
+      ctx.drawImage(logo, W - 420, H - 320, 300, 300);
+    } catch {}
   }
 
-  // ===== QUOTE =====
-  if (quote) {
-    ctx.font = "italic 32px system-ui";
-    ctx.fillText(`“${quote}”`, LEFT_X, H - 220);
+  async function download() {
+    await drawCard();
+    if (!canvasRef.current) return;
+    const a = document.createElement("a");
+    a.download = `ncx_s9_draft_${(data as any).ncxid}.png`;
+    a.href = canvasRef.current.toDataURL("image/png");
+    a.click();
   }
-
-  // ===== LOGO (FIXED) =====
-  try {
-    const logo = await loadImage(
-      `${window.location.origin}/logo.webp`
-    );
-    ctx.drawImage(logo, W - 420, H - 320, 300, 300);
-  } catch {}
-}
-
-// =======================
-// REPLACE Preview BUTTON HANDLER
-// =======================
-<button onClick={() => drawCard()} className="border px-3 py-1">
-  Preview
-</button>
-
-// =======================
-// REPLACE download() WITH THIS
-// =======================
-async function download() {
-  await drawCard();
-  if (!canvasRef.current) return;
-  const a = document.createElement("a");
-  a.download = `ncx_s9_draft_${(data as any).ncxid}.png`;
-  a.href = canvasRef.current.toDataURL("image/png");
-  a.click();
-}
 
   if (loading) {
     return (
@@ -382,7 +355,7 @@ async function download() {
         <div className="border p-4 text-sm">
           You haven&apos;t signed up yet —{" "}
           <a
-            className="underline"
+            className="underline cursor-pointer"
             href="https://forms.gle/X7VNuw1jbDp5985g8"
             target="_blank"
             rel="noreferrer"
@@ -409,10 +382,10 @@ async function download() {
           type="button"
           onClick={save}
           disabled={!canSave || saving}
-          className={`px-6 py-2 rounded-xl text-white transition ${
+          className={`px-6 py-2 rounded-xl text-white transition cursor-pointer ${
             !canSave || saving
               ? "bg-purple-400 opacity-60 cursor-not-allowed"
-              : "bg-purple-600 hover:bg-purple-700 cursor-pointer"
+              : "bg-purple-600 hover:bg-purple-700"
           }`}
         >
           {saving ? "Saving…" : "Save Preferences"}
@@ -434,7 +407,7 @@ async function download() {
           <select
             value={bgId}
             onChange={(e) => setBgId(e.target.value)}
-            className="border bg-white text-black px-2 py-1"
+            className="border bg-white text-black px-2 py-1 cursor-pointer"
           >
             {CARD_BACKGROUNDS.map((b) => (
               <option key={b.id} value={b.id}>
@@ -453,12 +426,12 @@ async function download() {
           <canvas ref={canvasRef} className="border w-full max-w-3xl" />
 
           <div className="flex gap-3">
-            <button onClick={drawCard} className="border px-3 py-1">
+            <button onClick={drawCard} className="border px-3 py-1 cursor-pointer">
               Preview
             </button>
             <button
               onClick={download}
-              className="bg-purple-600 text-white px-3 py-1"
+              className="bg-purple-600 text-white px-3 py-1 cursor-pointer"
             >
               Download
             </button>
@@ -467,7 +440,7 @@ async function download() {
                 setDraftOpen(false);
                 setHistory(null);
               }}
-              className="border px-3 py-1"
+              className="border px-3 py-1 cursor-pointer"
             >
               Close
             </button>
@@ -493,7 +466,7 @@ function PrefSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border px-3 py-2 bg-white text-black"
+        className="w-full rounded-lg border px-3 py-2 bg-white text-black cursor-pointer"
       >
         <option value="" disabled>
           Choose…
