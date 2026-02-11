@@ -214,6 +214,35 @@ export default function Season9PrefsPanel() {
     });
   }
 
+  function wrapText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    maxWidth: number,
+    lineHeight: number
+  ) {
+    const words = text.split(" ");
+    let line = "";
+
+    for (let n = 0; n < words.length; n++) {
+      const testLine = line + words[n] + " ";
+      const metrics = ctx.measureText(testLine);
+      const testWidth = metrics.width;
+
+      if (testWidth > maxWidth && n > 0) {
+        ctx.fillText(line.trim(), x, y);
+        line = words[n] + " ";
+        y += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+
+    ctx.fillText(line.trim(), x, y);
+    return y + lineHeight;
+  }
+
   async function drawCard() {
     if (!canvasRef.current || !data || !data.ok) return;
     if (!("found" in data) || !data.found) return;
@@ -311,7 +340,15 @@ export default function Season9PrefsPanel() {
 
       if (history.seasons.length) {
         ry += 44;
-        ctx.fillText(`Seasons: ${history.seasons.join(", ")}`, RIGHT_X, ry);
+        ctx.font = "32px system-ui";
+
+        const maxWidth = 800;   // keeps it safely inside panel
+        const lineHeight = 42;
+
+        history.seasons.forEach((team: string, index: number) => {
+          const label = `S${index + 1}: ${team}`;
+          ry = wrapText(ctx, label, RIGHT_X, ry, maxWidth, lineHeight);
+        });
       }
 
       if (history.championships) {
