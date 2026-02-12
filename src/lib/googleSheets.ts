@@ -414,7 +414,29 @@ export async function fetchAdvStatsCached() {
 
 export async function fetchAllTimeStatsCached() {
   const rows = await dbQuery<any>(`
-    SELECT *
+    SELECT
+      ncxid,
+      first_name,
+      last_name,
+      discord,
+      wins,
+      losses,
+      points,
+      plms,
+      games,
+      win_pct,
+      ppg,
+      adj_ppg,
+      s1,
+      s2,
+      s3,
+      s4,
+      s5,
+      s6,
+      s7,
+      s8,
+      s9,
+      championships
     FROM all_time_stats
   `);
 

@@ -10,7 +10,6 @@ function fullName(p: PlayerRow) {
   return f && l ? `${f} ${l}` : f || l || p.ncxid;
 }
 
-// Champion teams per season
 const CHAMPIONS_BY_SEASON: Record<number, string> = {
   1: "HAVOC",
   2: "HAVOC",
@@ -22,9 +21,6 @@ const CHAMPIONS_BY_SEASON: Record<number, string> = {
   8: "WOLFPACK",
 };
 
-/**
- * Easter egg override: set Smash Count per NCXID here.
- */
 const SMASH_COUNTS: Record<string, number> = {
   NCX94: 69,
 };
@@ -34,10 +30,7 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    const base = data.filter(
-      (p) => p.first && p.first.trim() !== ""
-    );
-
+    const base = data.filter((p) => p.first && p.first.trim() !== "");
     if (!qq) return base;
 
     return data.filter((p) => {
@@ -63,11 +56,11 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
   }, [filtered.length, selectedIdx]);
 
   return (
-    // 🔑 Break out of any parent padding/max-width and center on the viewport
     <div className="relative left-1/2 -translate-x-1/2 w-screen px-4">
       <div className="mx-auto w-full max-w-[1400px]">
         <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-4">
-          {/* LEFT: list */}
+
+          {/* LEFT LIST */}
           <aside className="rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] p-3">
             <div className="mb-3">
               <input
@@ -81,10 +74,10 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
             <ul className="max-h-[68vh] overflow-auto space-y-1 pr-1">
               {filtered.map((p, i) => {
                 const active = i === selectedIdx;
-
                 const isRookie = p.seasons.every(
                   (s) => !s || !String(s).trim()
                 );
+
                 return (
                   <li key={`${p.ncxid}-${i}`}>
                     <button
@@ -97,7 +90,6 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                       ].join(" ")}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        {/* Left: name + discord */}
                         <div className="min-w-0 text-left">
                           <div className="truncate text-sm font-semibold text-[var(--ncx-text-primary)]">
                             {p.ncxid} • {fullName(p)}
@@ -110,52 +102,30 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                         </div>
 
                         <div className="flex items-center gap-2">
-
-                          {/* Rookie Badge */}
                           {isRookie && (
-                            <div
-                              className="flex items-center justify-center
-                                w-5 h-5 rounded-full
-                                border border-[rgb(var(--ncx-gold-rgb)/0.8)]
-                                text-[10px] font-bold
-                                text-[rgb(var(--ncx-gold-rgb))]
-                                bg-[rgb(var(--ncx-gold-rgb)/0.08)]"
-                              title="Rookie"
-                            >
+                            <div className="w-5 h-5 flex items-center justify-center rounded-full border border-[rgb(var(--ncx-gold-rgb)/0.8)] text-[10px] font-bold text-[rgb(var(--ncx-gold-rgb))] bg-[rgb(var(--ncx-gold-rgb)/0.08)]">
                               R
                             </div>
                           )}
 
-
-                          {/* Championship Trophy */}
                           {Number(p.championships) > 0 && (
-                            <div
-                              className="flex items-center gap-1 text-xs font-semibold
-                                text-[rgb(var(--ncx-gold-rgb))]"
-                              title={`${p.championships} Championship${Number(p.championships) > 1 ? "s" : ""}`}
-                            >
+                            <div className="flex items-center gap-1 text-xs font-semibold text-[rgb(var(--ncx-gold-rgb))]">
                               <span>🏆</span>
-                              {Number(p.championships) > 1 && <span>{p.championships}</span>}
+                              {Number(p.championships) > 1 && (
+                                <span>{p.championships}</span>
+                              )}
                             </div>
                           )}
-
                         </div>
-
                       </div>
                     </button>
                   </li>
                 );
               })}
-
-              {!filtered.length && (
-                <li className="text-sm text-[var(--ncx-text-muted)] italic px-1 py-2">
-                  No players found.
-                </li>
-              )}
             </ul>
           </aside>
 
-          {/* RIGHT: player card */}
+          {/* RIGHT PANEL */}
           <section className="rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] p-5">
             {!selected ? (
               <div className="text-[var(--ncx-text-muted)]">
@@ -163,24 +133,21 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
               </div>
             ) : (
               <div className="space-y-5 mx-auto w-full max-w-[1100px]">
+
                 <header className="flex items-center justify-between">
                   <h2 className="text-xl font-bold">
-                    <span className="text-[var(--ncx-text-primary)]">
-                      {selected.ncxid}
-                    </span>{" "}
-                    <span className="text-[var(--ncx-text-muted)]">•</span>{" "}
-                    <span className="ncx-accent">{fullName(selected)}</span>
+                    {selected.ncxid} • {fullName(selected)}
                   </h2>
 
                   {selected.championships && (
                     <span className="inline-flex items-center px-3 py-1 text-xs rounded-full ncx-championship">
                       Championships: {selected.championships}
-                    </span> 
+                    </span>
                   )}
                 </header>
 
-                {/* Stats grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {/* STATS GRID */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-3">
                   {(() => {
                     const stats: Array<[string, string]> = [
                       ["Wins", selected.wins],
@@ -190,14 +157,11 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                       ["Games", selected.games],
                       ["Win %", selected.winPct],
                       ["PPG", selected.ppg],
+                      ["Adj PPG", selected.adj_ppg],
                     ];
 
                     if (selected.ncxid in SMASH_COUNTS) {
-                      const ppgIndex = stats.findIndex(
-                        ([label]) => label === "PPG"
-                      );
-                      const insertAt = ppgIndex >= 0 ? ppgIndex + 1 : stats.length;
-                      stats.splice(insertAt, 0, [
+                      stats.push([
                         "Smash Count",
                         String(SMASH_COUNTS[selected.ncxid]),
                       ]);
@@ -219,9 +183,9 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                   })()}
                 </div>
 
-                {/* Seasons table */}
+                {/* SEASONS TABLE */}
                 <div className="rounded-xl border border-[var(--ncx-border)] overflow-hidden">
-                  <div className="bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] px-4 py-2 text-sm font-semibold text-[var(--ncx-text-primary)]">
+                  <div className="bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] px-4 py-2 text-sm font-semibold">
                     Season Teams
                   </div>
 
@@ -232,53 +196,38 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                         <th className="text-left px-3 py-2">Team</th>
                       </tr>
                     </thead>
-
                     <tbody className="divide-y divide-[var(--ncx-border)]">
                       {selected.seasons.map((team, idx) => {
                         const seasonNum = idx + 1;
                         const isChampion =
-                          !!team &&
-                          !!CHAMPIONS_BY_SEASON[seasonNum] &&
+                          team &&
+                          CHAMPIONS_BY_SEASON[seasonNum] &&
                           team.toUpperCase().trim() ===
                             CHAMPIONS_BY_SEASON[seasonNum];
 
                         return (
                           <tr key={idx}>
-                            <td
-                              className={[
-                                "px-3 py-2",
-                                isChampion
-                                  ? "bg-[rgb(var(--ncx-gold-rgb)/0.10)] text-[var(--ncx-text-primary)]"
-                                  : "text-[var(--ncx-text-primary)]",
-                              ].join(" ")}
-                            >
+                            <td className="px-3 py-2">
                               Season {seasonNum}
                             </td>
-
                             <td
                               className={[
                                 "px-3 py-2",
                                 isChampion
-                                  ? "bg-[rgb(var(--ncx-gold-rgb)/0.10)] font-semibold text-[rgb(var(--ncx-gold-rgb))]"
-                                  : "text-[var(--ncx-text-primary)]",
+                                  ? "font-semibold text-[rgb(var(--ncx-gold-rgb))]"
+                                  : "",
                               ].join(" ")}
                             >
-                              {team && team.trim() ? team : (
-                                <span className="text-[var(--ncx-text-muted)]">—</span>
-                              )}
+                              {team && team.trim() ? team : "—"}
                             </td>
                           </tr>
-
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
 
-                {/* Videos */}
-                <div className="pt-2">
-                  <PlayerVideos ncxid={selected.ncxid} />
-                </div>
+                <PlayerVideos ncxid={selected.ncxid} />
               </div>
             )}
           </section>

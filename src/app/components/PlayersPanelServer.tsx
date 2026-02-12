@@ -20,6 +20,7 @@ export type PlayerRow = {
   games: string;
   winPct: string;
   ppg: string;
+  adj_ppg: string;
   seasons: (string | null)[];
   championships: string;
 };
@@ -59,6 +60,7 @@ export default async function PlayersPanelServer() {
         games,
         win_pct,
         ppg,
+        adj_ppg,
         s1, s2, s3, s4, s5, s6, s7, s8, s9,
         championships
       FROM S9.all_time_stats
@@ -78,6 +80,7 @@ export default async function PlayersPanelServer() {
       games: String(r.games ?? ""),
       winPct: String(r.win_pct ?? ""),
       ppg: String(r.ppg ?? ""),
+      adj_ppg: String(r.adj_ppg ?? ""),
       seasons: [
         r.s1 || null,
         r.s2 || null,
