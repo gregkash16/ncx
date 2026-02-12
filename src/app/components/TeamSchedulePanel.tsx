@@ -8,6 +8,7 @@ import {
 } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
 import PlayerDMLink from "@/app/components/PlayerDMLink";
+import TeamIntroToggle from "@/app/components/TeamIntroToggle";
 
 /* ----------------------------- helpers ----------------------------- */
 
@@ -297,6 +298,9 @@ export default async function TeamSchedulePanel({
               </p>
             </div>
           </header>
+
+          {/* Team Intro Video */}
+          <TeamIntroToggle slug={teamSlug(teamName)} />
 
           {/* Optional: team advanced stats summary */}
           {teamAdvStats && (
