@@ -34,7 +34,12 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    if (!qq) return data;
+    const base = data.filter(
+      (p) => p.first && p.first.trim() !== ""
+    );
+
+    if (!qq) return base;
+
     return data.filter((p) => {
       const name = fullName(p).toLowerCase();
       const discord = (p.discord || "").toLowerCase();
@@ -76,6 +81,10 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
             <ul className="max-h-[68vh] overflow-auto space-y-1 pr-1">
               {filtered.map((p, i) => {
                 const active = i === selectedIdx;
+
+                const isRookie = p.seasons.every(
+                  (s) => !s || !String(s).trim()
+                );
                 return (
                   <li key={`${p.ncxid}-${i}`}>
                     <button
@@ -100,17 +109,38 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                           )}
                         </div>
 
-                        {/* Right: championship trophy */}
-                        {Number(p.championships) > 0 && (
-                          <div
-                            className="flex items-center gap-1 text-xs font-semibold
-                              text-[rgb(var(--ncx-gold-rgb))]"
-                            title={`${p.championships} Championship${Number(p.championships) > 1 ? "s" : ""}`}
-                          >
-                            <span>🏆</span>
-                            {Number(p.championships) > 1 && <span>{p.championships}</span>}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+
+                          {/* Rookie Badge */}
+                          {isRookie && (
+                            <div
+                              className="flex items-center justify-center
+                                w-5 h-5 rounded-full
+                                border border-[rgb(var(--ncx-gold-rgb)/0.8)]
+                                text-[10px] font-bold
+                                text-[rgb(var(--ncx-gold-rgb))]
+                                bg-[rgb(var(--ncx-gold-rgb)/0.08)]"
+                              title="Rookie"
+                            >
+                              R
+                            </div>
+                          )}
+
+
+                          {/* Championship Trophy */}
+                          {Number(p.championships) > 0 && (
+                            <div
+                              className="flex items-center gap-1 text-xs font-semibold
+                                text-[rgb(var(--ncx-gold-rgb))]"
+                              title={`${p.championships} Championship${Number(p.championships) > 1 ? "s" : ""}`}
+                            >
+                              <span>🏆</span>
+                              {Number(p.championships) > 1 && <span>{p.championships}</span>}
+                            </div>
+                          )}
+
+                        </div>
+
                       </div>
                     </button>
                   </li>
