@@ -66,6 +66,7 @@ type PlayerHistory = {
   points: number;
   plms: number;
   ppg: number;
+  adj_ppg: number;
   championships: string;
   seasons: { season: number; team: string }[];
 
@@ -210,6 +211,7 @@ export default function Season9PrefsPanel() {
       points: raw.points,
       plms: raw.plms,
       ppg: raw.ppg,
+      adj_ppg: raw.adj_ppg,
       championships: raw.championships,
       seasons: raw.seasons, // <-- now structured
     });
@@ -322,13 +324,14 @@ export default function Season9PrefsPanel() {
 
       ry += 60;
       ctx.font = "32px system-ui";
+      const winDecimal = history.winPct.toFixed(3).replace(/^0/, "");
+
       ctx.fillText(
-        `${history.wins}-${history.losses} (${history.winPct.toFixed(
-          1
-        )}%) • ${history.games} games`,
+        `${history.wins}-${history.losses} (${winDecimal}) • ${history.games} games`,
         RIGHT_X,
         ry
       );
+
 
       ry += 44;
       ctx.fillText(
@@ -337,8 +340,14 @@ export default function Season9PrefsPanel() {
         ry
       );
 
+      const adj = history.adj_ppg ?? history.ppg;
+
       ry += 44;
       ctx.fillText(`PPG: ${history.ppg.toFixed(2)}`, RIGHT_X, ry);
+
+      ry += 44;
+      ctx.fillText(`Adj PPG: ${adj.toFixed(2)}`, RIGHT_X, ry);
+
 
       if (history.seasons.length) {
         ry += 44;
