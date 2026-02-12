@@ -102,6 +102,23 @@ export default async function PodcastPanel() {
           </div>
         )}
       </div>
+
+              {/* Contact Email */}
+        <div className="mt-6 rounded-xl border border-[var(--ncx-border)] bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] px-4 py-4">
+          <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
+            Contact the Show
+          </div>
+          <div className="mt-1 text-sm text-[var(--ncx-text-muted)]">
+            Have comments, questions, or something X-Wing related to promote?
+          </div>
+          <a
+            href="mailto:pod@nickelcityxwing.com"
+            className="mt-2 inline-block text-sm font-semibold text-[rgb(var(--ncx-primary-rgb))] hover:underline"
+          >
+            pod@nickelcityxwing.com
+          </a>
+        </div>
+
     </div>
   );
 }
