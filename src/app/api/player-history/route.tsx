@@ -23,6 +23,7 @@ export async function GET(req: Request) {
         points,
         plms,
         ppg,
+        adj_ppg,
         championships,
         s1, s2, s3, s4, s5, s6, s7, s8, s9
       FROM S9.all_time_stats
@@ -62,6 +63,7 @@ export async function GET(req: Request) {
       points: Number(r.points ?? 0),
       plms: Number(r.plms ?? 0),
       ppg: Number(r.ppg ?? 0),
+      adj_ppg: Number(r.adj_ppg ?? 0),
       championships: r.championships ?? "",
       seasons,
     });
