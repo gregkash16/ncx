@@ -434,6 +434,7 @@ async function TeamTable({
         <tbody>
           {enriched.map((r, i) => {
             const weekLabel = normalizeWeekLabel(r.week);
+            const weekNumber = weekLabel.replace(/[^0-9]/g, "");
             const weekHref = `/m/current?w=${encodeURIComponent(weekLabel)}`;
 
             let rowTone = "";
@@ -468,13 +469,19 @@ async function TeamTable({
                   <Link
                     href={weekHref}
                     prefetch={false}
-                    className="text-xs text-[rgb(var(--ncx-primary-rgb))] underline-offset-2 hover:underline hover:opacity-90"
+                    className="text-xs font-semibold text-[rgb(var(--ncx-primary-rgb))] hover:underline hover:opacity-90"
                   >
-                    {weekLabel}
+                    {weekNumber}
                   </Link>
                 </td>
+
+                
                 <td className="py-1.5 px-2 align-top">
-                  <div className="flex items-center gap-1 min-w-0">
+                  <Link
+                    href={`/m/team/${encodeURIComponent(teamSlug(r.away))}`}
+                    prefetch={false}
+                    className="flex items-center gap-1 min-w-0 hover:underline underline-offset-2"
+                  >
                     <Image
                       src={`/logos/${teamSlug(r.away)}.webp`}
                       alt={`${r.away} logo`}
@@ -484,10 +491,15 @@ async function TeamTable({
                       unoptimized
                     />
                     <span className="truncate text-xs">{r.away}</span>
-                  </div>
+                  </Link>
                 </td>
+
                 <td className="py-1.5 px-2 align-top">
-                  <div className="flex items-center gap-1 min-w-0">
+                  <Link
+                    href={`/m/team/${encodeURIComponent(teamSlug(r.home))}`}
+                    prefetch={false}
+                    className="flex items-center gap-1 min-w-0 hover:underline underline-offset-2"
+                  >
                     <Image
                       src={`/logos/${teamSlug(r.home)}.webp`}
                       alt={`${r.home} logo`}
@@ -497,8 +509,9 @@ async function TeamTable({
                       unoptimized
                     />
                     <span className="truncate text-xs">{r.home}</span>
-                  </div>
+                  </Link>
                 </td>
+
                 <td className="py-1.5 px-2 text-right align-top">
                   <StatusCell row={r} teamName={teamName} />
                 </td>

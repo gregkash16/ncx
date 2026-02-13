@@ -14,6 +14,7 @@ import {
   Users as UsersIcon,
   ClipboardEdit,
   X,
+  Mic,
 } from "lucide-react";
 
 type Props = {
@@ -72,8 +73,10 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
         { href: currentHref, label: "Current", icon: CalendarDays },
         { href: matchupsHref, label: "Matchups", icon: ListIcon },
         { href: "/m/standings", label: "Standings", icon: TrophyIcon },
+        { href: "/m/podcast", label: "Podcast", icon: Mic }, // ← ADD THIS
         { href: "/m/report", label: "Report", icon: ClipboardEdit },
       ],
+
       stats: [
         { href: "/m/indstats", label: "Ind Stats", icon: BarChart3 },
         { href: "/m/advstats", label: "Adv Stats", icon: BarChart3 },
