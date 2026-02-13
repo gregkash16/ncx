@@ -570,7 +570,11 @@ async function TeamTable({
 
                 {/* Away */}
                 <td className="py-2 px-2">
-                  <div className="flex items-center gap-2 min-w-0">
+                  <Link
+                    href={`/?tab=team&team=${encodeURIComponent(teamSlug(r.away))}`}
+                    prefetch={false}
+                    className="flex items-center gap-2 min-w-0 hover:underline underline-offset-2"
+                  >
                     <Image
                       src={`/logos/${teamSlug(r.away)}.webp`}
                       alt={`${r.away} logo`}
@@ -580,12 +584,16 @@ async function TeamTable({
                       unoptimized
                     />
                     <span className="truncate">{r.away}</span>
-                  </div>
+                  </Link>
                 </td>
 
                 {/* Home */}
                 <td className="py-2 px-2">
-                  <div className="flex items-center gap-2 min-w-0">
+                  <Link
+                    href={`/?tab=team&team=${encodeURIComponent(teamSlug(r.home))}`}
+                    prefetch={false}
+                    className="flex items-center gap-2 min-w-0 hover:underline underline-offset-2"
+                  >
                     <Image
                       src={`/logos/${teamSlug(r.home)}.webp`}
                       alt={`${r.home} logo`}
@@ -595,7 +603,7 @@ async function TeamTable({
                       unoptimized
                     />
                     <span className="truncate">{r.home}</span>
-                  </div>
+                  </Link>
                 </td>
 
                 {/* Status → Winner/Loser/In Progress */}
