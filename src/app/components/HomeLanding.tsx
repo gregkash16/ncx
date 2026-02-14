@@ -103,6 +103,11 @@ export default function HomeLanding({
               <p className="text-sm md:text-base text-zinc-300">{message}</p>
             )}
             <p className="text-xs md:text-sm text-zinc-400">
+              If you're a new sign-up, after sign-up go to the Discord and type "$player NCX#" (Your NCX Number) that's how the 
+              website will be able to recognize you.
+            </p>
+            <br />
+            <p className="text-xs md:text-sm text-zinc-400">
               Use the links below to watch games, join the community, check the rules,
               or jump straight to a team page.
             </p>
