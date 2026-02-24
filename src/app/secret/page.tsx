@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 type CalEvent = {
   id: string;
   title: string;
-  start: string; // ISO or YYYY-MM-DD
+  start: string;
   end?: string;
   allDay: boolean;
   location?: string;
@@ -18,11 +18,52 @@ type CalEvent = {
 
 const TIMEZONE = "America/New_York";
 
-// ---- Timezone-safe helpers ----
+/* ---------------- NY TIME HELPERS ---------------- */
+
+function nyOffsetISO(forDate: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIMEZONE,
+    timeZoneName: "shortOffset",
+  }).formatToParts(forDate);
+
+  const tz = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT";
+  const m = tz.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/);
+  if (!m) return "Z";
+
+  const rawH = Number(m[1]);
+  const sign = rawH >= 0 ? "+" : "-";
+  const hh = String(Math.abs(rawH)).padStart(2, "0");
+  const mm = String(Number(m[2] ?? "0")).padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
+}
+
+function toNYDate(input: string): Date | null {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return null;
+
+  if (/[zZ]$/.test(input) || /[+-]\d{2}:\d{2}$/.test(input)) {
+    const d = new Date(input);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const m = input.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})$/);
+  if (!m) {
+    const d = new Date(input);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const dayKey = m[1];
+  const timePart = m[2];
+  const noonUTC = new Date(`${dayKey}T12:00:00Z`);
+  const offset = nyOffsetISO(noonUTC);
+  const d = new Date(`${dayKey}T${timePart}${offset}`);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function tzDayKey(input: string) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
 
-  const d = new Date(input);
+  const d = toNYDate(input) ?? new Date(input);
+
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: TIMEZONE,
     year: "numeric",
@@ -45,7 +86,10 @@ function formatDayLabel(dayKey: string) {
 
 function formatTime(e: Pick<CalEvent, "allDay" | "start">) {
   if (e.allDay) return "ALL DAY";
-  const d = new Date(e.start);
+
+  const d = toNYDate(e.start) ?? new Date(e.start);
+  if (isNaN(d.getTime())) return "";
+
   return new Intl.DateTimeFormat("en-US", {
     timeZone: TIMEZONE,
     hour: "numeric",
@@ -54,6 +98,8 @@ function formatTime(e: Pick<CalEvent, "allDay" | "start">) {
     .format(d)
     .toUpperCase();
 }
+
+/* ---------------- DATA ---------------- */
 
 async function getBaseUrlFromHeaders() {
   const h = await headers();
@@ -67,15 +113,13 @@ async function getEvents(): Promise<CalEvent[]> {
   const base = await getBaseUrlFromHeaders();
   const res = await fetch(`${base}/api/gcal`, { cache: "no-store" });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error("GET /api/gcal failed:", res.status, body.slice(0, 500));
-    return [];
-  }
+  if (!res.ok) return [];
 
   const data = (await res.json()) as { events?: CalEvent[] };
   return data.events ?? [];
 }
+
+/* ---------------- PAGE ---------------- */
 
 export default async function SecretPage() {
   const events = await getEvents();
@@ -85,6 +129,7 @@ export default async function SecretPage() {
     const key = tzDayKey(e.start);
     (grouped[key] ??= []).push(e);
   }
+
   const sortedDays = Object.keys(grouped).sort();
 
   return (
@@ -93,7 +138,7 @@ export default async function SecretPage() {
         minHeight: "100vh",
         background: "#000",
         color: "#fff",
-        padding: 36, // was 50
+        padding: 36,
         fontFamily:
           "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
       }}
@@ -102,9 +147,9 @@ export default async function SecretPage() {
         {sortedDays.length === 0 ? (
           <div
             style={{
-              fontSize: 32, // was 40
+              fontSize: 32,
               fontWeight: 900,
-              letterSpacing: 2, // was 3
+              letterSpacing: 2,
               background: "linear-gradient(90deg, #ff00cc, #8a2be2)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
@@ -121,7 +166,7 @@ export default async function SecretPage() {
                   style={{
                     height: 2,
                     background: "linear-gradient(90deg, #ff00cc, #8a2be2)",
-                    margin: "28px 0", // was 50
+                    margin: "28px 0",
                     opacity: 0.6,
                   }}
                 />
@@ -129,10 +174,10 @@ export default async function SecretPage() {
 
               <div
                 style={{
-                  fontSize: 40, // was 54
+                  fontSize: 40,
                   fontWeight: 900,
-                  letterSpacing: 1.5, // was 2
-                  marginBottom: 16, // was 28
+                  letterSpacing: 1.5,
+                  marginBottom: 16,
                   lineHeight: 1.05,
                   background: "linear-gradient(90deg, #ff00cc, #8a2be2)",
                   WebkitBackgroundClip: "text",
@@ -148,10 +193,10 @@ export default async function SecretPage() {
                     key={e.id}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "140px 1fr", // was 160px
-                      gap: 18, // was 24
+                      gridTemplateColumns: "140px 1fr",
+                      gap: 18,
                       alignItems: "center",
-                      padding: "12px 16px", // slightly tighter
+                      padding: "12px 16px",
                       background: "#0b0b0b",
                       borderRadius: 12,
                       borderLeft: `4px solid ${e.calendarColor}`,
@@ -159,7 +204,7 @@ export default async function SecretPage() {
                   >
                     <div
                       style={{
-                        fontSize: 18, // was 20
+                        fontSize: 18,
                         fontWeight: 800,
                         opacity: 0.95,
                         color: "#c084fc",
@@ -171,7 +216,7 @@ export default async function SecretPage() {
                     <div style={{ display: "grid", gap: 6 }}>
                       <div
                         style={{
-                          fontSize: 22, // was 26
+                          fontSize: 22,
                           fontWeight: 650,
                           lineHeight: 1.15,
                         }}
