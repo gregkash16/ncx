@@ -86,16 +86,16 @@ function tzDayKey(input: string) {
   }).format(new Date(ms));
 }
 
-function nowNYMs() {
-  return new Date(
-    new Date().toLocaleString("en-US", { timeZone: TIMEZONE })
-  ).getTime();
+function nowMs() {
+  return Date.now();
 }
 
 function isPastEvent(e: { start: string; end?: string; allDay: boolean }) {
   if (e.allDay) return false;
-  const now = nowNYMs();
+
+  const now = Date.now();
   const cmp = toComparableNYMs(e.end ?? e.start);
+
   return !isNaN(cmp) && cmp < now;
 }
 
