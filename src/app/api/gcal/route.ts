@@ -23,32 +23,7 @@ const ICAL_SOURCES = [
   },
 ];
 
-function nowInNY() {
-  // Date object representing "now" but expressed in NY local clock
-  return new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-}
-
-function isPastEvent(e: { start: string; end?: string; allDay: boolean }) {
-  if (e.allDay) return false; // keep all-day events all day
-
-  const nowNY = nowInNY();
-
-  // Prefer end, fall back to start
-  const compare = e.end ? new Date(e.end) : new Date(e.start);
-
-  // If the incoming timestamp is date-only, treat as not past here (shouldn't happen for non-allDay)
-  if (isNaN(compare.getTime())) return false;
-
-  // For safety, interpret "floating" times as NY by converting them into a NY-local Date via locale string
-  // (works for your iCloud feed "2026-02-24T15:00:00" style)
-  const compareNY = e.end || e.start
-    ? new Date(new Date(compare.toISOString()).toLocaleString("en-US", { timeZone: TIMEZONE }))
-    : compare;
-
-  return compareNY.getTime() < nowNY.getTime();
-}
-
-// ---- time helpers ----
+// -------------------- NY-time helpers (DST-safe) --------------------
 function todayKeyNY() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: TIMEZONE,
@@ -59,6 +34,7 @@ function todayKeyNY() {
 }
 
 function tzDayKey(input: string) {
+  // input is ISO dateTime or YYYY-MM-DD (all-day)
   if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
 
   const d = new Date(input);
@@ -70,16 +46,91 @@ function tzDayKey(input: string) {
   }).format(d);
 }
 
-function startEndOfTodayNY() {
-  const now = new Date();
-  const startNY = new Date(now.toLocaleString("en-US", { timeZone: TIMEZONE }));
-  startNY.setHours(0, 0, 0, 0);
-  const endNY = new Date(startNY);
-  endNY.setHours(23, 59, 59, 999);
-  return { startNY, endNY };
+function nowNYMs() {
+  // milliseconds since epoch; expressed from a Date created via NY locale string.
+  // This is good enough for "hide past events" comparisons.
+  return new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE })).getTime();
 }
 
-// ---- Google fetch ----
+function nyOffsetISO(forDate: Date) {
+  // Use noon to avoid DST edge cases around midnight
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIMEZONE,
+    timeZoneName: "shortOffset",
+  }).formatToParts(forDate);
+
+  const tz = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT";
+  // e.g. "GMT-5", "GMT-04:00"
+  const m = tz.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/);
+  if (!m) return "Z";
+
+  const rawH = Number(m[1]);
+  const sign = rawH >= 0 ? "+" : "-";
+  const hh = String(Math.abs(rawH)).padStart(2, "0");
+  const mm = String(Number(m[2] ?? "0")).padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
+}
+
+function nyDayRangeISO(dayKey: string) {
+  // dayKey = "YYYY-MM-DD"
+  // Calculate the correct NY UTC-offset for that calendar day (DST-safe)
+  const noonUTC = new Date(`${dayKey}T12:00:00Z`);
+  const offset = nyOffsetISO(noonUTC);
+
+  const start = new Date(`${dayKey}T00:00:00${offset}`);
+  const end = new Date(`${dayKey}T23:59:59.999${offset}`);
+
+  return { timeMin: start.toISOString(), timeMax: end.toISOString() };
+}
+
+function toComparableNYMs(input: string) {
+  // Handles:
+  // - ISO with zone: "2026-02-24T09:45:00-05:00" or "...Z"
+  // - date-only: "2026-02-24"
+  // - floating: "2026-02-24T15:00:00" (treat as NY local)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    // date-only: treat as noon NY (not past-filtered for all-day anyway)
+    const dayKey = input;
+    const { timeMin } = nyDayRangeISO(dayKey);
+    // noon NY: start + 12h
+    return new Date(new Date(timeMin).getTime() + 12 * 60 * 60 * 1000).getTime();
+  }
+
+  // If there's a Z or explicit offset, Date() is safe.
+  if (/[zZ]$/.test(input) || /[+-]\d{2}:\d{2}$/.test(input)) {
+    const d = new Date(input);
+    return d.getTime();
+  }
+
+  // Floating time: interpret as NY local clock.
+  // Convert "YYYY-MM-DDTHH:mm:ss" into a Date with NY offset for that day.
+  const m = input.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})$/);
+  if (!m) {
+    const d = new Date(input);
+    return d.getTime();
+  }
+
+  const dayKey = m[1];
+  const timePart = m[2];
+
+  const noonUTC = new Date(`${dayKey}T12:00:00Z`);
+  const offset = nyOffsetISO(noonUTC);
+  const d = new Date(`${dayKey}T${timePart}${offset}`);
+  return d.getTime();
+}
+
+function isPastEvent(e: { start: string; end?: string; allDay: boolean }) {
+  if (e.allDay) return false; // keep all-day events all day
+
+  const now = nowNYMs();
+  const compareStr = e.end ?? e.start;
+  const cmp = toComparableNYMs(compareStr);
+
+  if (isNaN(cmp)) return false;
+  return cmp < now;
+}
+
+// -------------------- Google fetch --------------------
 async function fetchGoogle(calendarId: string, key: string, timeMin: string, timeMax: string) {
   const url =
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` +
@@ -100,8 +151,9 @@ async function fetchGoogle(calendarId: string, key: string, timeMin: string, tim
   return (data.items ?? []).filter((e: any) => e.status !== "cancelled");
 }
 
-// ---- Minimal ICS parsing (no deps) ----
+// -------------------- Minimal ICS parsing (no deps) --------------------
 function unfoldIcsLines(text: string) {
+  // RFC5545 line folding: lines starting with space/tab continue previous line
   const raw = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
   const out: string[] = [];
   for (const line of raw) {
@@ -113,9 +165,14 @@ function unfoldIcsLines(text: string) {
 }
 
 function parseIcsDate(value: string): { iso: string; allDay: boolean } | null {
+  // Common formats:
+  // 1) YYYYMMDD (all-day)
+  // 2) YYYYMMDDTHHMMSSZ (UTC)
+  // 3) YYYYMMDDTHHMMSS (floating/local-ish)
   const v = value.trim();
   if (!v) return null;
 
+  // all-day
   if (/^\d{8}$/.test(v)) {
     const y = v.slice(0, 4);
     const m = v.slice(4, 6);
@@ -123,13 +180,14 @@ function parseIcsDate(value: string): { iso: string; allDay: boolean } | null {
     return { iso: `${y}-${m}-${d}`, allDay: true };
   }
 
+  // datetime
   const m = v.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/);
   if (!m) return null;
 
   const [_, yy, mo, dd, hh, mi, ss, z] = m;
   const iso = z
     ? `${yy}-${mo}-${dd}T${hh}:${mi}:${ss}Z`
-    : `${yy}-${mo}-${dd}T${hh}:${mi}:${ss}`;
+    : `${yy}-${mo}-${dd}T${hh}:${mi}:${ss}`; // floating time
   return { iso, allDay: false };
 }
 
@@ -175,6 +233,7 @@ function parseVeventsFromIcs(text: string) {
 
     const left = line.slice(0, idx);
     const value = line.slice(idx + 1);
+
     const key = left.split(";")[0].toUpperCase();
 
     if (key === "UID") cur.uid = value.trim();
@@ -209,9 +268,11 @@ async function fetchIcsToday(url: string) {
   const vevents = parseVeventsFromIcs(text);
   const todayKey = todayKeyNY();
 
+  // Keep only today in NY
   return vevents.filter((e) => tzDayKey(e.dtstart) === todayKey);
 }
 
+// -------------------- Route --------------------
 export async function GET() {
   try {
     const key = process.env.GOOGLE_CAL_API_KEY;
@@ -222,10 +283,10 @@ export async function GET() {
       );
     }
 
-    const { startNY, endNY } = startEndOfTodayNY();
-    const timeMin = startNY.toISOString();
-    const timeMax = endNY.toISOString();
+    const dayKey = todayKeyNY();
+    const { timeMin, timeMax } = nyDayRangeISO(dayKey);
 
+    // Google
     const googleBatches = await Promise.all(
       CALENDARS.map(async (cal) => {
         const items = await fetchGoogle(cal.id, key, timeMin, timeMax);
@@ -243,6 +304,7 @@ export async function GET() {
       })
     );
 
+    // iCal
     const icsBatches = await Promise.all(
       ICAL_SOURCES.map(async (src) => {
         const items = await fetchIcsToday(src.url);
@@ -262,16 +324,16 @@ export async function GET() {
 
     const merged = [...googleBatches.flat(), ...icsBatches.flat()];
 
-    const todayKey = todayKeyNY();
+    // Today only + hide past events
     const filtered = merged
-  .filter((e) => tzDayKey(e.start) === todayKey)
-  .filter((e) => !isPastEvent(e));
+      .filter((e) => tzDayKey(e.start) === dayKey)
+      .filter((e) => !isPastEvent(e));
 
     filtered.sort((a, b) => {
       const aAll = a.allDay ? 0 : 1;
       const bAll = b.allDay ? 0 : 1;
       if (aAll !== bAll) return aAll - bAll;
-      return new Date(a.start).getTime() - new Date(b.start).getTime();
+      return toComparableNYMs(a.start) - toComparableNYMs(b.start);
     });
 
     return NextResponse.json(
