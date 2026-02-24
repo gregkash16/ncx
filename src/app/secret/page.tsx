@@ -1,5 +1,8 @@
 // src/app/secret/page.tsx
+import { headers } from "next/headers";
+
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type CalEvent = {
   id: string;
@@ -17,7 +20,6 @@ const TIMEZONE = "America/New_York";
 
 // ---- Timezone-safe helpers ----
 function tzDayKey(input: string) {
-  // input is ISO dateTime or YYYY-MM-DD (all-day)
   if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
 
   const d = new Date(input);
@@ -30,7 +32,6 @@ function tzDayKey(input: string) {
 }
 
 function formatDayLabel(dayKey: string) {
-  // "MONDAY, FEBRUARY 24"
   const d = new Date(`${dayKey}T12:00:00Z`);
   return new Intl.DateTimeFormat("en-US", {
     timeZone: TIMEZONE,
@@ -54,27 +55,26 @@ function formatTime(e: Pick<CalEvent, "allDay" | "start">) {
     .toUpperCase();
 }
 
-function getBaseUrl() {
-  // Works on localhost + Vercel + most Node hosts
-  const site = process.env.NEXT_PUBLIC_SITE_URL;
-  if (site) return site.replace(/\/$/, "");
-
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) {
-    const v = vercel.startsWith("http") ? vercel : `https://${vercel}`;
-    return v.replace(/\/$/, "");
-  }
-
-  return "http://localhost:3000";
+async function getBaseUrlFromHeaders() {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  if (!host) return "http://localhost:3000";
+  return `${proto}://${host}`;
 }
 
 async function getEvents(): Promise<CalEvent[]> {
-  const base = getBaseUrl();
+  const base = await getBaseUrlFromHeaders();
   const res = await fetch(`${base}/api/gcal`, { cache: "no-store" });
-  if (!res.ok) return [];
 
-  const data = await res.json();
-  return (data.events ?? []) as CalEvent[];
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("GET /api/gcal failed:", res.status, body.slice(0, 500));
+    return [];
+  }
+
+  const data = (await res.json()) as { events?: CalEvent[] };
+  return data.events ?? [];
 }
 
 export default async function SecretPage() {
@@ -94,7 +94,8 @@ export default async function SecretPage() {
         background: "#000",
         color: "#fff",
         padding: 50,
-        fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        fontFamily:
+          "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
       }}
     >
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -167,11 +168,19 @@ export default async function SecretPage() {
                     </div>
 
                     <div style={{ display: "grid", gap: 6 }}>
-                      <div style={{ fontSize: 26, fontWeight: 650, lineHeight: 1.15 }}>
+                      <div
+                        style={{
+                          fontSize: 26,
+                          fontWeight: 650,
+                          lineHeight: 1.15,
+                        }}
+                      >
                         {e.title}
                       </div>
 
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <div
+                        style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
+                      >
                         <span
                           style={{
                             fontSize: 12,
@@ -184,7 +193,9 @@ export default async function SecretPage() {
                         </span>
 
                         {e.location && (
-                          <span style={{ fontSize: 12, opacity: 0.65 }}>{e.location}</span>
+                          <span style={{ fontSize: 12, opacity: 0.65 }}>
+                            {e.location}
+                          </span>
                         )}
                       </div>
                     </div>
