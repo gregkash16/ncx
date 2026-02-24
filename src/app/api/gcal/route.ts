@@ -1,6 +1,8 @@
+// src/app/api/gcal/route.ts
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const TIMEZONE = "America/New_York";
 
@@ -15,12 +17,36 @@ const CALENDARS = [
 
 const ICAL_SOURCES = [
   {
-    // webcal:// -> https://
     url: "https://p129-caldav.icloud.com/published/2/MTAwOTYwNjgxNjEwMDk2MABFvRuSy29sHSI0mscRdtKX7YK_-BkdZ8aEj56WcJsf",
     color: "#a855f7",
     label: "iCloud",
   },
 ];
+
+function nowInNY() {
+  // Date object representing "now" but expressed in NY local clock
+  return new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+}
+
+function isPastEvent(e: { start: string; end?: string; allDay: boolean }) {
+  if (e.allDay) return false; // keep all-day events all day
+
+  const nowNY = nowInNY();
+
+  // Prefer end, fall back to start
+  const compare = e.end ? new Date(e.end) : new Date(e.start);
+
+  // If the incoming timestamp is date-only, treat as not past here (shouldn't happen for non-allDay)
+  if (isNaN(compare.getTime())) return false;
+
+  // For safety, interpret "floating" times as NY by converting them into a NY-local Date via locale string
+  // (works for your iCloud feed "2026-02-24T15:00:00" style)
+  const compareNY = e.end || e.start
+    ? new Date(new Date(compare.toISOString()).toLocaleString("en-US", { timeZone: TIMEZONE }))
+    : compare;
+
+  return compareNY.getTime() < nowNY.getTime();
+}
 
 // ---- time helpers ----
 function todayKeyNY() {
@@ -33,7 +59,6 @@ function todayKeyNY() {
 }
 
 function tzDayKey(input: string) {
-  // input is ISO dateTime or YYYY-MM-DD (all-day)
   if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
 
   const d = new Date(input);
@@ -65,7 +90,7 @@ async function fetchGoogle(calendarId: string, key: string, timeMin: string, tim
     `&timeZone=${encodeURIComponent(TIMEZONE)}` +
     `&maxResults=250`;
 
-  const r = await fetch(url, { next: { revalidate: 60 } });
+  const r = await fetch(url, { cache: "no-store" });
   if (!r.ok) {
     const detail = await r.text();
     throw new Error(`Google API ${r.status}: ${detail.slice(0, 400)}`);
@@ -77,7 +102,6 @@ async function fetchGoogle(calendarId: string, key: string, timeMin: string, tim
 
 // ---- Minimal ICS parsing (no deps) ----
 function unfoldIcsLines(text: string) {
-  // RFC5545 line folding: lines starting with space/tab continue previous line
   const raw = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
   const out: string[] = [];
   for (const line of raw) {
@@ -89,14 +113,9 @@ function unfoldIcsLines(text: string) {
 }
 
 function parseIcsDate(value: string): { iso: string; allDay: boolean } | null {
-  // Common formats:
-  // 1) YYYYMMDD (all-day)
-  // 2) YYYYMMDDTHHMMSSZ (UTC)
-  // 3) YYYYMMDDTHHMMSS (floating/local-ish)
   const v = value.trim();
   if (!v) return null;
 
-  // all-day
   if (/^\d{8}$/.test(v)) {
     const y = v.slice(0, 4);
     const m = v.slice(4, 6);
@@ -104,16 +123,13 @@ function parseIcsDate(value: string): { iso: string; allDay: boolean } | null {
     return { iso: `${y}-${m}-${d}`, allDay: true };
   }
 
-  // datetime
   const m = v.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/);
   if (!m) return null;
 
   const [_, yy, mo, dd, hh, mi, ss, z] = m;
   const iso = z
     ? `${yy}-${mo}-${dd}T${hh}:${mi}:${ss}Z`
-    : `${yy}-${mo}-${dd}T${hh}:${mi}:${ss}`; // floating time
-  // If it's floating, JS Date will interpret in server tz; that’s not perfect.
-  // Published iCloud feeds usually include Z or are consistent; for display this is acceptable.
+    : `${yy}-${mo}-${dd}T${hh}:${mi}:${ss}`;
   return { iso, allDay: false };
 }
 
@@ -159,7 +175,6 @@ function parseVeventsFromIcs(text: string) {
 
     const left = line.slice(0, idx);
     const value = line.slice(idx + 1);
-
     const key = left.split(";")[0].toUpperCase();
 
     if (key === "UID") cur.uid = value.trim();
@@ -184,7 +199,7 @@ function parseVeventsFromIcs(text: string) {
 }
 
 async function fetchIcsToday(url: string) {
-  const r = await fetch(url, { next: { revalidate: 300 } });
+  const r = await fetch(url, { cache: "no-store" });
   if (!r.ok) {
     const detail = await r.text();
     throw new Error(`ICS ${r.status}: ${detail.slice(0, 200)}`);
@@ -194,7 +209,6 @@ async function fetchIcsToday(url: string) {
   const vevents = parseVeventsFromIcs(text);
   const todayKey = todayKeyNY();
 
-  // Keep only today in NY
   return vevents.filter((e) => tzDayKey(e.dtstart) === todayKey);
 }
 
@@ -202,14 +216,16 @@ export async function GET() {
   try {
     const key = process.env.GOOGLE_CAL_API_KEY;
     if (!key) {
-      return NextResponse.json({ error: "Missing GOOGLE_CAL_API_KEY", events: [] }, { status: 500 });
+      return NextResponse.json(
+        { error: "Missing GOOGLE_CAL_API_KEY", events: [] },
+        { status: 500, headers: { "Cache-Control": "no-store" } }
+      );
     }
 
     const { startNY, endNY } = startEndOfTodayNY();
     const timeMin = startNY.toISOString();
     const timeMax = endNY.toISOString();
 
-    // Google
     const googleBatches = await Promise.all(
       CALENDARS.map(async (cal) => {
         const items = await fetchGoogle(cal.id, key, timeMin, timeMax);
@@ -227,7 +243,6 @@ export async function GET() {
       })
     );
 
-    // iCal
     const icsBatches = await Promise.all(
       ICAL_SOURCES.map(async (src) => {
         const items = await fetchIcsToday(src.url);
@@ -247,9 +262,10 @@ export async function GET() {
 
     const merged = [...googleBatches.flat(), ...icsBatches.flat()];
 
-    // Today only (extra safety)
     const todayKey = todayKeyNY();
-    const filtered = merged.filter((e) => tzDayKey(e.start) === todayKey);
+    const filtered = merged
+  .filter((e) => tzDayKey(e.start) === todayKey)
+  .filter((e) => !isPastEvent(e));
 
     filtered.sort((a, b) => {
       const aAll = a.allDay ? 0 : 1;
@@ -258,11 +274,14 @@ export async function GET() {
       return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
 
-    return NextResponse.json({ events: filtered });
+    return NextResponse.json(
+      { events: filtered },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (err: any) {
     return NextResponse.json(
       { error: String(err?.message ?? err), events: [] },
-      { status: 502 }
+      { status: 502, headers: { "Cache-Control": "no-store" } }
     );
   }
 }

@@ -93,18 +93,18 @@ export default async function SecretPage() {
         minHeight: "100vh",
         background: "#000",
         color: "#fff",
-        padding: 50,
+        padding: 36, // was 50
         fontFamily:
           "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
       }}
     >
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         {sortedDays.length === 0 ? (
           <div
             style={{
-              fontSize: 40,
+              fontSize: 32, // was 40
               fontWeight: 900,
-              letterSpacing: 3,
+              letterSpacing: 2, // was 3
               background: "linear-gradient(90deg, #ff00cc, #8a2be2)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
@@ -121,7 +121,7 @@ export default async function SecretPage() {
                   style={{
                     height: 2,
                     background: "linear-gradient(90deg, #ff00cc, #8a2be2)",
-                    margin: "50px 0",
+                    margin: "28px 0", // was 50
                     opacity: 0.6,
                   }}
                 />
@@ -129,10 +129,11 @@ export default async function SecretPage() {
 
               <div
                 style={{
-                  fontSize: 54,
+                  fontSize: 40, // was 54
                   fontWeight: 900,
-                  letterSpacing: 2,
-                  marginBottom: 28,
+                  letterSpacing: 1.5, // was 2
+                  marginBottom: 16, // was 28
+                  lineHeight: 1.05,
                   background: "linear-gradient(90deg, #ff00cc, #8a2be2)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
@@ -141,16 +142,16 @@ export default async function SecretPage() {
                 {formatDayLabel(dayKey)}
               </div>
 
-              <div style={{ display: "grid", gap: 18 }}>
+              <div style={{ display: "grid", gap: 14 }}>
                 {grouped[dayKey].map((e) => (
                   <div
                     key={e.id}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "160px 1fr",
-                      gap: 24,
+                      gridTemplateColumns: "140px 1fr", // was 160px
+                      gap: 18, // was 24
                       alignItems: "center",
-                      padding: "14px 18px",
+                      padding: "12px 16px", // slightly tighter
                       background: "#0b0b0b",
                       borderRadius: 12,
                       borderLeft: `4px solid ${e.calendarColor}`,
@@ -158,7 +159,7 @@ export default async function SecretPage() {
                   >
                     <div
                       style={{
-                        fontSize: 20,
+                        fontSize: 18, // was 20
                         fontWeight: 800,
                         opacity: 0.95,
                         color: "#c084fc",
@@ -170,7 +171,7 @@ export default async function SecretPage() {
                     <div style={{ display: "grid", gap: 6 }}>
                       <div
                         style={{
-                          fontSize: 26,
+                          fontSize: 22, // was 26
                           fontWeight: 650,
                           lineHeight: 1.15,
                         }}
@@ -178,9 +179,7 @@ export default async function SecretPage() {
                         {e.title}
                       </div>
 
-                      <div
-                        style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
-                      >
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <span
                           style={{
                             fontSize: 12,
