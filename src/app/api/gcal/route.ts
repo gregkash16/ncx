@@ -8,6 +8,13 @@ const TIMEZONE = "America/New_York";
 
 const CALENDARS = [
   { id: "greg@equatemedia.com", color: "#ff00cc", label: "Greg" },
+
+  { 
+    id: "gregkash@gmail.com", 
+    color: "#f97316",   // choose a distinct color
+    label: "Gmail" 
+  },
+
   {
     id: "c_ed14f5995a544c9935ab6a0ad1e361e02768e5b7345909737c93dda1ee09fabc@group.calendar.google.com",
     color: "#8a2be2",
