@@ -52,7 +52,7 @@ function getLogo(team: any): string {
 
 function isFinal(game: any) {
   const state = safeStr(game?.gameState);
-  return state === "FINAL" || state === "OFF"; // OFF often means concluded in this feed
+  return state === "FINAL" || state === "OFF";
 }
 
 function deriveEndType(game: any): "REG" | "OT" | "SO" | "" {
@@ -63,34 +63,35 @@ function deriveEndType(game: any): "REG" | "OT" | "SO" | "" {
   const pt = safeStr(pd?.periodType);
   if (pt === "REG" || pt === "OT" || pt === "SO") return pt as any;
 
-  // Fallback heuristic: period > maxRegulationPeriods implies OT/SO-ish
   const num = typeof pd?.number === "number" ? pd.number : 0;
-  const maxReg = typeof pd?.maxRegulationPeriods === "number" ? pd.maxRegulationPeriods : 3;
+  const maxReg =
+    typeof pd?.maxRegulationPeriods === "number"
+      ? pd.maxRegulationPeriods
+      : 3;
+
   if (num > maxReg) return "OT";
 
   return "";
 }
 
 function liveMiniStatus(game: any): string {
-  // Returns a short status like:
-  // "P2 12:34", "OT 03:21", "SO", "P3 20:00"
   const pd = game?.periodDescriptor;
   const num = typeof pd?.number === "number" ? pd.number : 0;
-  const pt = safeStr(pd?.periodType); // REG/OT/SO
+  const pt = safeStr(pd?.periodType);
   const rem = safeStr(game?.clock?.timeRemaining);
 
   if (pt === "SO") return "SO";
 
   if (pt === "OT") {
-    // If there are multiple OTs you can show OT2, OT3 etc.
-    // With maxReg=3, period 4 => OT, 5 => OT2...
-    const maxReg = typeof pd?.maxRegulationPeriods === "number" ? pd.maxRegulationPeriods : 3;
+    const maxReg =
+      typeof pd?.maxRegulationPeriods === "number"
+        ? pd.maxRegulationPeriods
+        : 3;
     const otIndex = num > maxReg ? num - maxReg : 1;
     const otLabel = otIndex > 1 ? `OT${otIndex}` : "OT";
     return rem ? `${otLabel} ${rem}` : otLabel;
   }
 
-  // Regulation
   if (num > 0) return rem ? `P${num} ${rem}` : `P${num}`;
 
   return "LIVE";
@@ -107,7 +108,6 @@ function centerUnderDashLabel(game: any): string {
   const state = safeStr(game?.gameState);
   if (state === "LIVE" || state === "CRIT") return liveMiniStatus(game);
 
-  // pregame / scheduled
   const start = safeStr(game?.startTimeUTC);
   const t = fmtLocalTimeFromUTC(start);
   return t ? `@ ${t}` : "—";
@@ -122,8 +122,8 @@ export default function ScoresClient() {
     setLoading(true);
     try {
       const r = await fetch("/api/nhl/scores", { cache: "no-store" });
-
       const ct = r.headers.get("content-type") || "";
+
       if (!ct.includes("application/json")) {
         const text = await r.text();
         throw new Error(
@@ -137,7 +137,10 @@ export default function ScoresClient() {
       setResp(j);
       setLastUpdated(new Date());
     } catch (e) {
-      setResp({ ok: false, error: e instanceof Error ? e.message : String(e) });
+      setResp({
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setLoading(false);
     }
@@ -157,7 +160,6 @@ export default function ScoresClient() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <div className="text-base text-white/80">
@@ -165,7 +167,9 @@ export default function ScoresClient() {
           </div>
           <div className="text-sm text-white/50">
             {resp?.date ? `Showing date: ${resp.date}` : ""}
-            {lastUpdated ? ` • Updated: ${lastUpdated.toLocaleTimeString()}` : ""}
+            {lastUpdated
+              ? ` • Updated: ${lastUpdated.toLocaleTimeString()}`
+              : ""}
           </div>
         </div>
 
@@ -177,7 +181,6 @@ export default function ScoresClient() {
         </button>
       </div>
 
-      {/* Error */}
       {!resp?.ok && (
         <div className="p-4 rounded-xl border border-red-400/40 bg-red-500/10 text-white">
           <div className="font-medium text-lg">Failed to load scores</div>
@@ -189,7 +192,6 @@ export default function ScoresClient() {
         </div>
       )}
 
-      {/* Games */}
       <div className="space-y-5">
         {games.map((g: any) => {
           const away = g?.awayTeam ?? {};
@@ -204,12 +206,13 @@ export default function ScoresClient() {
           const awayLogo = getLogo(away);
           const homeLogo = getLogo(home);
 
-          const awayScore = typeof away?.score === "number" ? away.score : 0;
-          const homeScore = typeof home?.score === "number" ? home.score : 0;
+          const awayScore =
+            typeof away?.score === "number" ? away.score : 0;
+          const homeScore =
+            typeof home?.score === "number" ? home.score : 0;
 
           const venue = venueLine(g);
           const tv = broadcastsLine(g);
-
           const centerLabel = centerUnderDashLabel(g);
 
           const key =
@@ -219,64 +222,59 @@ export default function ScoresClient() {
           return (
             <div
               key={key}
-              className="rounded-2xl border border-white/15 bg-black/70 px-6 py-5"
+              className="rounded-2xl border border-white/15 bg-black/70 px-6 py-4"
             >
-              {/* Main Line */}
               <div className="flex items-center justify-between gap-6">
-                {/* Away */}
                 <div className="flex-1 text-white font-semibold text-xl truncate">
                   {awayName}
                 </div>
 
-                {/* Center Score Block */}
-                <div className="flex items-center gap-5 shrink-0">
-                {awayLogo ? (
+                <div className="flex items-center gap-10 shrink-0">
+                  {awayLogo ? (
                     <img
-                    src={awayLogo}
-                    alt={`${awayAbbrev} logo`}
-                    className="w-10 h-10"
-                    loading="lazy"
+                      src={awayLogo}
+                      alt={`${awayAbbrev} logo`}
+                      className="w-24 h-24"
+                      loading="lazy"
                     />
-                ) : (
-                    <div className="w-10 h-10 rounded bg-white/10" />
-                )}
+                  ) : (
+                    <div className="w-24 h-24 rounded bg-white/10" />
+                  )}
 
-                <div className="text-white font-extrabold text-3xl tabular-nums">
+                  <div className="text-white font-extrabold text-5xl tabular-nums">
                     {awayScore}
-                </div>
+                  </div>
 
-                {/* Dash + BIG status */}
-                <div className="flex flex-col items-center leading-none">
-                    <div className="text-white/50 font-bold text-2xl">-</div>
-
-                    <div className="mt-1 text-white font-extrabold text-3xl tabular-nums">
-                    {centerLabel}
+                  <div className="flex flex-col items-center leading-none">
+                    <div className="text-white/50 font-bold text-3xl">
+                      -
                     </div>
-                </div>
+                    <div className="mt-2 text-white font-extrabold text-4xl tabular-nums">
+                      {centerLabel}
+                    </div>
+                  </div>
 
-                <div className="text-white font-extrabold text-3xl tabular-nums">
+                  <div className="text-white font-extrabold text-5xl tabular-nums">
                     {homeScore}
-                </div>
+                  </div>
 
-                {homeLogo ? (
+                  {homeLogo ? (
                     <img
-                    src={homeLogo}
-                    alt={`${homeAbbrev} logo`}
-                    className="w-10 h-10"
-                    loading="lazy"
+                      src={homeLogo}
+                      alt={`${homeAbbrev} logo`}
+                      className="w-24 h-24"
+                      loading="lazy"
                     />
-                ) : (
-                    <div className="w-10 h-10 rounded bg-white/10" />
-                )}
+                  ) : (
+                    <div className="w-24 h-24 rounded bg-white/10" />
+                  )}
                 </div>
 
-                {/* Home */}
                 <div className="flex-1 text-white font-semibold text-xl truncate text-right">
                   {homeName}
                 </div>
               </div>
 
-              {/* Secondary Info */}
               <div className="mt-4 text-sm text-white/60 flex flex-wrap gap-x-4 gap-y-2">
                 {venue && <span>{venue}</span>}
                 {tv && <span>• {tv}</span>}
