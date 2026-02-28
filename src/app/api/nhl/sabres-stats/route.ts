@@ -18,6 +18,14 @@ function safeName(obj: any) {
   );
 }
 
+function statValue(team: any, key: string) {
+  if (!Array.isArray(team?.teamStats)) return 0;
+  const found = team.teamStats.find(
+    (s: any) => s.category === key
+  );
+  return found?.value ?? 0;
+}
+
 export async function GET() {
   try {
     const season = currentSeason();
@@ -61,10 +69,8 @@ export async function GET() {
       });
     }
 
-    const gameId = game.id;
-
     const gameRes = await fetch(
-      `https://api-web.nhle.com/v1/gamecenter/${gameId}/play-by-play`,
+      `https://api-web.nhle.com/v1/gamecenter/${game.id}/play-by-play`,
       { cache: "no-store" }
     );
 
@@ -77,7 +83,6 @@ export async function GET() {
 
     const gameData = await gameRes.json();
 
-    // Pregame fallback
     if (!gameData.boxscore) {
       const sabresIsHome = game.homeTeam?.abbrev === "BUF";
       const sabresTeam = sabresIsHome
@@ -95,20 +100,20 @@ export async function GET() {
             score: sabresTeam?.score ?? 0,
             shots: 0,
             hits: 0,
-            faceoff: 0,
-            pp: "0/0",
-            pim: 0,
             blocked: 0,
+            faceoff: 0,
+            pim: 0,
+            pp: "0/0",
           },
           opponent: {
             name: safeName(opponentTeam),
             score: opponentTeam?.score ?? 0,
             shots: 0,
             hits: 0,
-            faceoff: 0,
-            pp: "0/0",
-            pim: 0,
             blocked: 0,
+            faceoff: 0,
+            pim: 0,
+            pp: "0/0",
           },
           goals: [],
         },
@@ -140,27 +145,22 @@ export async function GET() {
         sabres: {
           name: safeName(sabres),
           score: sabres?.score ?? 0,
-          shots: sabres?.teamStats?.sog ?? 0,
-          hits: sabres?.teamStats?.hits ?? 0,
-          faceoff:
-            sabres?.teamStats?.faceoffWinningPctg ?? 0,
+          shots: statValue(sabres, "sog"),
+          hits: statValue(sabres, "hits"),
+          blocked: statValue(sabres, "blockedShots"),
+          faceoff: statValue(sabres, "faceoffWinningPctg"),
+          pim: statValue(sabres, "pim"),
           pp: `${sabres?.powerPlay?.goals ?? 0}/${sabres?.powerPlay?.opportunities ?? 0}`,
-          pim: sabres?.teamStats?.pim ?? 0,
-          blocked:
-            sabres?.teamStats?.blockedShots ?? 0,
         },
         opponent: {
           name: safeName(opponent),
           score: opponent?.score ?? 0,
-          shots: opponent?.teamStats?.sog ?? 0,
-          hits: opponent?.teamStats?.hits ?? 0,
-          faceoff:
-            opponent?.teamStats?.faceoffWinningPctg ??
-            0,
+          shots: statValue(opponent, "sog"),
+          hits: statValue(opponent, "hits"),
+          blocked: statValue(opponent, "blockedShots"),
+          faceoff: statValue(opponent, "faceoffWinningPctg"),
+          pim: statValue(opponent, "pim"),
           pp: `${opponent?.powerPlay?.goals ?? 0}/${opponent?.powerPlay?.opportunities ?? 0}`,
-          pim: opponent?.teamStats?.pim ?? 0,
-          blocked:
-            opponent?.teamStats?.blockedShots ?? 0,
         },
         goals,
       },

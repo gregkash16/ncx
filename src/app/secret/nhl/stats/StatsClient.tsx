@@ -74,7 +74,7 @@ export default function StatsClient() {
 
   useEffect(() => {
     load();
-    const id = window.setInterval(load, 60000); // 1 minute
+    const id = window.setInterval(load, 60000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -91,29 +91,27 @@ export default function StatsClient() {
   const goals = resp.data?.goals ?? [];
 
   return (
-    <div className="space-y-12 text-white">
+    <div className="space-y-10 text-white">
       <div className="text-sm text-white/50">
         {loading ? "Updating…" : "Live"}
         {updated ? ` • Updated ${updated.toLocaleTimeString()}` : ""}
       </div>
 
-      {/* Score Header */}
-      <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-2xl p-10">
-        <div className="text-4xl font-extrabold text-white">
+      <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-2xl p-8">
+        <div className="text-4xl font-extrabold">
           {sabres.name}
         </div>
 
-        <div className="text-7xl font-extrabold text-white tabular-nums">
+        <div className="text-6xl font-extrabold tabular-nums">
           {sabres.score} - {opponent.score}
         </div>
 
-        <div className="text-4xl font-extrabold text-white text-right">
+        <div className="text-4xl font-extrabold text-right">
           {opponent.name}
         </div>
       </div>
 
-      {/* Stats Comparison */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-10 space-y-8">
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-8">
         <StatRow
           label="Shots"
           left={sabres.shots}
@@ -141,22 +139,21 @@ export default function StatsClient() {
         />
       </div>
 
-      {/* Goal Summary */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-10">
-        <div className="text-3xl font-extrabold text-white mb-8">
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
+        <div className="text-2xl font-extrabold mb-6">
           Goal Summary
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           {goals.map((g: any, i: number) => (
             <div
               key={i}
-              className="border-b border-white/10 pb-5"
+              className="border-b border-white/10 pb-4"
             >
-              <div className="font-bold text-xl text-white">
+              <div className="font-semibold text-lg">
                 {g.team} – {g.scorer}
               </div>
-              <div className="text-white/80">
+              <div className="text-white/70 text-sm">
                 Assists:{" "}
                 {g.assists.length
                   ? g.assists.join(", ")
