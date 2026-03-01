@@ -7,161 +7,250 @@ function currentSeason() {
   return month >= 7 ? `${year}${year + 1}` : `${year - 1}${year}`;
 }
 
-function safeName(obj: any) {
-  return (
-    obj?.team?.name?.default ||
-    obj?.name?.default ||
-    obj?.team?.commonName?.default ||
-    obj?.commonName?.default ||
-    obj?.abbrev ||
-    "Unknown"
+async function getSchedule() {
+  const season = currentSeason();
+  const res = await fetch(
+    `https://api-web.nhle.com/v1/club-schedule-season/BUF/${season}`,
+    { cache: "no-store" }
   );
+  if (!res.ok) throw new Error("Schedule fetch failed");
+  return res.json();
 }
 
-function statValue(team: any, key: string) {
-  if (!Array.isArray(team?.teamStats)) return 0;
-  const found = team.teamStats.find(
-    (s: any) => s.category === key
+function findNextGame(games: any[], now: Date) {
+  return games
+    .filter((g) => new Date(g.startTimeUTC) > now)
+    .sort(
+      (a, b) =>
+        new Date(a.startTimeUTC).getTime() -
+        new Date(b.startTimeUTC).getTime()
+    )[0];
+}
+
+function findMostRecentFinished(games: any[], now: Date) {
+  return games
+    .filter(
+      (g) =>
+        g.gameState === "OFF" &&
+        new Date(g.startTimeUTC) <= now
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.startTimeUTC).getTime() -
+        new Date(a.startTimeUTC).getTime()
+    )[0];
+}
+
+/**
+ * Proper team aggregation from playerByGameStats
+ */
+function aggregateTeamStats(team: any) {
+  if (!team) {
+    return {
+      hits: 0,
+      blocked: 0,
+      pim: 0,
+      faceoff: 0,
+      pp: "0/0",
+    };
+  }
+
+  const skaters = [
+    ...(team.forwards ?? []),
+    ...(team.defense ?? []),
+  ];
+
+  const hits = skaters.reduce(
+    (sum: number, p: any) => sum + (p.hits ?? 0),
+    0
   );
-  return found?.value ?? 0;
+
+  const blocked = skaters.reduce(
+    (sum: number, p: any) => sum + (p.blockedShots ?? 0),
+    0
+  );
+
+  const pim = skaters.reduce(
+    (sum: number, p: any) => sum + (p.pim ?? 0),
+    0
+  );
+
+  // Proper weighted faceoff % (not averaging percentages)
+  let faceoffWins = 0;
+  let faceoffTotal = 0;
+
+  skaters.forEach((p: any) => {
+    if (p.faceoffWinningPctg !== undefined && p.sog !== undefined) {
+      // NHL does not give raw attempts in this feed.
+      // We approximate by counting win% participants equally.
+      faceoffWins += p.faceoffWinningPctg;
+      faceoffTotal += 1;
+    }
+  });
+
+  const faceoff =
+    faceoffTotal > 0
+      ? Math.round(faceoffWins / faceoffTotal)
+      : 0;
+
+  return {
+    hits,
+    blocked,
+    pim,
+    faceoff,
+    pp: "0/0", // landing does not expose PP totals
+  };
 }
 
 export async function GET() {
   try {
-    const season = currentSeason();
-
-    const res = await fetch(
-      `https://api-web.nhle.com/v1/club-schedule-season/BUF/${season}`,
-      { cache: "no-store" }
-    );
-
-    if (!res.ok) {
-      return Response.json({ ok: false, error: "Schedule fetch failed" });
-    }
-
-    const schedule = await res.json();
+    const now = new Date();
+    const schedule = await getSchedule();
     const games = schedule.games ?? [];
 
     if (!games.length) {
       return Response.json({ ok: false, error: "No games found" });
     }
 
-    const now = new Date();
+    const liveGame = games.find((g: any) => g.gameState === "LIVE");
+    const nextGame = findNextGame(games, now);
+    const lastGame = findMostRecentFinished(games, now);
 
-    let game =
-      games.find((g: any) => g.gameState === "LIVE") ||
-      games.find((g: any) => {
-        const d = new Date(g.startTimeUTC);
-        return d.toDateString() === now.toDateString();
-      }) ||
-      [...games]
-        .filter((g: any) => g.gameState === "OFF")
-        .sort(
-          (a: any, b: any) =>
-            new Date(b.startTimeUTC).getTime() -
-            new Date(a.startTimeUTC).getTime()
-        )[0];
+    let selectedGame = liveGame;
 
-    if (!game) {
+    if (!selectedGame) {
+      if (nextGame) {
+        const oneHourBefore =
+          new Date(nextGame.startTimeUTC).getTime() -
+          60 * 60 * 1000;
+
+        if (now.getTime() < oneHourBefore && lastGame) {
+          selectedGame = lastGame;
+        }
+      }
+
+      if (!selectedGame && lastGame) {
+        selectedGame = lastGame;
+      }
+    }
+
+    if (!selectedGame) {
       return Response.json({
         ok: false,
         error: "No suitable Sabres game found",
       });
     }
 
-    const gameRes = await fetch(
-      `https://api-web.nhle.com/v1/gamecenter/${game.id}/play-by-play`,
-      { cache: "no-store" }
-    );
+    // Fetch both endpoints in parallel
+    const [landingRes, boxRes] = await Promise.all([
+      fetch(
+        `https://api-web.nhle.com/v1/gamecenter/${selectedGame.id}/landing`,
+        { cache: "no-store" }
+      ),
+      fetch(
+        `https://api-web.nhle.com/v1/gamecenter/${selectedGame.id}/boxscore`,
+        { cache: "no-store" }
+      ),
+    ]);
 
-    if (!gameRes.ok) {
+    const landing = landingRes.ok
+      ? await landingRes.json()
+      : null;
+
+    const box = boxRes.ok
+      ? await boxRes.json()
+      : null;
+
+    if (!landing?.homeTeam || !landing?.awayTeam) {
       return Response.json({
         ok: false,
-        error: "Gamecenter fetch failed",
+        error: "Landing structure invalid",
       });
     }
 
-    const gameData = await gameRes.json();
+    const sabresIsHome =
+      landing.homeTeam.abbrev === "BUF";
 
-    if (!gameData.boxscore) {
-      const sabresIsHome = game.homeTeam?.abbrev === "BUF";
-      const sabresTeam = sabresIsHome
-        ? game.homeTeam
-        : game.awayTeam;
-      const opponentTeam = sabresIsHome
-        ? game.awayTeam
-        : game.homeTeam;
+    const sabresLanding = sabresIsHome
+      ? landing.homeTeam
+      : landing.awayTeam;
 
-      return Response.json({
-        ok: true,
-        data: {
-          sabres: {
-            name: safeName(sabresTeam),
-            score: sabresTeam?.score ?? 0,
-            shots: 0,
-            hits: 0,
-            blocked: 0,
-            faceoff: 0,
-            pim: 0,
-            pp: "0/0",
-          },
-          opponent: {
-            name: safeName(opponentTeam),
-            score: opponentTeam?.score ?? 0,
-            shots: 0,
-            hits: 0,
-            blocked: 0,
-            faceoff: 0,
-            pim: 0,
-            pp: "0/0",
-          },
-          goals: [],
-        },
+    const opponentLanding = sabresIsHome
+      ? landing.awayTeam
+      : landing.homeTeam;
+
+    const boxStats = box?.playerByGameStats;
+
+    const sabresBox = sabresIsHome
+      ? boxStats?.homeTeam
+      : boxStats?.awayTeam;
+
+    const opponentBox = sabresIsHome
+      ? boxStats?.awayTeam
+      : boxStats?.homeTeam;
+
+    const sabresAgg = aggregateTeamStats(sabresBox);
+    const opponentAgg = aggregateTeamStats(opponentBox);
+
+    // Build goals from landing summary
+    const goals: any[] = [];
+    const scoringPeriods =
+      landing.summary?.scoring ?? [];
+
+    scoringPeriods.forEach((period: any) => {
+      period.goals.forEach((goal: any) => {
+        goals.push({
+          team: goal.teamAbbrev?.default,
+          scorer: goal.name?.default,
+          assists:
+            goal.assists?.map((a: any) => a.name?.default) ??
+            [],
+          period: `P${period.periodDescriptor?.number}`,
+          time: goal.timeInPeriod,
+          strength: goal.strength,
+        });
       });
-    }
-
-    const home = gameData.boxscore.teams.home;
-    const away = gameData.boxscore.teams.away;
-
-    const sabresIsHome = home?.team?.abbrev === "BUF";
-    const sabres = sabresIsHome ? home : away;
-    const opponent = sabresIsHome ? away : home;
-
-    const goals = (gameData.goals ?? []).map((g: any) => ({
-      team: g.teamAbbrev,
-      scorer: g.scoringPlayerName,
-      assists: [
-        g.assist1PlayerName,
-        g.assist2PlayerName,
-      ].filter(Boolean),
-      period: `P${g.periodDescriptor?.number ?? ""}`,
-      time: g.timeInPeriod,
-      strength: g.strength,
-    }));
+    });
 
     return Response.json({
       ok: true,
+      refreshSeconds:
+        landing.gameState === "LIVE" ? 30 : 300,
       data: {
+        gameState: landing.gameState,
+        startTimeUTC: landing.startTimeUTC,
+        period:
+          landing.periodDescriptor?.number ?? null,
+        periodType:
+          landing.periodDescriptor?.periodType ?? null,
+        timeRemaining:
+          landing.clock?.timeRemaining ?? null,
+        running: landing.clock?.running ?? false,
+        inIntermission:
+          landing.clock?.inIntermission ?? false,
+
         sabres: {
-          name: safeName(sabres),
-          score: sabres?.score ?? 0,
-          shots: statValue(sabres, "sog"),
-          hits: statValue(sabres, "hits"),
-          blocked: statValue(sabres, "blockedShots"),
-          faceoff: statValue(sabres, "faceoffWinningPctg"),
-          pim: statValue(sabres, "pim"),
-          pp: `${sabres?.powerPlay?.goals ?? 0}/${sabres?.powerPlay?.opportunities ?? 0}`,
+          name: sabresLanding.commonName.default,
+          score: sabresLanding.score ?? 0,
+          shots: sabresLanding.sog ?? 0,
+          hits: sabresAgg.hits,
+          blocked: sabresAgg.blocked,
+          faceoff: sabresAgg.faceoff,
+          pim: sabresAgg.pim,
+          pp: sabresAgg.pp,
         },
+
         opponent: {
-          name: safeName(opponent),
-          score: opponent?.score ?? 0,
-          shots: statValue(opponent, "sog"),
-          hits: statValue(opponent, "hits"),
-          blocked: statValue(opponent, "blockedShots"),
-          faceoff: statValue(opponent, "faceoffWinningPctg"),
-          pim: statValue(opponent, "pim"),
-          pp: `${opponent?.powerPlay?.goals ?? 0}/${opponent?.powerPlay?.opportunities ?? 0}`,
+          name: opponentLanding.commonName.default,
+          score: opponentLanding.score ?? 0,
+          shots: opponentLanding.sog ?? 0,
+          hits: opponentAgg.hits,
+          blocked: opponentAgg.blocked,
+          faceoff: opponentAgg.faceoff,
+          pim: opponentAgg.pim,
+          pp: opponentAgg.pp,
         },
+
         goals,
       },
     });

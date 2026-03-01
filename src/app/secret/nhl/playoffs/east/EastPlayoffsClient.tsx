@@ -1,3 +1,4 @@
+// src/app/secret/nhl/playoffs/east/EastPlayoffsClient.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -35,19 +36,13 @@ function teamName(row: any) {
   );
 }
 
-function teamAbbrev(row: any) {
-  return safeStr(row?.teamAbbrev?.default) || safeStr(row?.teamAbbrev) || "";
-}
-
 function teamLogo(row: any) {
-  // standings feed commonly has teamLogo
   return safeStr(row?.teamLogo) || safeStr(row?.logo) || "";
 }
 
 function SlotRow({ r }: { r: any }) {
   const slot = safeStr(r?._slot) || "—";
   const name = teamName(r);
-  const abbr = teamAbbrev(r);
   const logo = teamLogo(r);
 
   const gp = num(r?.gamesPlayed);
@@ -57,48 +52,55 @@ function SlotRow({ r }: { r: any }) {
   const pts = num(r?.points);
 
   return (
-    <div className="rounded-xl border border-white/15 bg-black/70 px-5 py-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="text-white/70 font-bold tabular-nums w-12">{slot}</div>
+    <div className="rounded-2xl border border-white/15 bg-black/80 px-6 py-5">
+      <div className="flex items-center justify-between gap-6">
+        {/* Left */}
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="text-white/60 font-bold tabular-nums w-12 text-2xl">
+            {slot}
+          </div>
 
           {logo ? (
             <img
               src={logo}
-              alt={`${abbr || name} logo`}
-              className="w-9 h-9"
+              alt={`${name} logo`}
+              className="w-14 h-14"
               loading="lazy"
             />
           ) : (
-            <div className="w-9 h-9 rounded bg-white/10" />
+            <div className="w-14 h-14 rounded-lg bg-white/10" />
           )}
 
-          <div className="min-w-0">
-            <div className="text-white font-semibold text-lg truncate">{name}</div>
-            {abbr ? <div className="text-xs text-white/50">{abbr}</div> : null}
+          <div className="text-white font-extrabold text-3xl truncate">
+            {name}
           </div>
         </div>
 
-        <div className="flex items-center gap-4 text-white tabular-nums">
-          <div className="text-white/60 text-sm">
-            <span className="mr-2">GP</span>
-            <span className="font-semibold">{gp}</span>
+        {/* Right */}
+        <div className="flex items-center gap-6 tabular-nums shrink-0">
+          <div className="text-right">
+            <div className="text-xs text-white/50">GP</div>
+            <div className="text-2xl font-semibold">{gp}</div>
           </div>
-          <div className="text-white/60 text-sm">
-            <span className="mr-2">W</span>
-            <span className="font-semibold">{w}</span>
+
+          <div className="text-right">
+            <div className="text-xs text-white/50">W</div>
+            <div className="text-2xl font-semibold">{w}</div>
           </div>
-          <div className="text-white/60 text-sm">
-            <span className="mr-2">L</span>
-            <span className="font-semibold">{l}</span>
+
+          <div className="text-right">
+            <div className="text-xs text-white/50">L</div>
+            <div className="text-2xl font-semibold">{l}</div>
           </div>
-          <div className="text-white/60 text-sm">
-            <span className="mr-2">OTL</span>
-            <span className="font-semibold">{otl}</span>
+
+          <div className="text-right">
+            <div className="text-xs text-white/50">OTL</div>
+            <div className="text-2xl font-semibold">{otl}</div>
           </div>
-          <div className="text-white text-sm">
-            <span className="mr-2 text-white/70">PTS</span>
-            <span className="font-extrabold">{pts}</span>
+
+          <div className="text-right">
+            <div className="text-xs text-white/60">PTS</div>
+            <div className="text-3xl font-extrabold">{pts}</div>
           </div>
         </div>
       </div>
@@ -108,9 +110,9 @@ function SlotRow({ r }: { r: any }) {
 
 function Section({ title, rows }: { title: string; rows: any[] }) {
   return (
-    <div className="space-y-3">
-      <div className="text-white/80 text-sm font-semibold">{title}</div>
-      <div className="space-y-3">
+    <div className="space-y-4">
+      <div className="text-3xl font-extrabold text-white/90">{title}</div>
+      <div className="space-y-4">
         {rows.map((r, i) => (
           <SlotRow key={`${safeStr(r?._slot) || title}-${i}`} r={r} />
         ))}
@@ -159,39 +161,45 @@ export default function EastPlayoffsClient() {
     return () => window.clearInterval(id);
   }, []);
 
-  const atl = useMemo(() => (Array.isArray(resp?.atlantic) ? resp!.atlantic! : []), [resp]);
+  const atl = useMemo(
+    () => (Array.isArray(resp?.atlantic) ? resp!.atlantic! : []),
+    [resp]
+  );
   const met = useMemo(
     () => (Array.isArray(resp?.metropolitan) ? resp!.metropolitan! : []),
     [resp]
   );
-  const wc = useMemo(() => (Array.isArray(resp?.wildcards) ? resp!.wildcards! : []), [resp]);
+  const wc = useMemo(
+    () => (Array.isArray(resp?.wildcards) ? resp!.wildcards! : []),
+    [resp]
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-base text-white/80">{loading ? "Updating…" : "Playoff Picture"}</div>
-          <div className="text-sm text-white/50">
-            {pulledAt ? `Pulled: ${pulledAt.toLocaleTimeString()}` : ""}
-            {resp?.updatedAt ? ` • API: ${new Date(resp.updatedAt).toLocaleTimeString()}` : ""}
-          </div>
-        </div>
-
-        <button
-          onClick={() => load({ bypassCache: true })}
-          className="text-base px-4 py-2 rounded border border-white/20 text-white/80 hover:text-white hover:border-white/40 hover:bg-white/5"
-          title="Force refresh (bypass 1-hour cache)"
-        >
-          Refresh
-        </button>
+    <div className="space-y-10">
+    {/* Header */}
+    <div className="space-y-2">
+      <div className="text-sm text-white/50">
+        {loading ? "Updating…" : "Playoff Picture"}
+        {pulledAt ? ` • Updated ${pulledAt.toLocaleTimeString()}` : ""}
+        {resp?.updatedAt
+          ? ` • API ${new Date(resp.updatedAt).toLocaleTimeString()}`
+          : ""}
       </div>
+
+      <button
+        onClick={() => load({ bypassCache: true })}
+        className="text-sm px-4 py-2 rounded border border-white/20 text-white/80 hover:text-white hover:border-white/40 hover:bg-white/5"
+        title="Force refresh (bypass cache)"
+      >
+        Refresh
+      </button>
+    </div>
 
       {/* Error */}
       {!resp?.ok && (
-        <div className="p-4 rounded-xl border border-red-400/40 bg-red-500/10 text-white">
-          <div className="font-medium text-lg">Failed to load playoff picture</div>
-          <pre className="text-sm mt-2 whitespace-pre-wrap text-white/80">
+        <div className="p-8 rounded-3xl border border-red-400/40 bg-red-500/10 text-white">
+          <div className="font-extrabold text-4xl">Failed to load playoff picture</div>
+          <pre className="text-2xl mt-4 whitespace-pre-wrap text-white/80">
             {resp?.error ||
               `${resp?.status ?? ""} ${resp?.statusText ?? ""}` ||
               "Unknown error"}
@@ -201,12 +209,12 @@ export default function EastPlayoffsClient() {
 
       {/* Sections */}
       {resp?.ok && (
-        <div className="space-y-6">
+        <div className="space-y-10">
           <Section title="Atlantic — Top 3" rows={atl} />
           <Section title="Metropolitan — Top 3" rows={met} />
           <Section title="Wild Cards — Top 2 (East)" rows={wc} />
 
-          <div className="text-xs text-white/35">
+          <div className="text-xl text-white/35 pt-2">
             Source: {resp?.upstream ?? "—"}
           </div>
         </div>

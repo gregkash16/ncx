@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 type ApiResponse = {
   ok: boolean;
+  refreshSeconds?: number;
   data?: any;
   error?: string;
 };
@@ -27,11 +28,9 @@ function StatRow({
         <div className="text-2xl font-extrabold text-white tabular-nums">
           {left}
         </div>
-
         <div className="text-lg font-bold text-white/80 tracking-wide">
           {label}
         </div>
-
         <div className="text-2xl font-extrabold text-white tabular-nums">
           {right}
         </div>
@@ -55,16 +54,17 @@ export default function StatsClient() {
   const [resp, setResp] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [updated, setUpdated] = useState<Date | null>(null);
+  const [refreshSeconds, setRefreshSeconds] = useState(60);
 
   async function load() {
     try {
-      setLoading(true);
       const r = await fetch("/api/nhl/sabres-stats", {
         cache: "no-store",
       });
       const j = await r.json();
       setResp(j);
       setUpdated(new Date());
+      setRefreshSeconds(j.refreshSeconds ?? 60);
     } catch {
       setResp({ ok: false, error: "Failed to fetch" });
     } finally {
@@ -74,9 +74,12 @@ export default function StatsClient() {
 
   useEffect(() => {
     load();
-    const id = window.setInterval(load, 60000);
-    return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(load, refreshSeconds * 1000);
+    return () => window.clearInterval(id);
+  }, [refreshSeconds]);
 
   if (!resp?.ok) {
     return (
@@ -93,7 +96,7 @@ export default function StatsClient() {
   return (
     <div className="space-y-10 text-white">
       <div className="text-sm text-white/50">
-        {loading ? "Updating…" : "Live"}
+        {resp.data.gameState === "LIVE" ? "Live" : "Final"}
         {updated ? ` • Updated ${updated.toLocaleTimeString()}` : ""}
       </div>
 
@@ -102,8 +105,16 @@ export default function StatsClient() {
           {sabres.name}
         </div>
 
-        <div className="text-6xl font-extrabold tabular-nums">
-          {sabres.score} - {opponent.score}
+        <div className="text-center">
+          <div className="text-6xl font-extrabold tabular-nums">
+            {sabres.score} - {opponent.score}
+          </div>
+
+          <div className="text-2xl front-extrabold mt-2">
+            {resp.data.period
+              ? `P${resp.data.period} • ${resp.data.timeRemaining ?? ""}`
+              : "Pregame"}
+          </div>
         </div>
 
         <div className="text-4xl font-extrabold text-right">
@@ -112,31 +123,11 @@ export default function StatsClient() {
       </div>
 
       <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-8">
-        <StatRow
-          label="Shots"
-          left={sabres.shots}
-          right={opponent.shots}
-        />
-        <StatRow
-          label="Hits"
-          left={sabres.hits}
-          right={opponent.hits}
-        />
-        <StatRow
-          label="Blocked"
-          left={sabres.blocked}
-          right={opponent.blocked}
-        />
-        <StatRow
-          label="Faceoff %"
-          left={sabres.faceoff}
-          right={opponent.faceoff}
-        />
-        <StatRow
-          label="PIM"
-          left={sabres.pim}
-          right={opponent.pim}
-        />
+        <StatRow label="Shots" left={sabres.shots} right={opponent.shots} />
+        <StatRow label="Hits" left={sabres.hits} right={opponent.hits} />
+        <StatRow label="Blocked" left={sabres.blocked} right={opponent.blocked} />
+        <StatRow label="Faceoff %" left={sabres.faceoff} right={opponent.faceoff} />
+        <StatRow label="PIM" left={sabres.pim} right={opponent.pim} />
       </div>
 
       <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
@@ -146,10 +137,7 @@ export default function StatsClient() {
 
         <div className="space-y-5">
           {goals.map((g: any, i: number) => (
-            <div
-              key={i}
-              className="border-b border-white/10 pb-4"
-            >
+            <div key={i} className="border-b border-white/10 pb-4">
               <div className="font-semibold text-lg">
                 {g.team} – {g.scorer}
               </div>
