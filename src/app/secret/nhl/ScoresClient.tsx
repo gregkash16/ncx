@@ -207,54 +207,54 @@ export default function ScoresClient() {
                     onClick={() => loadDetails(g)}
                     className="w-full text-left rounded-2xl border border-white/15 bg-black/70 px-6 py-4 hover:bg-white/5 hover:border-white/25 transition"
                   >
-                    <div className="flex items-center justify-between gap-6">
-                      <div className="flex-1 text-white font-semibold text-xl truncate">
-                        {getDisplayName(awayT)}
-                      </div>
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6">
+  <div className="text-white font-semibold text-xl truncate text-left">
+    {getDisplayName(awayT)}
+  </div>
 
-                      <div className="flex items-center gap-10 shrink-0">
-                        {getLogo(awayT) ? (
-                          <img
-                            src={getLogo(awayT)}
-                            alt={`${getAbbrev(awayT)} logo`}
-                            className="w-24 h-24"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-24 h-24 rounded bg-white/10" />
-                        )}
+  <div className="flex items-center justify-center gap-10">
+    {getLogo(awayT) ? (
+      <img
+        src={getLogo(awayT)}
+        alt={`${getAbbrev(awayT)} logo`}
+        className="w-24 h-24"
+        loading="lazy"
+      />
+    ) : (
+      <div className="w-24 h-24 rounded bg-white/10" />
+    )}
 
-                        <div className="text-white font-extrabold text-5xl tabular-nums">
-                          {awayT.score ?? 0}
-                        </div>
+    <div className="text-white font-extrabold text-5xl tabular-nums">
+      {awayT.score ?? 0}
+    </div>
 
-                        <div className="flex flex-col items-center leading-none">
-                          <div className="text-white/50 font-bold text-3xl">-</div>
-                          <div className="mt-2 text-white font-extrabold text-4xl tabular-nums">
-                            {centerUnderDashLabel(g)}
-                          </div>
-                        </div>
+    <div className="flex flex-col items-center leading-none">
+      <div className="text-white/50 font-bold text-3xl">-</div>
+      <div className="mt-2 text-white font-extrabold text-4xl tabular-nums">
+        {centerUnderDashLabel(g)}
+      </div>
+    </div>
 
-                        <div className="text-white font-extrabold text-5xl tabular-nums">
-                          {homeT.score ?? 0}
-                        </div>
+    <div className="text-white font-extrabold text-5xl tabular-nums">
+      {homeT.score ?? 0}
+    </div>
 
-                        {getLogo(homeT) ? (
-                          <img
-                            src={getLogo(homeT)}
-                            alt={`${getAbbrev(homeT)} logo`}
-                            className="w-24 h-24"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-24 h-24 rounded bg-white/10" />
-                        )}
-                      </div>
+    {getLogo(homeT) ? (
+      <img
+        src={getLogo(homeT)}
+        alt={`${getAbbrev(homeT)} logo`}
+        className="w-24 h-24"
+        loading="lazy"
+      />
+    ) : (
+      <div className="w-24 h-24 rounded bg-white/10" />
+    )}
+  </div>
 
-                      <div className="flex-1 text-white font-semibold text-xl truncate text-right">
-                        {getDisplayName(homeT)}
-                      </div>
-                    </div>
+  <div className="text-white font-semibold text-xl truncate text-right">
+    {getDisplayName(homeT)}
+  </div>
+</div>
 
                     <div className="mt-4 text-sm text-white/60">
                       {venueLine(g)}
