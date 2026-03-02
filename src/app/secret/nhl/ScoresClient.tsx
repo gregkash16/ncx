@@ -12,6 +12,13 @@ type ApiResponse = {
   statusText?: string;
 };
 
+type GameDetailsResponse = {
+  ok: boolean;
+  refreshSeconds?: number;
+  data?: any;
+  error?: string;
+};
+
 function safeStr(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
@@ -26,12 +33,7 @@ function fmtLocalTimeFromUTC(utc: string) {
 function broadcastsLine(game: any) {
   const tv = Array.isArray(game?.tvBroadcasts) ? game.tvBroadcasts : [];
   const names = tv.map((x: any) => safeStr(x?.network)).filter(Boolean);
-
-  const unique: string[] = [];
-  for (const n of names) if (!unique.includes(n)) unique.push(n);
-
-  if (!unique.length) return "";
-  return `TV: ${unique.slice(0, 6).join(", ")}${unique.length > 6 ? "…" : ""}`;
+  return names.length ? `TV: ${names.join(", ")}` : "";
 }
 
 function venueLine(game: any) {
@@ -55,59 +57,31 @@ function isFinal(game: any) {
   return state === "FINAL" || state === "OFF";
 }
 
-function deriveEndType(game: any): "REG" | "OT" | "SO" | "" {
-  const end = safeStr(game?.gameOutcome?.lastPeriodType);
-  if (end === "REG" || end === "OT" || end === "SO") return end as any;
-
-  const pd = game?.periodDescriptor;
-  const pt = safeStr(pd?.periodType);
-  if (pt === "REG" || pt === "OT" || pt === "SO") return pt as any;
-
-  const num = typeof pd?.number === "number" ? pd.number : 0;
-  const maxReg =
-    typeof pd?.maxRegulationPeriods === "number"
-      ? pd.maxRegulationPeriods
-      : 3;
-
-  if (num > maxReg) return "OT";
-
-  return "";
-}
-
-function liveMiniStatus(game: any): string {
-  const pd = game?.periodDescriptor;
-  const num = typeof pd?.number === "number" ? pd.number : 0;
-  const pt = safeStr(pd?.periodType);
-  const rem = safeStr(game?.clock?.timeRemaining);
-
-  if (pt === "SO") return "SO";
-
-  if (pt === "OT") {
-    const maxReg =
-      typeof pd?.maxRegulationPeriods === "number"
-        ? pd.maxRegulationPeriods
-        : 3;
-    const otIndex = num > maxReg ? num - maxReg : 1;
-    const otLabel = otIndex > 1 ? `OT${otIndex}` : "OT";
-    return rem ? `${otLabel} ${rem}` : otLabel;
-  }
-
-  if (num > 0) return rem ? `P${num} ${rem}` : `P${num}`;
-
-  return "LIVE";
-}
-
 function centerUnderDashLabel(game: any): string {
-  if (isFinal(game)) {
-    const endType = deriveEndType(game);
+  const state = safeStr(game?.gameState);
+
+  // FINAL handling with OT / SO detection
+  if (state === "FINAL" || state === "OFF") {
+    const endType =
+      safeStr(game?.gameOutcome?.lastPeriodType) ||
+      safeStr(game?.periodDescriptor?.periodType);
+
     if (endType === "OT") return "F / OT";
     if (endType === "SO") return "F / SO";
     return "F";
   }
 
-  const state = safeStr(game?.gameState);
-  if (state === "LIVE" || state === "CRIT") return liveMiniStatus(game);
+  // LIVE handling
+  if (state === "LIVE" || state === "CRIT") {
+    const period = game?.periodDescriptor?.number;
+    const rem = safeStr(game?.clock?.timeRemaining);
 
+    if (period && rem) return `P${period} ${rem}`;
+    if (period) return `P${period}`;
+    return "LIVE";
+  }
+
+  // Pre-game
   const start = safeStr(game?.startTimeUTC);
   const t = fmtLocalTimeFromUTC(start);
   return t ? `@ ${t}` : "—";
@@ -118,21 +92,14 @@ export default function ScoresClient() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  async function load() {
+  const [selectedGame, setSelectedGame] = useState<any | null>(null);
+  const [detail, setDetail] = useState<GameDetailsResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  async function loadScores() {
     setLoading(true);
     try {
       const r = await fetch("/api/nhl/scores", { cache: "no-store" });
-      const ct = r.headers.get("content-type") || "";
-
-      if (!ct.includes("application/json")) {
-        const text = await r.text();
-        throw new Error(
-          `Expected JSON but got ${ct || "unknown"}.\n` +
-            `Status: ${r.status} ${r.statusText}\n` +
-            text.slice(0, 140)
-        );
-      }
-
       const j = (await r.json()) as ApiResponse;
       setResp(j);
       setLastUpdated(new Date());
@@ -146,17 +113,54 @@ export default function ScoresClient() {
     }
   }
 
+  async function loadDetails(game: any) {
+    const gameId = String(game?.id ?? "");
+    if (!/^\d+$/.test(gameId)) return;
+
+    setSelectedGame(game);
+    setDetail(null);
+    setDetailLoading(true);
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    try {
+      const r = await fetch(`/api/nhl/game?gameId=${gameId}`, {
+        cache: "no-store",
+      });
+      const j = (await r.json()) as GameDetailsResponse;
+      setDetail(j);
+    } catch (e) {
+      setDetail({
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  function backToList() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setSelectedGame(null);
+    setDetail(null);
+    setDetailLoading(false);
+  }
+
   useEffect(() => {
-    load();
-    const id = window.setInterval(load, 60_000);
+    loadScores();
+    const id = window.setInterval(loadScores, 60000);
     return () => window.clearInterval(id);
   }, []);
 
   const games = useMemo(() => {
     const d = resp?.data;
-    if (d?.games && Array.isArray(d.games)) return d.games;
-    return [];
+    return d?.games && Array.isArray(d.games) ? d.games : [];
   }, [resp]);
+
+  const panel = selectedGame ? "details" : "list";
+
+  const away = selectedGame?.awayTeam ?? {};
+  const home = selectedGame?.homeTeam ?? {};
 
   return (
     <div className="space-y-6">
@@ -174,118 +178,218 @@ export default function ScoresClient() {
         </div>
 
         <button
-          onClick={load}
+          onClick={loadScores}
           className="text-base px-4 py-2 rounded border border-white/20 text-white/80 hover:text-white hover:border-white/40 hover:bg-white/5"
         >
           Refresh
         </button>
       </div>
 
-      {!resp?.ok && (
-        <div className="p-4 rounded-xl border border-red-400/40 bg-red-500/10 text-white">
-          <div className="font-medium text-lg">Failed to load scores</div>
-          <pre className="text-sm mt-2 whitespace-pre-wrap text-white/80">
-            {resp?.error ||
-              `${resp?.status ?? ""} ${resp?.statusText ?? ""}` ||
-              "Unknown error"}
-          </pre>
-        </div>
-      )}
+      <div className="overflow-hidden">
+        <div
+          className={[
+            "flex w-[200%] transition-transform duration-300 ease-out",
+            panel === "details" ? "-translate-x-1/2" : "translate-x-0",
+          ].join(" ")}
+        >
+          {/* LEFT SIDE — FULL ORIGINAL VISUALS RESTORED */}
+          <div className="w-1/2 pr-3">
+            <div className="space-y-5">
+              {games.map((g: any) => {
+                const awayT = g?.awayTeam ?? {};
+                const homeT = g?.homeTeam ?? {};
 
-      <div className="space-y-5">
-        {games.map((g: any) => {
-          const away = g?.awayTeam ?? {};
-          const home = g?.homeTeam ?? {};
+                const key = g?.id ?? Math.random();
 
-          const awayName = getDisplayName(away);
-          const homeName = getDisplayName(home);
+                return (
+                  <button
+                    key={key}
+                    onClick={() => loadDetails(g)}
+                    className="w-full text-left rounded-2xl border border-white/15 bg-black/70 px-6 py-4 hover:bg-white/5 hover:border-white/25 transition"
+                  >
+                    <div className="flex items-center justify-between gap-6">
+                      <div className="flex-1 text-white font-semibold text-xl truncate">
+                        {getDisplayName(awayT)}
+                      </div>
 
-          const awayAbbrev = getAbbrev(away);
-          const homeAbbrev = getAbbrev(home);
+                      <div className="flex items-center gap-10 shrink-0">
+                        {getLogo(awayT) ? (
+                          <img
+                            src={getLogo(awayT)}
+                            alt={`${getAbbrev(awayT)} logo`}
+                            className="w-24 h-24"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-24 h-24 rounded bg-white/10" />
+                        )}
 
-          const awayLogo = getLogo(away);
-          const homeLogo = getLogo(home);
+                        <div className="text-white font-extrabold text-5xl tabular-nums">
+                          {awayT.score ?? 0}
+                        </div>
 
-          const awayScore =
-            typeof away?.score === "number" ? away.score : 0;
-          const homeScore =
-            typeof home?.score === "number" ? home.score : 0;
+                        <div className="flex flex-col items-center leading-none">
+                          <div className="text-white/50 font-bold text-3xl">-</div>
+                          <div className="mt-2 text-white font-extrabold text-4xl tabular-nums">
+                            {centerUnderDashLabel(g)}
+                          </div>
+                        </div>
 
-          const venue = venueLine(g);
-          const tv = broadcastsLine(g);
-          const centerLabel = centerUnderDashLabel(g);
+                        <div className="text-white font-extrabold text-5xl tabular-nums">
+                          {homeT.score ?? 0}
+                        </div>
 
-          const key =
-            g?.id ??
-            `${awayAbbrev}-${homeAbbrev}-${safeStr(g?.startTimeUTC) || "na"}`;
+                        {getLogo(homeT) ? (
+                          <img
+                            src={getLogo(homeT)}
+                            alt={`${getAbbrev(homeT)} logo`}
+                            className="w-24 h-24"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-24 h-24 rounded bg-white/10" />
+                        )}
+                      </div>
 
-          return (
-            <div
-              key={key}
-              className="rounded-2xl border border-white/15 bg-black/70 px-6 py-4"
-            >
-              <div className="flex items-center justify-between gap-6">
-                <div className="flex-1 text-white font-semibold text-xl truncate">
-                  {awayName}
-                </div>
-
-                <div className="flex items-center gap-10 shrink-0">
-                  {awayLogo ? (
-                    <img
-                      src={awayLogo}
-                      alt={`${awayAbbrev} logo`}
-                      className="w-24 h-24"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 rounded bg-white/10" />
-                  )}
-
-                  <div className="text-white font-extrabold text-5xl tabular-nums">
-                    {awayScore}
-                  </div>
-
-                  <div className="flex flex-col items-center leading-none">
-                    <div className="text-white/50 font-bold text-3xl">
-                      -
+                      <div className="flex-1 text-white font-semibold text-xl truncate text-right">
+                        {getDisplayName(homeT)}
+                      </div>
                     </div>
-                    <div className="mt-2 text-white font-extrabold text-4xl tabular-nums">
-                      {centerLabel}
+
+                    <div className="mt-4 text-sm text-white/60">
+                      {venueLine(g)}
+                      {broadcastsLine(g)
+                        ? ` • ${broadcastsLine(g)}`
+                        : ""}
                     </div>
-                  </div>
-
-                  <div className="text-white font-extrabold text-5xl tabular-nums">
-                    {homeScore}
-                  </div>
-
-                  {homeLogo ? (
-                    <img
-                      src={homeLogo}
-                      alt={`${homeAbbrev} logo`}
-                      className="w-24 h-24"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 rounded bg-white/10" />
-                  )}
-                </div>
-
-                <div className="flex-1 text-white font-semibold text-xl truncate text-right">
-                  {homeName}
-                </div>
-              </div>
-
-              <div className="mt-4 text-sm text-white/60 flex flex-wrap gap-x-4 gap-y-2">
-                {venue && <span>{venue}</span>}
-                {tv && <span>• {tv}</span>}
-              </div>
+                  </button>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+
+          {/* DETAILS SIDE — ONLY DATA CHANGED */}
+          <div className="w-1/2 pl-3">
+            <div className="rounded-2xl border border-white/15 bg-black/70 px-6 py-5">
+              <div className="flex items-center justify-between gap-4">
+                <button
+                  onClick={backToList}
+                  className="px-3 py-2 rounded border border-white/20 text-white/80 hover:text-white hover:border-white/40 hover:bg-white/5"
+                >
+                  ← Back
+                </button>
+              </div>
+
+              {detailLoading && (
+                <div className="mt-6 text-white/70">
+                  Loading game details…
+                </div>
+              )}
+
+              {!detailLoading && detail?.ok && (
+  <div className="mt-6 space-y-6">
+    {/* SCORE HEADER */}
+    <div className="text-white text-2xl font-bold">
+      {detail.data.away.name} {detail.data.away.score} —{" "}
+      {detail.data.home.score} {detail.data.home.name}
+    </div>
+
+    {/* GOAL SCORERS */}
+    <div>
+      <div className="text-white font-semibold text-lg">
+        Goal scorers
       </div>
 
-      <div className="text-sm text-white/35">
-        Source: {resp?.upstream ?? "—"}
+      {detail.data.goals.length === 0 ? (
+        <div className="mt-2 text-white/60 text-sm">
+          No goals yet.
+        </div>
+      ) : (
+        <div className="mt-3 space-y-4">
+          {(() => {
+            let lastPeriod: string | null = null;
+
+            return detail.data.goals.map((g: any, i: number) => {
+              const isNewPeriod = g.period !== lastPeriod;
+              lastPeriod = g.period;
+
+              const scoringTeam =
+                g.team === detail.data.home.abbrev
+                  ? detail.data.home
+                  : detail.data.away;
+
+              return (
+                <div key={i} className="space-y-2">
+                  {isNewPeriod && (
+                    <div className="text-white/50 text-xl mt-4">
+                      {g.period}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4 text-white/90 text-2xl rounded-lg border border-white/10 bg-white/5 px-5 py-4">
+                    {scoringTeam.logo && (
+                      <img
+                        src={scoringTeam.logo}
+                        alt={`${scoringTeam.abbrev} logo`}
+                        className="w-15 h-15"
+                      />
+                    )}
+
+                    <div>
+                      {g.time} — {g.scorer}
+                      {g.assists?.length
+                        ? ` (Ast: ${g.assists.join(", ")})`
+                        : ""}
+                      {g.strength ? ` • ${g.strength}` : ""}
+                    </div>
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      )}
+    </div>
+
+    {/* TEAM STATS (now using normalized API data) */}
+    <div>
+      <div className="text-white font-semibold text-lg">
+        Team stats
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {["shots", "hits", "blocked", "pim"].map(
+          (stat) => (
+            <div
+              key={stat}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+            >
+              <div className="text-white/60 text-2xl uppercase">
+                {stat}
+              </div>
+              <div className="mt-1 text-white text-2xl font-semibold">
+                {detail.data.away.abbrev}:{" "}
+                {detail.data.away[stat] ?? "—"}{" "}
+                <span className="text-white/40">|</span>{" "}
+                {detail.data.home.abbrev}:{" "}
+                {detail.data.home[stat] ?? "—"}
+              </div>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
+              {!detailLoading && detail && !detail.ok && (
+                <div className="mt-6 text-red-400">
+                  {detail.error}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

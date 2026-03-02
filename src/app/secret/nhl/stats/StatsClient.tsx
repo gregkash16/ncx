@@ -1,3 +1,5 @@
+// /secret/nhl/stats/StatsClient.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -23,20 +25,20 @@ function StatRow({
   const rightPct = total > 0 ? (right / total) * 100 : 50;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       <div className="flex justify-between items-center">
-        <div className="text-2xl font-extrabold text-white tabular-nums">
+        <div className="text-4xl font-extrabold text-white tabular-nums">
           {left}
         </div>
-        <div className="text-lg font-bold text-white/80 tracking-wide">
+        <div className="text-2xl font-bold text-white/80 tracking-wide">
           {label}
         </div>
-        <div className="text-2xl font-extrabold text-white tabular-nums">
+        <div className="text-4xl font-extrabold text-white tabular-nums">
           {right}
         </div>
       </div>
 
-      <div className="relative h-3 bg-white/10 rounded-full overflow-hidden">
+      <div className="relative h-4 bg-white/10 rounded-full overflow-hidden">
         <div
           className="absolute left-0 top-0 h-full bg-blue-500"
           style={{ width: `${leftPct}%` }}
@@ -48,6 +50,11 @@ function StatRow({
       </div>
     </div>
   );
+}
+
+function logoFromAbbrev(abbrev?: string) {
+  if (!abbrev) return null;
+  return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
 }
 
 export default function StatsClient() {
@@ -82,27 +89,73 @@ export default function StatsClient() {
   }, [refreshSeconds]);
 
   if (!resp?.ok) {
-    return (
-      <div className="text-red-400">
-        {resp?.error ?? "No data"}
-      </div>
-    );
+    return <div className="text-red-400">{resp?.error ?? "No data"}</div>;
   }
 
   const sabres = resp.data?.sabres;
   const opponent = resp.data?.opponent;
   const goals = resp.data?.goals ?? [];
 
+  const gameState = resp.data?.gameState;
+  const inIntermission = !!resp.data?.inIntermission;
+  const period = resp.data?.period;
+  const timeRemaining = resp.data?.timeRemaining;
+
+  const isLive = gameState === "LIVE";
+  const isFinal =
+    gameState === "OFF" ||
+    gameState === "FINAL" ||
+    (!isLive && timeRemaining === "00:00");
+
+  const topStatus = isLive ? (inIntermission ? "Intermission" : "Live") : "Final";
+
+  const centerStatus = isFinal
+    ? "Final"
+    : inIntermission
+    ? "Intermission"
+    : period
+    ? `P${period} • ${timeRemaining ?? ""}`
+    : "Pregame";
+
+  // Group goals by period
+  const goalsByPeriod = goals.reduce((acc: Record<string, any[]>, g: any) => {
+    const key = g.period ?? "Other";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(g);
+    return acc;
+  }, {});
+
+  const periodOrder = (p: string) => {
+    if (p === "P1") return 1;
+    if (p === "P2") return 2;
+    if (p === "P3") return 3;
+    if (p === "OT") return 4;
+    if (p === "SO") return 5;
+    return 99;
+  };
+
+  const periodKeys = Object.keys(goalsByPeriod).sort(
+    (a, b) => periodOrder(a) - periodOrder(b)
+  );
+
   return (
     <div className="space-y-10 text-white">
       <div className="text-sm text-white/50">
-        {resp.data.gameState === "LIVE" ? "Live" : "Final"}
+        {topStatus}
         {updated ? ` • Updated ${updated.toLocaleTimeString()}` : ""}
       </div>
 
+      {/* SCORE HEADER — reverted to original sizing */}
       <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-2xl p-8">
-        <div className="text-4xl font-extrabold">
-          {sabres.name}
+        <div className="flex items-center gap-4">
+          {sabres.logo ? (
+            <img
+              src={sabres.logo}
+              alt={`${sabres.name} logo`}
+              className="h-12 w-12"
+            />
+          ) : null}
+          <div className="text-4xl font-extrabold">{sabres.name}</div>
         </div>
 
         <div className="text-center">
@@ -110,48 +163,88 @@ export default function StatsClient() {
             {sabres.score} - {opponent.score}
           </div>
 
-          <div className="text-2xl front-extrabold mt-2">
-            {resp.data.period
-              ? `P${resp.data.period} • ${resp.data.timeRemaining ?? ""}`
-              : "Pregame"}
+          <div className="text-2xl font-extrabold mt-2">
+            {centerStatus}
           </div>
         </div>
 
-        <div className="text-4xl font-extrabold text-right">
-          {opponent.name}
+        <div className="flex items-center justify-end gap-4">
+          <div className="text-4xl font-extrabold text-right">
+            {opponent.name}
+          </div>
+          {opponent.logo ? (
+            <img
+              src={opponent.logo}
+              alt={`${opponent.name} logo`}
+              className="h-12 w-12"
+            />
+          ) : null}
         </div>
       </div>
 
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-8">
+      {/* STATS — kept larger */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-10 space-y-10">
         <StatRow label="Shots" left={sabres.shots} right={opponent.shots} />
         <StatRow label="Hits" left={sabres.hits} right={opponent.hits} />
-        <StatRow label="Blocked" left={sabres.blocked} right={opponent.blocked} />
-        <StatRow label="Faceoff %" left={sabres.faceoff} right={opponent.faceoff} />
+        <StatRow
+          label="Blocked"
+          left={sabres.blocked}
+          right={opponent.blocked}
+        />
         <StatRow label="PIM" left={sabres.pim} right={opponent.pim} />
       </div>
 
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
-        <div className="text-2xl font-extrabold mb-6">
-          Goal Summary
-        </div>
+      {/* GOAL SUMMARY — large */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-12">
+        <div className="text-5xl font-extrabold mb-12">Goal Summary</div>
 
-        <div className="space-y-5">
-          {goals.map((g: any, i: number) => (
-            <div key={i} className="border-b border-white/10 pb-4">
-              <div className="font-semibold text-lg">
-                {g.team} – {g.scorer}
+        <div className="space-y-14">
+          {periodKeys.length ? (
+            periodKeys.map((pk) => (
+              <div key={pk} className="space-y-8">
+                <div className="text-4xl font-extrabold text-white/90">
+                  {pk}
+                </div>
+
+                <div className="space-y-8">
+                  {goalsByPeriod[pk].map((g: any, i: number) => {
+                    const goalLogo = logoFromAbbrev(g.team);
+
+                    return (
+                      <div
+                        key={i}
+                        className="border-b border-white/10 pb-8"
+                      >
+                        <div className="flex items-center gap-5 text-3xl font-semibold">
+                          {goalLogo ? (
+                            <img
+                              src={goalLogo}
+                              alt={`${g.team} logo`}
+                              className="h-10 w-10"
+                            />
+                          ) : null}
+                          <span>{g.scorer}</span>
+                        </div>
+
+                        <div className="text-white/70 text-2xl mt-3">
+                          Assists:{" "}
+                          {g.assists.length
+                            ? g.assists.join(", ")
+                            : "Unassisted"}
+                        </div>
+
+                        <div className="text-white/50 text-2xl mt-2">
+                          {g.time} • {g.strength}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="text-white/70 text-sm">
-                Assists:{" "}
-                {g.assists.length
-                  ? g.assists.join(", ")
-                  : "Unassisted"}
-              </div>
-              <div className="text-white/50 text-sm">
-                {g.period} • {g.time} • {g.strength}
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="text-3xl text-white/60">No goals</div>
+          )}
         </div>
       </div>
     </div>

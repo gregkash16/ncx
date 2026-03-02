@@ -1,3 +1,5 @@
+// /nhl/sabres-stats/route.ts
+
 export const dynamic = "force-dynamic";
 
 function currentSeason() {
@@ -29,15 +31,10 @@ function findNextGame(games: any[], now: Date) {
 
 function findMostRecentFinished(games: any[], now: Date) {
   return games
-    .filter(
-      (g) =>
-        g.gameState === "OFF" &&
-        new Date(g.startTimeUTC) <= now
-    )
+    .filter((g) => g.gameState === "OFF" && new Date(g.startTimeUTC) <= now)
     .sort(
       (a, b) =>
-        new Date(b.startTimeUTC).getTime() -
-        new Date(a.startTimeUTC).getTime()
+        new Date(b.startTimeUTC).getTime() - new Date(a.startTimeUTC).getTime()
     )[0];
 }
 
@@ -55,25 +52,16 @@ function aggregateTeamStats(team: any) {
     };
   }
 
-  const skaters = [
-    ...(team.forwards ?? []),
-    ...(team.defense ?? []),
-  ];
+  const skaters = [...(team.forwards ?? []), ...(team.defense ?? [])];
 
-  const hits = skaters.reduce(
-    (sum: number, p: any) => sum + (p.hits ?? 0),
-    0
-  );
+  const hits = skaters.reduce((sum: number, p: any) => sum + (p.hits ?? 0), 0);
 
   const blocked = skaters.reduce(
     (sum: number, p: any) => sum + (p.blockedShots ?? 0),
     0
   );
 
-  const pim = skaters.reduce(
-    (sum: number, p: any) => sum + (p.pim ?? 0),
-    0
-  );
+  const pim = skaters.reduce((sum: number, p: any) => sum + (p.pim ?? 0), 0);
 
   // Proper weighted faceoff % (not averaging percentages)
   let faceoffWins = 0;
@@ -88,10 +76,7 @@ function aggregateTeamStats(team: any) {
     }
   });
 
-  const faceoff =
-    faceoffTotal > 0
-      ? Math.round(faceoffWins / faceoffTotal)
-      : 0;
+  const faceoff = faceoffTotal > 0 ? Math.round(faceoffWins / faceoffTotal) : 0;
 
   return {
     hits,
@@ -100,6 +85,11 @@ function aggregateTeamStats(team: any) {
     faceoff,
     pp: "0/0", // landing does not expose PP totals
   };
+}
+
+function teamLogoUrl(abbrev?: string) {
+  if (!abbrev) return null;
+  return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
 }
 
 export async function GET() {
@@ -121,8 +111,7 @@ export async function GET() {
     if (!selectedGame) {
       if (nextGame) {
         const oneHourBefore =
-          new Date(nextGame.startTimeUTC).getTime() -
-          60 * 60 * 1000;
+          new Date(nextGame.startTimeUTC).getTime() - 60 * 60 * 1000;
 
         if (now.getTime() < oneHourBefore && lastGame) {
           selectedGame = lastGame;
@@ -143,23 +132,18 @@ export async function GET() {
 
     // Fetch both endpoints in parallel
     const [landingRes, boxRes] = await Promise.all([
-      fetch(
-        `https://api-web.nhle.com/v1/gamecenter/${selectedGame.id}/landing`,
-        { cache: "no-store" }
-      ),
+      fetch(`https://api-web.nhle.com/v1/gamecenter/${selectedGame.id}/landing`, {
+        cache: "no-store",
+      }),
       fetch(
         `https://api-web.nhle.com/v1/gamecenter/${selectedGame.id}/boxscore`,
         { cache: "no-store" }
       ),
     ]);
 
-    const landing = landingRes.ok
-      ? await landingRes.json()
-      : null;
+    const landing = landingRes.ok ? await landingRes.json() : null;
 
-    const box = boxRes.ok
-      ? await boxRes.json()
-      : null;
+    const box = boxRes.ok ? await boxRes.json() : null;
 
     if (!landing?.homeTeam || !landing?.awayTeam) {
       return Response.json({
@@ -168,43 +152,31 @@ export async function GET() {
       });
     }
 
-    const sabresIsHome =
-      landing.homeTeam.abbrev === "BUF";
+    const sabresIsHome = landing.homeTeam.abbrev === "BUF";
 
-    const sabresLanding = sabresIsHome
-      ? landing.homeTeam
-      : landing.awayTeam;
+    const sabresLanding = sabresIsHome ? landing.homeTeam : landing.awayTeam;
 
-    const opponentLanding = sabresIsHome
-      ? landing.awayTeam
-      : landing.homeTeam;
+    const opponentLanding = sabresIsHome ? landing.awayTeam : landing.homeTeam;
 
     const boxStats = box?.playerByGameStats;
 
-    const sabresBox = sabresIsHome
-      ? boxStats?.homeTeam
-      : boxStats?.awayTeam;
+    const sabresBox = sabresIsHome ? boxStats?.homeTeam : boxStats?.awayTeam;
 
-    const opponentBox = sabresIsHome
-      ? boxStats?.awayTeam
-      : boxStats?.homeTeam;
+    const opponentBox = sabresIsHome ? boxStats?.awayTeam : boxStats?.homeTeam;
 
     const sabresAgg = aggregateTeamStats(sabresBox);
     const opponentAgg = aggregateTeamStats(opponentBox);
 
     // Build goals from landing summary
     const goals: any[] = [];
-    const scoringPeriods =
-      landing.summary?.scoring ?? [];
+    const scoringPeriods = landing.summary?.scoring ?? [];
 
     scoringPeriods.forEach((period: any) => {
       period.goals.forEach((goal: any) => {
         goals.push({
           team: goal.teamAbbrev?.default,
           scorer: goal.name?.default,
-          assists:
-            goal.assists?.map((a: any) => a.name?.default) ??
-            [],
+          assists: goal.assists?.map((a: any) => a.name?.default) ?? [],
           period: `P${period.periodDescriptor?.number}`,
           time: goal.timeInPeriod,
           strength: goal.strength,
@@ -214,22 +186,18 @@ export async function GET() {
 
     return Response.json({
       ok: true,
-      refreshSeconds:
-        landing.gameState === "LIVE" ? 30 : 300,
+      refreshSeconds: landing.gameState === "LIVE" ? 30 : 300,
       data: {
         gameState: landing.gameState,
         startTimeUTC: landing.startTimeUTC,
-        period:
-          landing.periodDescriptor?.number ?? null,
-        periodType:
-          landing.periodDescriptor?.periodType ?? null,
-        timeRemaining:
-          landing.clock?.timeRemaining ?? null,
+        period: landing.periodDescriptor?.number ?? null,
+        periodType: landing.periodDescriptor?.periodType ?? null,
+        timeRemaining: landing.clock?.timeRemaining ?? null,
         running: landing.clock?.running ?? false,
-        inIntermission:
-          landing.clock?.inIntermission ?? false,
+        inIntermission: landing.clock?.inIntermission ?? false,
 
         sabres: {
+          logo: teamLogoUrl(sabresLanding.abbrev),
           name: sabresLanding.commonName.default,
           score: sabresLanding.score ?? 0,
           shots: sabresLanding.sog ?? 0,
@@ -241,6 +209,7 @@ export async function GET() {
         },
 
         opponent: {
+          logo: teamLogoUrl(opponentLanding.abbrev),
           name: opponentLanding.commonName.default,
           score: opponentLanding.score ?? 0,
           shots: opponentLanding.sog ?? 0,
