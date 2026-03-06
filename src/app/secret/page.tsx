@@ -37,7 +37,6 @@ export default function DisplayPage() {
   const handleClear = async () => {
     setConv(null);
     lastTimestamp.current = 0;
-    // Reset the server-side conversation too
     await fetch("/api/secret/conversation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -85,7 +84,7 @@ export default function DisplayPage() {
           animation: "blink 2s ease-in-out infinite",
         }} />
         <span style={{
-          fontSize: 20,
+          fontSize: 23,
           fontWeight: 700,
           letterSpacing: "0.25em",
           color: "#00cfff",
@@ -98,13 +97,13 @@ export default function DisplayPage() {
           onClick={handleClear}
           style={{
             background: "transparent",
-            border: "1px solid rgba(0,255,159,0.3)",
-            color: "#00ff9f",
+            border: "1px solid rgba(0,207,255,0.5)",
+            color: "#00cfff",
             fontFamily: "'Courier New', Courier, monospace",
             fontSize: 13,
             fontWeight: 700,
             letterSpacing: "0.15em",
-            padding: "3px 8px",
+            padding: "3px 16px",
             cursor: "pointer",
             textTransform: "uppercase",
             opacity: 0.5,
@@ -148,7 +147,7 @@ export default function DisplayPage() {
                 // YOU
               </div>
               <div style={{
-                fontSize: 22,
+                fontSize: 19,
                 lineHeight: 1.6,
                 padding: "8px 12px",
                 borderLeft: "2px solid rgba(0,255,159,0.4)",
@@ -164,7 +163,7 @@ export default function DisplayPage() {
                 // CL-4UDE
               </div>
               <div style={{
-                fontSize: 26,
+                fontSize: 22,
                 lineHeight: 1.7,
                 padding: "10px 14px",
                 borderLeft: "2px solid rgba(0,207,255,0.6)",
