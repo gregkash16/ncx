@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const SYSTEM_PROMPT = "You are a helpful voice assistant displayed on a Corsair Xeneon Edge gaming monitor. Keep all responses short and conversational — 1 to 3 sentences maximum. Never use markdown, bullet points, headers, asterisks, or any special formatting. Plain text only.";
+
 export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 1024,
+          system: SYSTEM_PROMPT,
           messages,
         }),
       });

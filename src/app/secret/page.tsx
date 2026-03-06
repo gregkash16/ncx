@@ -34,6 +34,17 @@ export default function DisplayPage() {
     return () => clearInterval(interval);
   }, []);
 
+  const handleClear = async () => {
+    setConv(null);
+    lastTimestamp.current = 0;
+    // Reset the server-side conversation too
+    await fetch("/api/secret/conversation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: "", assistant: "", timestamp: 0 }),
+    }).catch(() => {});
+  };
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -79,9 +90,31 @@ export default function DisplayPage() {
           letterSpacing: "0.25em",
           color: "#00cfff",
           textTransform: "uppercase",
+          flex: 1,
         }}>
           CL-4UDE // TERMINAL
         </span>
+        <button
+          onClick={handleClear}
+          style={{
+            background: "transparent",
+            border: "1px solid rgba(0,255,159,0.3)",
+            color: "#00ff9f",
+            fontFamily: "'Courier New', Courier, monospace",
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: "0.15em",
+            padding: "3px 8px",
+            cursor: "pointer",
+            textTransform: "uppercase",
+            opacity: 0.5,
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+          onMouseLeave={e => (e.currentTarget.style.opacity = "0.5")}
+        >
+          CLR
+        </button>
       </div>
 
       {/* Content */}
@@ -110,14 +143,8 @@ export default function DisplayPage() {
           </div>
         ) : (
           <>
-            {/* User query */}
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{
-                fontSize: 15,
-                letterSpacing: "0.2em",
-                color: "rgba(0,255,159,0.45)",
-                textTransform: "uppercase",
-              }}>
+              <div style={{ fontSize: 15, letterSpacing: "0.2em", color: "rgba(0,255,159,0.45)", textTransform: "uppercase" }}>
                 // YOU
               </div>
               <div style={{
@@ -132,14 +159,8 @@ export default function DisplayPage() {
               </div>
             </div>
 
-            {/* Claude response */}
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <div style={{
-                fontSize: 15,
-                letterSpacing: "0.2em",
-                color: "rgba(0,207,255,0.45)",
-                textTransform: "uppercase",
-              }}>
+              <div style={{ fontSize: 15, letterSpacing: "0.2em", color: "rgba(0,207,255,0.45)", textTransform: "uppercase" }}>
                 // CL-4UDE
               </div>
               <div style={{
