@@ -20,9 +20,11 @@ export default function DisplayPage() {
         const data: Conversation = await res.json();
         if (data.timestamp && data.timestamp !== lastTimestamp.current) {
           lastTimestamp.current = data.timestamp;
-          setConv(data);
           setIsNew(true);
-          setTimeout(() => setIsNew(false), 600);
+          setTimeout(() => {
+            setConv(data);
+            setIsNew(false);
+          }, 150);
         }
       } catch {}
     };
@@ -35,71 +37,149 @@ export default function DisplayPage() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#080810",
+      background: "#000000",
       display: "flex",
       flexDirection: "column",
-      fontFamily: "'Courier New', monospace",
-      color: "#c8c8e0",
-      padding: "20px",
+      fontFamily: "'Courier New', Courier, monospace",
+      color: "#00ff9f",
+      overflow: "hidden",
+      position: "relative",
     }}>
-      {/* Header dot */}
+      {/* Scanline overlay */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        marginBottom: 16,
-        borderBottom: "1px solid #1e1e2e",
-        paddingBottom: 12,
+        position: "fixed",
+        inset: 0,
+        background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 4px)",
+        pointerEvents: "none",
+        zIndex: 999,
+      }} />
+
+      {/* Corner accents */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: 18, height: 18, borderTop: "2px solid #00cfff", borderLeft: "2px solid #00cfff" }} />
+      <div style={{ position: "absolute", bottom: 0, right: 0, width: 18, height: 18, borderBottom: "2px solid #00cfff", borderRight: "2px solid #00cfff" }} />
+
+      {/* Header */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 16px",
+        borderBottom: "1px solid rgba(0,255,159,0.2)",
+        flexShrink: 0,
       }}>
         <div style={{
-          width: 7, height: 7, borderRadius: "50%",
-          background: conv ? "#00ffaa" : "#333355",
-          boxShadow: conv ? "0 0 10px #00ffaa88" : "none",
+          width: 8, height: 8, borderRadius: "50%",
+          background: conv ? "#00cfff" : "#333355",
+          boxShadow: conv ? "0 0 8px #00cfff" : "none",
+          animation: "blink 2s ease-in-out infinite",
         }} />
-        <span style={{ fontSize: 10, letterSpacing: "0.2em", color: "#555580", textTransform: "uppercase" }}>
-          claude
+        <span style={{
+          fontSize: 20,
+          fontWeight: 700,
+          letterSpacing: "0.25em",
+          color: "#00cfff",
+          textTransform: "uppercase",
+        }}>
+          CL-4UDE // TERMINAL
         </span>
       </div>
 
-      {!conv || !conv.assistant ? (
-        <div style={{
-          flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#333355", fontSize: 12, letterSpacing: "0.1em",
-        }}>
-          hold alt+` to speak
-        </div>
-      ) : (
-        <div style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          opacity: isNew ? 0 : 1,
-          transition: "opacity 0.4s ease",
-        }}>
-          {/* User query */}
+      {/* Content */}
+      <div style={{
+        flex: 1,
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        opacity: isNew ? 0 : 1,
+        transition: "opacity 0.25s ease",
+        overflowY: "auto",
+      }}>
+        {!conv || !conv.assistant ? (
           <div style={{
-            fontSize: 11,
-            color: "#00ffaa66",
-            letterSpacing: "0.05em",
-            fontStyle: "italic",
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            letterSpacing: "0.15em",
+            color: "rgba(0,255,159,0.3)",
+            textTransform: "uppercase",
           }}>
-            {conv.user}
+            &gt; AWAITING INPUT_
           </div>
+        ) : (
+          <>
+            {/* User query */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{
+                fontSize: 15,
+                letterSpacing: "0.2em",
+                color: "rgba(0,255,159,0.45)",
+                textTransform: "uppercase",
+              }}>
+                // YOU
+              </div>
+              <div style={{
+                fontSize: 22,
+                lineHeight: 1.6,
+                padding: "8px 12px",
+                borderLeft: "2px solid rgba(0,255,159,0.4)",
+                background: "rgba(0,255,159,0.08)",
+                color: "#00ff9f",
+              }}>
+                {conv.user}
+              </div>
+            </div>
 
-          {/* Claude response */}
-          <div style={{
-            fontSize: 14,
-            lineHeight: 1.7,
-            color: "#d0d0f0",
-            whiteSpace: "pre-wrap",
-          }}>
-            {conv.assistant}
-          </div>
-        </div>
-      )}
+            {/* Claude response */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{
+                fontSize: 15,
+                letterSpacing: "0.2em",
+                color: "rgba(0,207,255,0.45)",
+                textTransform: "uppercase",
+              }}>
+                // CL-4UDE
+              </div>
+              <div style={{
+                fontSize: 26,
+                lineHeight: 1.7,
+                padding: "10px 14px",
+                borderLeft: "2px solid rgba(0,207,255,0.6)",
+                background: "rgba(0,207,255,0.08)",
+                color: "#00cfff",
+                whiteSpace: "pre-wrap",
+              }}>
+                {conv.assistant}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Status bar */}
+      <div style={{
+        padding: "4px 16px 8px",
+        fontSize: 13,
+        letterSpacing: "0.15em",
+        color: "rgba(0,207,255,0.4)",
+        textTransform: "uppercase",
+        borderTop: "1px solid rgba(0,255,159,0.1)",
+        flexShrink: 0,
+      }}>
+        READY
+      </div>
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        ::-webkit-scrollbar { display: none; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,255,159,0.2); }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.2; }
+        }
       `}</style>
     </div>
   );
