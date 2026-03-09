@@ -160,54 +160,14 @@ export default function HomeLanding({
             Streamer Kit
           </a>
 
-          {/* NEW — Season 9 Sign Up */}
+          {/* NEW — Streamer Kit */}
           <a
-            href="https://forms.gle/X7VNuw1jbDp5985g8"
-            target="_blank"
+            href="/?tab=podcast"
+            /* target="_blank" */
             rel="noreferrer"
-            className="
-              group relative isolate overflow-hidden
-              flex items-center justify-center gap-2
-              rounded-2xl border border-blue-400/60
-              bg-gradient-to-r from-blue-600/25 via-cyan-500/15 to-purple-600/25
-              px-4 py-3 text-sm font-extrabold tracking-wide text-zinc-50
-              shadow-[0_0_0_1px_rgba(59,130,246,0.25),0_12px_40px_rgba(59,130,246,0.25)]
-              hover:shadow-[0_0_0_1px_rgba(34,211,238,0.35),0_16px_55px_rgba(34,211,238,0.30)]
-              hover:border-cyan-300/70
-              transition
-            "
+            className="flex items-center justify-center rounded-xl border border-blue-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold hover:bg-blue-500/20 hover:border-blue-400 transition"
           >
-            {/* glow blob */}
-            <span
-              className="
-                pointer-events-none absolute -inset-10 -z-10
-                opacity-70 blur-2xl
-                bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.55),transparent_55%)]
-                group-hover:opacity-100
-                transition
-              "
-            />
-
-            {/* shimmer sweep */}
-            <span
-              className="
-                pointer-events-none absolute inset-0 -z-10
-                translate-x-[-120%] group-hover:translate-x-[120%]
-                bg-gradient-to-r from-transparent via-white/15 to-transparent
-                transition-transform duration-1000
-              "
-            />
-
-            {/* badge */}
-            <span className="inline-flex items-center rounded-full bg-cyan-400/20 border border-cyan-300/40 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-cyan-200 animate-pulse">
-              New
-            </span>
-
-            <span className="relative">Season 9 Sign-Ups</span>
-
-            <span className="relative text-cyan-200 group-hover:translate-x-0.5 transition-transform">
-              →
-            </span>
+            NCX Podcast
           </a>
 
         </div>

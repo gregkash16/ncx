@@ -22,14 +22,14 @@ const row1: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "current",   label: "Current Week", href: "/?tab=current" },
   { key: "matchups",  label: "Matchups",     href: "/?tab=matchups" },
   { key: "standings", label: "Standings",    href: "/?tab=standings" },
-  { key: "indstats",  label: "Ind. Stats",   href: "/?tab=indstats" },
-  { key: "advstats",  label: "Adv. Stats",   href: "/?tab=advstats" },
+  { key: "report",      label: "Report a Game", href: "/?tab=report" },
 ];
 
 const row2Base: Array<{ key: TabKey; label: string; href: string }> = [
+  { key: "indstats",  label: "Ind. Stats",   href: "/?tab=indstats" },
+  { key: "advstats",  label: "Adv. Stats",   href: "/?tab=advstats" },
   { key: "players",     label: "Players",       href: "/?tab=players" },
   { key: "podcast",     label: "Podcast",       href: "/?tab=podcast" },
-  { key: "report",      label: "Report a Game", href: "/?tab=report" },
   { key: "prevseasons", label: "Prev. Seasons", href: "/?tab=prevseasons" },
 ];
 
