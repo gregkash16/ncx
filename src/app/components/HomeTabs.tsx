@@ -16,7 +16,8 @@ export type TabKey =
   | "report"
   | "prefs"
   | "team"
-  | "playoffs";
+  | "playoffs"
+  | "prevseasons";
 
 const MATCHUPS: TabKey = "matchups";
 function isMatchups(k: TabKey): k is "matchups" {
@@ -40,6 +41,7 @@ type HomeTabsProps = {
   prefsPanel?: React.ReactNode;
   teamPanel?: React.ReactNode;
   playoffsPanel?: React.ReactNode;
+  prevSeasonsPanel?: React.ReactNode;
   hideButtons?: boolean;
   preSeasonEnabled?: boolean;
 };
@@ -57,6 +59,7 @@ export default function HomeTabs({
   prefsPanel,
   teamPanel,
   playoffsPanel,
+  prevSeasonsPanel,
   hideButtons = false,
   preSeasonEnabled = false,
 }: HomeTabsProps) {
@@ -68,6 +71,7 @@ export default function HomeTabs({
   const hasPlayoffs = !!playoffsPanel;
   const hasPrefs = !!prefsPanel && preSeasonEnabled;
   const hasPodcast = !!podcastPanel;
+  const hasPrevSeasons = !!prevSeasonsPanel;
 
   const urlTabRaw = (searchParams.get("tab") as TabKey) || "home";
   let active: TabKey = urlTabRaw;
@@ -76,8 +80,9 @@ export default function HomeTabs({
   if (active === "playoffs" && !hasPlayoffs) active = "home";
   if (active === "prefs" && !hasPrefs) active = "home";
   if (active === "podcast" && !hasPodcast) active = "home";
+  if (active === "prevseasons" && !hasPrevSeasons) active = "home";
 
-  /* ───────────── Button styling (FIXED) ───────────── */
+  /* ───────────── Button styling ───────────── */
 
   const btnBase =
     `
@@ -138,6 +143,7 @@ export default function HomeTabs({
     ...(hasPodcast ? [{ key: "podcast" as const, label: "Podcast" }] : []),
     { key: "report", label: "Report a Game" },
     ...(hasPrefs ? [{ key: "prefs" as const, label: "SEASON 9" }] : []),
+    { key: "prevseasons", label: "Prev. Seasons" },
   ];
 
   return (
@@ -166,7 +172,7 @@ export default function HomeTabs({
 
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
-          active === "indstats" || active === "advstats"
+          active === "indstats" || active === "advstats" || active === "prevseasons"
             ? "w-full max-w-[115rem]"
             : "max-w-6xl"
         }`}
@@ -183,6 +189,7 @@ export default function HomeTabs({
         {active === "prefs" && hasPrefs && prefsPanel}
         {active === "team" && hasTeam && teamPanel}
         {active === "playoffs" && hasPlayoffs && playoffsPanel}
+        {active === "prevseasons" && hasPrevSeasons && prevSeasonsPanel}
       </div>
     </div>
   );

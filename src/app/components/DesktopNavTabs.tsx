@@ -14,18 +14,23 @@ type TabKey =
   | "players"
   | "report"
   | "prefs"
-  | "podcast";
+  | "podcast"
+  | "prevseasons";
 
-const tabsBase: Array<{ key: TabKey; label: string; href: string }> = [
-  { key: "home", label: "Home", href: "/" },
-  { key: "current", label: "Current Week", href: "/?tab=current" },
-  { key: "matchups", label: "Matchups", href: "/?tab=matchups" },
-  { key: "standings", label: "Standings", href: "/?tab=standings" },
-  { key: "indstats", label: "Ind. Stats", href: "/?tab=indstats" },
-  { key: "advstats", label: "Adv. Stats", href: "/?tab=advstats" },
-  { key: "players", label: "Players", href: "/?tab=players" },
-  { key: "podcast", label: "Podcast", href: "/?tab=podcast" },
-  { key: "report", label: "Report a Game", href: "/?tab=report" },
+const row1: Array<{ key: TabKey; label: string; href: string }> = [
+  { key: "home",      label: "Home",         href: "/" },
+  { key: "current",   label: "Current Week", href: "/?tab=current" },
+  { key: "matchups",  label: "Matchups",     href: "/?tab=matchups" },
+  { key: "standings", label: "Standings",    href: "/?tab=standings" },
+  { key: "indstats",  label: "Ind. Stats",   href: "/?tab=indstats" },
+  { key: "advstats",  label: "Adv. Stats",   href: "/?tab=advstats" },
+];
+
+const row2Base: Array<{ key: TabKey; label: string; href: string }> = [
+  { key: "players",     label: "Players",       href: "/?tab=players" },
+  { key: "podcast",     label: "Podcast",       href: "/?tab=podcast" },
+  { key: "report",      label: "Report a Game", href: "/?tab=report" },
+  { key: "prevseasons", label: "Prev. Seasons", href: "/?tab=prevseasons" },
 ];
 
 export default function DesktopNavTabs() {
@@ -33,72 +38,66 @@ export default function DesktopNavTabs() {
   const searchParams = useSearchParams();
 
   const rawTab = (searchParams.get("tab") as TabKey | null) ?? "home";
-
-  // IMPORTANT: must be NEXT_PUBLIC_
   const preSeasonEnabled = process.env.NEXT_PUBLIC_PRE_SEASON === "true";
 
-  const tabs = preSeasonEnabled
-    ? [...tabsBase, { key: "prefs", label: "S9 Signups", href: "/?tab=prefs" }]
-    : tabsBase;
+  const row2 = preSeasonEnabled
+    ? [...row2Base, { key: "prefs" as TabKey, label: "S9 Signups", href: "/?tab=prefs" }]
+    : row2Base;
 
   const active: TabKey | null = pathname === "/" ? rawTab : null;
 
+  function renderTab({ key, label, href }: { key: TabKey; label: string; href: string }) {
+    const isActive =
+      pathname === "/" &&
+      !(!preSeasonEnabled && key === "prefs") &&
+      active === key;
+
+    return (
+      <Link
+        key={key}
+        href={href}
+        scroll={false}
+        className="group relative overflow-hidden rounded-xl border px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2"
+        style={{
+          background: "var(--ncx-bg-panel)",
+          borderColor: "var(--ncx-border)",
+          color: "var(--ncx-text-primary)",
+        }}
+      >
+        {/* FILL LAYER — active state */}
+        <span
+          className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
+          style={{
+            opacity: isActive ? 1 : 0,
+            background: "linear-gradient(to right, var(--ncx-hero-from), var(--ncx-hero-via), var(--ncx-hero-to))",
+          }}
+        />
+
+        {/* HOVER FILL */}
+        {!isActive && (
+          <span
+            className="pointer-events-none absolute inset-0 z-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{
+              background: "linear-gradient(to right, var(--ncx-hero-from), var(--ncx-hero-via), var(--ncx-hero-to))",
+            }}
+          />
+        )}
+
+        <span className="relative z-10">{label}</span>
+      </Link>
+    );
+  }
+
   return (
-    <div className="mt-3 mb-4 flex justify-center">
+    <div className="mt-3 mb-4 flex flex-col items-center gap-2">
+      {/* Row 1: Home, Current Week, Matchups, Standings, Ind. Stats, Adv. Stats */}
       <div className="flex flex-wrap items-center justify-center gap-3">
-        {tabs.map(({ key, label, href }) => {
-          const isActive =
-            pathname === "/" &&
-            !(!preSeasonEnabled && key === "prefs") &&
-            active === key;
+        {row1.map(renderTab)}
+      </div>
 
-          return (
-            <Link
-              key={key}
-              href={href}
-              scroll={false}
-              className="group relative overflow-hidden rounded-xl border px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2"
-              style={{
-                background: "var(--ncx-bg-panel)",
-                borderColor: "var(--ncx-border)",
-                color: "var(--ncx-text-primary)",
-              }}
-            >
-              {/* FILL LAYER — this is the missing piece */}
-              <span
-                className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
-                style={{
-                  opacity: isActive ? 1 : 0,
-                  background: `linear-gradient(
-                    to right,
-                    var(--ncx-hero-from),
-                    var(--ncx-hero-via),
-                    var(--ncx-hero-to)
-                  )`,
-                }}
-              />
-
-              {/* HOVER FILL — kicks in when not active */}
-              {!isActive && (
-                <span
-                  className="pointer-events-none absolute inset-0 z-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  style={{
-                    background: `linear-gradient(
-                      to right,
-                      var(--ncx-hero-from),
-                      var(--ncx-hero-via),
-                      var(--ncx-hero-to)
-                    )`,
-                  }}
-                />
-              )}
-
-              {/* Text */}
-              <span className="relative z-10">{label}</span>
-            </Link>
-
-          );
-        })}
+      {/* Row 2: Players, Podcast, Report, Prev. Seasons (+ S9 Signups if enabled) */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {row2.map(renderTab)}
       </div>
     </div>
   );

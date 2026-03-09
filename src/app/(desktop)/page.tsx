@@ -20,6 +20,7 @@ import HomeTabs from "../components/HomeTabs";
 import DesktopNavTabs from "../components/DesktopNavTabs";
 import HomeLanding from "../components/HomeLanding";
 import PlayoffsPanel from "../components/PlayoffsPanel";
+import PrevSeasonsPanel from "../components/PrevSeasonsPanel";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -38,6 +39,7 @@ import { teamSlug } from "@/lib/slug";
 import Season9PrefsPanel from "../components/Season9PrefsPanel";
 import PodcastPanel from "../components/PodcastPanel";
 import Image from "next/image";
+import { type SeasonNumber, type StatsMode } from "@/lib/SeasonStats";
 
 function parseWeekNum(label: string | undefined | null): number | null {
   if (!label) return null;
@@ -169,6 +171,18 @@ export default async function HomePage({
 
   const teamParam = (sp?.team as string | undefined) || undefined;
 
+  // ── Previous seasons params ──────────────────────────────────────────────
+  const prevSeason = ((): SeasonNumber => {
+    const raw = Number(sp?.ps);
+    return ([1, 2, 3, 4, 5, 6, 7, 8] as SeasonNumber[]).includes(
+      raw as SeasonNumber
+    )
+      ? (raw as SeasonNumber)
+      : 8;
+  })();
+  const prevMode: StatsMode =
+    (sp?.pm as string) === "individual" ? "individual" : "overall";
+
   const session = await getServerSession(authOptions);
   let message = "Please log in with your Discord.";
 
@@ -264,7 +278,6 @@ export default async function HomePage({
       <section className="relative max-w-6xl mx-auto px-6 pt-24 pb-6 text-center">
         <div className="absolute inset-0 -z-10">
           <div className="absolute inset-0 ncx-neon-blob-a" />
-          {/* was hardcoded cyan radial — now uses global token-driven blob */}
           <div className="absolute inset-0 ncx-neon-blob-b blur-3xl" />
         </div>
 
@@ -286,7 +299,7 @@ export default async function HomePage({
             hideButtons
             preSeasonEnabled={preSeasonEnabled}
             prefsPanel={preSeasonEnabled ? <Season9PrefsPanel /> : undefined}
-            podcastPanel={<PodcastPanel />} // ✅ ALWAYS AVAILABLE
+            podcastPanel={<PodcastPanel />}
             homePanel={
               <HomeLanding
                 message={message}
@@ -333,6 +346,13 @@ export default async function HomePage({
               ) : undefined
             }
             playoffsPanel={<PlayoffsPanel key="playoffs" />}
+            prevSeasonsPanel={
+              <PrevSeasonsPanel
+                key={`prevseasons-${prevSeason}-${prevMode}`}
+                season={prevSeason}
+                mode={prevMode}
+              />
+            }
           />
         </div>
       </section>
