@@ -1,4 +1,4 @@
-// src/lib/seasonStats.ts
+// src/lib/SeasonStats.ts
 import mysql from "mysql2/promise";
 
 const DB_HOST = process.env.DB_HOST || "metro.proxy.rlwy.net";
@@ -59,6 +59,9 @@ export type SeasonStatsResult = {
   rows: Record<string, unknown>[];
 };
 
+// Desired column order for S8 overall
+const S8_OVERALL_COLUMNS = ["rank", "team", "wins", "losses", "game_wins", "points"];
+
 export async function fetchSeasonStats(
   season: SeasonNumber,
   mode: StatsMode
@@ -66,13 +69,23 @@ export async function fetchSeasonStats(
   const { db, table } = resolveTable(season, mode);
   const pool = getPool(db);
 
-  const [rows] = await pool.query(`SELECT * FROM \`${table}\``);
+  // S8 overall: order rows by rank, and pin column order with explicit SELECT
+  const query =
+    db === "S8" && mode === "overall"
+      ? "SELECT `rank`, `team`, `wins`, `losses`, `game_wins`, `points` FROM `overall_standings` ORDER BY `rank` ASC"
+      : `SELECT * FROM \`${table}\``;
+
+  const [rows] = await pool.query(query);
   const rowsArr = rows as Record<string, unknown>[];
 
   if (rowsArr.length === 0) {
     return { columns: [], rows: [] };
   }
 
-  const columns = Object.keys(rowsArr[0]);
+  const columns =
+    db === "S8" && mode === "overall"
+      ? S8_OVERALL_COLUMNS
+      : Object.keys(rowsArr[0]);
+
   return { columns, rows: rowsArr };
 }
