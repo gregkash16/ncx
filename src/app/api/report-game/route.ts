@@ -557,7 +557,7 @@ async function getMySqlConn() {
   const port = Number(process.env.DB_PORT ?? "3306");
   const user = process.env.DB_USER ?? "root";
   const password = process.env.DB_PASSWORD ?? process.env.MYSQLPASSWORD;
-  const database = process.env.DB_NAME ?? "S8";
+  const database = process.env.DB_NAME ?? "S9";
 
   if (!password) {
     throw new Error("Missing DB_PASSWORD / MYSQLPASSWORD");
