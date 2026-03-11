@@ -30,27 +30,43 @@ function WinBoxes({
   direction?: "left" | "right";
   color: string;
 }) {
-  const count = Math.max(0, Math.min(4, wins));
+  const TOTAL = 7;
+  const CLINCH = 4; // box index (1-based) that wins the series
+  const count = Math.max(0, Math.min(TOTAL, wins));
 
   return (
     <div className="flex items-center gap-1">
-      {Array.from({ length: 4 }).map((_, i) => {
-        const filled = direction === "left" ? i < count : i >= 4 - count;
+      {Array.from({ length: TOTAL }).map((_, i) => {
+        // For "left" direction, boxes fill left-to-right (index 0 = first win)
+        // For "right" direction, boxes fill right-to-left (index 6 = first win)
+        const filled =
+          direction === "left" ? i < count : i >= TOTAL - count;
+
+        // Box 4 is the clincher — 0-based index 3 for "left", index 3 for "right"
+        // For left: clincher is at position CLINCH-1 (index 3)
+        // For right: clincher is at position TOTAL-CLINCH (index 3)
+        const isClincher =
+          direction === "left" ? i === CLINCH - 1 : i === TOTAL - CLINCH;
 
         return (
           <span
             key={i}
-            className="inline-block size-4 rounded-[3px] border"
+            className="inline-block size-4 rounded-[3px] border transition-all duration-200"
             style={
               filled
                 ? {
                     backgroundColor: color,
-                    borderColor: color,
-                    boxShadow: `0 0 6px ${color}66`,
+                    borderColor: isClincher ? "#d4af37" : color,
+                    boxShadow: isClincher
+                      ? `0 0 8px ${color}99, 0 0 0 2px #d4af3788`
+                      : `0 0 6px ${color}66`,
                   }
                 : {
                     backgroundColor: "var(--ncx-bg-panel)",
-                    borderColor: "var(--ncx-border)",
+                    borderColor: isClincher ? "#d4af37" : "var(--ncx-border)",
+                    boxShadow: isClincher
+                      ? "0 0 6px #d4af3766, 0 0 0 1px #d4af3744"
+                      : undefined,
                   }
             }
           />
