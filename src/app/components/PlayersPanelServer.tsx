@@ -27,6 +27,7 @@ export type PlayerRow = {
 
 /** Playlists to scan for tagged videos */
 export const PLAYLIST_IDS: string[] = [
+  "PLthDdnmc3AhOhxGgL7i-VnuUAoXjiFijF", // S9
   "PLthDdnmc3AhMNcXcyb6thZpdCjWbt8RoP", // S8
   "PLthDdnmc3AhPIAWm3Eg14LKA-DXDcqsGf", // S7
   "PLthDdnmc3AhMAmg_RiTD6M5_Im5Me9Pb-", // S6
