@@ -3,12 +3,12 @@
  */
 
 import { NextResponse } from "next/server";
-import { getStandingsData } from "@/lib/googleSheets";
+import { fetchOverallStandingsCached } from "@/lib/googleSheets";
 
 export async function GET() {
   try {
-    const standings = await getStandingsData();
-    const teams = standings?.teams?.map((t: any) => t.team) || [];
+    const standings = await fetchOverallStandingsCached();
+    const teams = standings?.map((t: any) => t.team) || [];
 
     return NextResponse.json({
       ok: true,

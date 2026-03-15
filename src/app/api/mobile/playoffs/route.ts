@@ -3,15 +3,13 @@
  */
 
 import { NextResponse } from "next/server";
-import { fetchPlayoffBracket } from "@/lib/googleSheets";
 
 export async function GET() {
   try {
-    const bracket = await fetchPlayoffBracket();
-
+    // TODO: Implement playoff bracket data when available
     return NextResponse.json({
       ok: true,
-      bracket: bracket || {},
+      bracket: {},
     });
   } catch (e) {
     console.error("[mobile/playoffs]", e);
