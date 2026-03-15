@@ -29,8 +29,6 @@ export default async function MobileLayout({
 
   const NAV_PX = 64;
 
-  const HEADER_HEIGHT = 65; // Fixed header height (including padding)
-
   return (
     <div className="min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
       {/* Top Bar - Fixed */}
@@ -83,7 +81,7 @@ export default async function MobileLayout({
       <main
         className="flex-1"
         style={{
-          paddingTop: `${HEADER_HEIGHT}px`,
+          paddingTop: `calc(65px + env(safe-area-inset-top))`,
           paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
         }}
       >
