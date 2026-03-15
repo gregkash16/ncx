@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCallerIdentity } from "@/lib/mobileAuth";
 import { getSheets } from "@/lib/googleSheets";
 import { sql } from "@vercel/postgres";
 import webpush from "web-push";
@@ -1164,20 +1163,11 @@ async function syncLists(
 
 
 /* --------------------------- GET /report-game ------------------------- */
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json<LookupResult>({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
-    }
-
-    const raw = (session.user as any).discordId ?? (session.user as any).id;
-    const discordId = normalizeDiscordId(raw);
+    const { discordId } = await getCallerIdentity(req);
     if (!discordId) {
-      return NextResponse.json<LookupResult>(
-        { ok: false, reason: "NO_DISCORD_ID" },
-        { status: 400 }
-      );
+      return NextResponse.json<LookupResult>({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
@@ -1375,8 +1365,8 @@ export async function GET() {
 /* --------------------------- POST /report-game ------------------------ */
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const { discordId } = await getCallerIdentity(req);
+    if (!discordId) {
       return NextResponse.json({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
@@ -1445,9 +1435,6 @@ export async function POST(req: Request) {
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
     const statsSheetId = process.env.NCX_STATS_SHEET_ID || spreadsheetId;
     const sheets = getSheets();
-
-    const raw = (session.user as any).discordId ?? (session.user as any).id;
-    const discordId = normalizeDiscordId(raw);
 
     const [who, captainTeams] = await Promise.all([
       getNcxIdForDiscord(sheets, spreadsheetId, discordId),

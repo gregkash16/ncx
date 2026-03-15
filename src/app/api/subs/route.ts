@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCallerIdentity } from "@/lib/mobileAuth";
 import { getSheets } from "@/lib/googleSheets";
 import { pool } from "@/lib/db";
 
@@ -36,17 +35,11 @@ async function getCaptainTeamsForDiscord(
 }
 
 /* ------------------------- GET /api/subs ------------------------- */
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
-    }
-
-    const raw = (session.user as any).discordId ?? (session.user as any).id;
-    const discordId = normalizeDiscordId(raw);
+    const { discordId } = await getCallerIdentity(req);
     if (!discordId) {
-      return NextResponse.json({ ok: false, reason: "NO_DISCORD_ID" }, { status: 400 });
+      return NextResponse.json({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
