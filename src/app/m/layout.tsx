@@ -29,10 +29,12 @@ export default async function MobileLayout({
 
   const NAV_PX = 64;
 
+  const HEADER_HEIGHT = 65; // Fixed header height (including padding)
+
   return (
     <div className="min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
-      {/* Top Bar */}
-      <header className="sticky top-0 z-20 border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
+      {/* Top Bar - Fixed */}
+      <header className="fixed inset-x-0 top-0 z-20 border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
         {/* Status-bar fill */}
         <div
           className="w-full"
@@ -40,7 +42,7 @@ export default async function MobileLayout({
         />
 
         {/* Actual header content */}
-        <div className="flex items-center justify-between gap-3 p-3">
+        <div className="flex items-center justify-between gap-3 p-3 pb-4">
           {/* Left */}
           <div className="flex items-center gap-3">
             <MobileNavButton />
@@ -81,6 +83,7 @@ export default async function MobileLayout({
       <main
         className="flex-1"
         style={{
+          paddingTop: `${HEADER_HEIGHT}px`,
           paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
         }}
       >
