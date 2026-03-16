@@ -9,14 +9,6 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key";
 
 export async function GET() {
-  // Only allow in development
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json(
-      { ok: false, reason: "DEBUG_DISABLED" },
-      { status: 403 }
-    );
-  }
-
   try {
     const token = jwt.sign(
       {
