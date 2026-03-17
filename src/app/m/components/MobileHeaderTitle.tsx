@@ -6,7 +6,7 @@ interface MobileHeaderTitleProps {
   defaultText?: string;
 }
 
-export default function MobileHeaderTitle({ defaultText = "NICKELCITYXWING.COM" }: MobileHeaderTitleProps) {
+export default function MobileHeaderTitle({ defaultText = "DRAFT LEAGUE" }: MobileHeaderTitleProps) {
   const [headerText, setHeaderText] = useState(defaultText);
 
   useEffect(() => {
