@@ -27,7 +27,7 @@ export default async function MobileLayout({
     | undefined;
 
   // Get NCXID for header
-  let headerText = "NICKELCITYXWING.COM";
+  let headerText = "DRAFT LEAGUE";
   if (session?.user) {
     try {
       const rawSessionId = (session.user as any).discordId ?? (session.user as any).id;
