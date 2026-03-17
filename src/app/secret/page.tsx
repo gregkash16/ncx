@@ -12,6 +12,7 @@ export default function DisplayPage() {
   const [conv, setConv] = useState<Conversation | null>(null);
   const [isNew, setIsNew] = useState(false);
   const lastTimestamp = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const poll = async () => {
@@ -24,6 +25,11 @@ export default function DisplayPage() {
           setTimeout(() => {
             setConv(data);
             setIsNew(false);
+
+            // Play TTS if assistant response exists
+            if (data.assistant) {
+              playTTS(data.assistant);
+            }
           }, 150);
         }
       } catch {}
@@ -33,6 +39,26 @@ export default function DisplayPage() {
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  const playTTS = async (text: string) => {
+    try {
+      const response = await fetch("/api/secret/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) return;
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      if (audioRef.current) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.play();
+      }
+    } catch {}
+  };
 
   const handleClear = async () => {
     setConv(null);
@@ -201,6 +227,8 @@ export default function DisplayPage() {
           50% { opacity: 0.2; }
         }
       `}</style>
+
+      <audio ref={audioRef} />
     </div>
   );
 }
