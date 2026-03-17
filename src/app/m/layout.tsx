@@ -3,10 +3,7 @@ import type { ReactNode } from "react";
 
 import MobileBottomNav from "./mobile/MobileBottomNav";
 import MobileNavButton from "./mobile/MobileNavButton";
-import NotificationsDrawer from "../components/NotificationsDrawer";
 import AuthStatus from "./components/AuthStatus";
-
-import { Settings } from "lucide-react";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -42,35 +39,20 @@ export default async function MobileLayout({
         {/* Actual header content */}
         <div className="flex items-center justify-between gap-3 p-3 pb-4">
           {/* Left */}
-          <div className="flex items-center gap-3">
+          <div>
             <MobileNavButton />
-            <img src="/logo.webp" alt="NCX" className="h-7 w-7 rounded-lg" />
-            <h1 className="text-lg font-extrabold tracking-wide ncx-hero-title ncx-hero-glow">
-              Nickel&nbsp;City&nbsp;X-Wing
+          </div>
+
+          {/* Center - Title */}
+          <div className="flex-1 text-center">
+            <h1 className="text-sm font-extrabold tracking-tight ncx-hero-title ncx-hero-glow leading-tight">
+              <div>Nickel City</div>
+              <div>X-Wing</div>
             </h1>
           </div>
 
           {/* Right */}
           <div className="flex items-center gap-2">
-            {/* Notifications */}
-            <NotificationsDrawer>
-              <button
-                aria-label="Notifications"
-                className="
-                  relative
-                  rounded-lg
-                  border border-[var(--ncx-border)]
-                  bg-[var(--ncx-bg-elev)]
-                  p-2
-                  hover:bg-[var(--ncx-bg-elev-hover)]
-                  active:scale-[0.97]
-                  transition
-                "
-              >
-                <Settings className="h-4 w-4" />
-              </button>
-            </NotificationsDrawer>
-
             {/* Auth status */}
             <AuthStatus />
           </div>

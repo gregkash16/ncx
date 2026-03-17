@@ -37,6 +37,11 @@ type HomeLandingProps = {
    * Same thing you already pass into MatchupsPanel as factionMap.
    */
   factionMap?: Record<string, string>;
+  /**
+   * If true, hides the team logos grid at the bottom.
+   * Used for mobile home page to show stats instead.
+   */
+  hideTeamGrid?: boolean;
 };
 
 const teams: TeamLogo[] = [
@@ -77,6 +82,7 @@ export default function HomeLanding({
   buildTeamHref,
   rulesHref,
   factionMap,
+  hideTeamGrid,
 }: HomeLandingProps) {
   const rulesLink = rulesHref ?? "/rules";
 
@@ -102,15 +108,6 @@ export default function HomeLanding({
             {message && (
               <p className="text-sm md:text-base text-zinc-300">{message}</p>
             )}
-            <p className="text-xs md:text-sm text-zinc-400">
-              If you're a new sign-up, after sign-up go to the Discord and type "$player NCX#" (Your NCX Number) that's how the 
-              website will be able to recognize you.
-            </p>
-            <br />
-            <p className="text-xs md:text-sm text-zinc-400">
-              Use the links below to watch games, join the community, check the rules,
-              or jump straight to a team page.
-            </p>
           </div>
         </div>
 
@@ -176,7 +173,7 @@ export default function HomeLanding({
         <MyMatchupWidget factionMap={factionMap} />
 
         {/* Team logos grid */}
-        {sortedTeams.length > 0 && (
+        {!hideTeamGrid && sortedTeams.length > 0 && (
           <div className="mt-8">
             <h3 className="text-center text-sm font-semibold text-zinc-300 mb-4">
               Jump to a Team Page
