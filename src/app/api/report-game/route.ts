@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCallerIdentity } from "@/lib/mobileAuth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { getSheets } from "@/lib/googleSheets";
 import { sql } from "@vercel/postgres";
 import webpush from "web-push";
@@ -556,7 +557,7 @@ async function getMySqlConn() {
   const port = Number(process.env.DB_PORT ?? "3306");
   const user = process.env.DB_USER ?? "root";
   const password = process.env.DB_PASSWORD ?? process.env.MYSQLPASSWORD;
-  const database = process.env.DB_NAME ?? "S9";
+  const database = process.env.DB_NAME ?? "S8";
 
   if (!password) {
     throw new Error("Missing DB_PASSWORD / MYSQLPASSWORD");
@@ -984,25 +985,63 @@ async function syncAllTimeStats(
 ) {
   const rowsRes = await sheets.spreadsheets.values.get({
     spreadsheetId: statsSheetId,
-    range: "ALL TIME STATS!A2:V500",
+    range: "ALL TIME STATS!A2:U500",
     valueRenderOption: "FORMATTED_VALUE",
   });
   const rows = (rowsRes.data.values ?? []) as string[][];
 
   await conn.execute("DELETE FROM all_time_stats");
 
-  const sql =
-    "INSERT INTO all_time_stats (" +
-    "ncxid, first_name, last_name, discord, wins, losses, points, plms, games, " +
-    "win_pct, ppg, extra, s1, s2, s3, s4, s5, s6, s7, s8, s9, championships" +
-    ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+  const sql = `
+    INSERT INTO all_time_stats (
+      ncxid,
+      first_name,
+      last_name,
+      discord,
+      wins,
+      losses,
+      points,
+      plms,
+      games,
+      win_pct,
+      ppg,
+      extra,
+      s1,
+      s2,
+      s3,
+      s4,
+      s5,
+      s6,
+      s7,
+      s8,
+      championships
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `;
 
   for (const r0 of rows) {
     const r = [
       ...r0,
-      "", "", "", "", "", "", "", "", "", "",
-      "", "", "", "", "", "", "", "", "", "", ""
-    ].slice(0, 22);
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ].slice(0, 21);
 
     const [
       ncxid,
@@ -1025,7 +1064,6 @@ async function syncAllTimeStats(
       s6,
       s7,
       s8,
-      s9,
       championships,
     ] = r.map(norm);
 
@@ -1052,7 +1090,6 @@ async function syncAllTimeStats(
       s6,
       s7,
       s8,
-      s9,
       toIntOrNone(championships),
     ]);
   }
@@ -1072,8 +1109,11 @@ async function syncTeamSchedule(
 
   await conn.execute("DELETE FROM team_schedule");
 
-  const sql =
-  "INSERT INTO team_schedule (week_label, away_team, home_team) VALUES (?,?,?)";
+  const sql = `
+    INSERT INTO team_schedule (
+      week_label, away_team, home_team
+    ) VALUES (?,?,?)
+  `;
 
   for (const r0 of rows) {
     const r = [...r0, "", "", "", ""].slice(0, 4);
@@ -1101,8 +1141,11 @@ async function syncOverallStandings(
 
   await conn.execute("DELETE FROM overall_standings");
 
-  const sql =
-  "INSERT INTO overall_standings (team, `rank`, wins, losses, game_wins, points) VALUES (?,?,?,?,?,?)";
+  const sql = `
+    INSERT INTO overall_standings (
+      team, \`rank\`, wins, losses, game_wins, points
+    ) VALUES (?,?,?,?,?,?)
+  `;
 
   for (const r0 of rows) {
     const r = [...r0, "", "", "", "", "", ""].slice(0, 6);
@@ -1163,11 +1206,20 @@ async function syncLists(
 
 
 /* --------------------------- GET /report-game ------------------------- */
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    const { discordId } = await getCallerIdentity(req);
-    if (!discordId) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json<LookupResult>({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
+    }
+
+    const raw = (session.user as any).discordId ?? (session.user as any).id;
+    const discordId = normalizeDiscordId(raw);
+    if (!discordId) {
+      return NextResponse.json<LookupResult>(
+        { ok: false, reason: "NO_DISCORD_ID" },
+        { status: 400 }
+      );
     }
 
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
@@ -1365,8 +1417,8 @@ export async function GET(req: Request) {
 /* --------------------------- POST /report-game ------------------------ */
 export async function POST(req: Request) {
   try {
-    const { discordId } = await getCallerIdentity(req);
-    if (!discordId) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
@@ -1435,6 +1487,9 @@ export async function POST(req: Request) {
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
     const statsSheetId = process.env.NCX_STATS_SHEET_ID || spreadsheetId;
     const sheets = getSheets();
+
+    const raw = (session.user as any).discordId ?? (session.user as any).id;
+    const discordId = normalizeDiscordId(raw);
 
     const [who, captainTeams] = await Promise.all([
       getNcxIdForDiscord(sheets, spreadsheetId, discordId),
@@ -1815,7 +1870,7 @@ export async function POST(req: Request) {
         // 8) lists (full refresh of URLs)
         await syncLists(sheets, spreadsheetId, conn);
 
-        // 9) For this specific game, resolve XWS + glyph letters into S9.lists
+        // 9) For this specific game, resolve XWS + glyph letters into S8.lists
         if (gameNo) {
           await syncSingleListXwsAndLetters(conn, canonicalWeekLabel, gameNo);
         }
