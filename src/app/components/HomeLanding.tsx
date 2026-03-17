@@ -42,6 +42,17 @@ type HomeLandingProps = {
    * Used for mobile home page to show stats instead.
    */
   hideTeamGrid?: boolean;
+  /**
+   * If true, hides the Streamer Kit pill.
+   * Used for mobile home page where it's not needed.
+   */
+  hideStreamerKit?: boolean;
+  /**
+   * Optional override for the podcast link.
+   * Desktop: default "/?tab=podcast"
+   * Mobile: pass "/m/podcast"
+   */
+  podcastHref?: string;
 };
 
 const teams: TeamLogo[] = [
@@ -83,8 +94,11 @@ export default function HomeLanding({
   rulesHref,
   factionMap,
   hideTeamGrid,
+  hideStreamerKit,
+  podcastHref,
 }: HomeLandingProps) {
   const rulesLink = rulesHref ?? "/rules";
+  const podcastLink = podcastHref ?? "/?tab=podcast";
 
   // Default behavior: click logo → team profile page
   const defaultBuildTeamHref = (team: TeamLogo) =>
@@ -147,20 +161,19 @@ export default function HomeLanding({
             League Rules
           </a>
 
-          {/* NEW — Streamer Kit */}
-          <a
-            href="https://drive.google.com/drive/folders/1gkSjUgjlYVYdcJN91fY0652bcLUwCQVO?usp=drive_link"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-center rounded-xl border border-yellow-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold hover:bg-yellow-500/20 hover:border-yellow-400 transition"
-          >
-            Streamer Kit
-          </a>
+          {!hideStreamerKit && (
+            <a
+              href="https://drive.google.com/drive/folders/1gkSjUgjlYVYdcJN91fY0652bcLUwCQVO?usp=drive_link"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-center rounded-xl border border-yellow-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold hover:bg-yellow-500/20 hover:border-yellow-400 transition"
+            >
+              Streamer Kit
+            </a>
+          )}
 
-          {/* NEW — Streamer Kit */}
           <a
-            href="/?tab=podcast"
-            /* target="_blank" */
+            href={podcastLink}
             rel="noreferrer"
             className="flex items-center justify-center rounded-xl border border-blue-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold hover:bg-blue-500/20 hover:border-blue-400 transition"
           >

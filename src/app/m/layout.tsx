@@ -4,9 +4,11 @@ import type { ReactNode } from "react";
 import MobileBottomNav from "./mobile/MobileBottomNav";
 import MobileNavButton from "./mobile/MobileNavButton";
 import AuthStatus from "./components/AuthStatus";
+import MobileHeaderTitle from "./components/MobileHeaderTitle";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getDiscordMapCached } from "@/lib/googleSheets";
 
 export const metadata = {
   title: "NCX (Mobile)",
@@ -23,6 +25,30 @@ export default async function MobileLayout({
         ? U
         : { name?: string | null; image?: string | null })
     | undefined;
+
+  // Get NCXID for header
+  let headerText = "NICKELCITYXWING.COM";
+  if (session?.user) {
+    try {
+      const rawSessionId = (session.user as any).discordId ?? (session.user as any).id;
+      const sessionId = String(rawSessionId ?? "")
+        .trim()
+        .replace(/[<@!>]/g, "")
+        .replace(/\D/g, "");
+
+      if (sessionId) {
+        const discordMap = await getDiscordMapCached();
+        const match = (discordMap as any)?.[sessionId];
+
+        if (match) {
+          const { ncxid } = match as any;
+          headerText = ncxid;
+        }
+      }
+    } catch (err) {
+      // On error, keep default
+    }
+  }
 
   const NAV_PX = 64;
 
@@ -45,9 +71,8 @@ export default async function MobileLayout({
 
           {/* Center - Title */}
           <div className="flex-1 text-center">
-            <h1 className="text-sm font-extrabold tracking-tight ncx-hero-title ncx-hero-glow leading-tight">
-              <div>Nickel City</div>
-              <div>X-Wing</div>
+            <h1 className="text-2xl font-extrabold tracking-tight ncx-hero-title ncx-hero-glow leading-tight">
+              <MobileHeaderTitle defaultText={headerText} />
             </h1>
           </div>
 

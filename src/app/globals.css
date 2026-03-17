@@ -148,14 +148,7 @@ body {
 }
 
 .ncx-hero-title {
-  background-image: linear-gradient(
-    to right,
-    var(--ncx-hero-from),
-    var(--ncx-hero-via),
-    var(--ncx-hero-to)
-  );
-  background-clip: text;
-  color: transparent;
+  color: rgb(var(--ncx-gold-rgb));
 }
 
 .ncx-hero-glow {

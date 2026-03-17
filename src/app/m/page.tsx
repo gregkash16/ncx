@@ -39,6 +39,7 @@ export default async function MobileHomePage({
   let message = "Please log in with your Discord.";
   let playerStats: IndRow | null = null;
   let targetNcxId: string | null = devNcxId;
+  let loggedInNoNcxId = false;
 
   if (!devNcxId && session?.user) {
     try {
@@ -56,13 +57,16 @@ export default async function MobileHomePage({
           message = `Welcome ${first} ${last}! – ${ncxid}`;
         } else {
           message = `Welcome ${session.user.name ?? "Pilot"}! – No NCXID Found.`;
+          loggedInNoNcxId = true;
         }
       } else {
         message = `Welcome ${session.user.name ?? "Pilot"}! – No Discord ID found`;
+        loggedInNoNcxId = true;
       }
     } catch (err) {
       console.error("Error fetching NCX info (mobile):", err);
       message = `Welcome ${session.user.name ?? "Pilot"}! – (Error fetching NCXID)`;
+      loggedInNoNcxId = true;
     }
   } else if (devNcxId) {
     message = `[DEV] Impersonating ${devNcxId}`;
@@ -91,9 +95,11 @@ export default async function MobileHomePage({
           `/m/team/${encodeURIComponent(teamSlug(team.filterValue))}`
         }
         hideTeamGrid={true}
+        hideStreamerKit={true}
+        podcastHref="/m/podcast"
       />
 
-      {/* Player stats section or login prompt */}
+      {/* Player stats section or login/error prompt */}
       {playerStats ? (
         <div className="rounded-2xl border border-cyan-500/40 bg-zinc-900/70 p-6 shadow-xl">
           <h3 className="text-lg font-bold text-cyan-400 mb-4">Your Stats</h3>
@@ -116,7 +122,11 @@ export default async function MobileHomePage({
         </div>
       ) : (
         <div className="rounded-2xl border border-purple-500/40 bg-zinc-900/70 p-6 shadow-xl text-center">
-          <p className="text-zinc-300 font-medium">Please log in with Discord to view your stats</p>
+          <p className="text-zinc-300 font-medium">
+            {loggedInNoNcxId
+              ? "No NCXID Found"
+              : "Please log in with Discord to view your stats"}
+          </p>
         </div>
       )}
     </div>
