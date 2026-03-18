@@ -1,0 +1,370 @@
+import { NextResponse } from "next/server";
+import { pool } from "@/lib/db";
+
+function normalizeNcxId(v: unknown): string {
+  return String(v ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+}
+
+function norm(v: unknown): string {
+  return String(v ?? "").trim();
+}
+
+type RecentMatch = {
+  season: "S8" | "S9";
+  week: string;
+  playerFaction: string;
+  playerTeam: string;
+  opponentName: string;
+  opponentId: string;
+  opponentFaction: string;
+  opponentTeam: string;
+  outcome: "W" | "L";
+  playerPts: number;
+  opponentPts: number;
+};
+
+type Nemesis = {
+  opponentId: string;
+  wins: number;
+  losses: number;
+};
+
+type PlayerDetails = {
+  ncxid: string;
+  playerFaction: string;
+  recentMatches: RecentMatch[];
+  recordLast10: { wins: number; losses: number };
+  factionWins: number;
+  factionLosses: number;
+  currentWinStreak: number;
+  currentLossStreak: number;
+  nemesis: Nemesis | null;
+};
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ ncxid: string }> }
+) {
+  try {
+    const { ncxid: rawNcxId } = await params;
+    const ncxid = normalizeNcxId(rawNcxId);
+
+    if (!ncxid.startsWith("NCX")) {
+      return NextResponse.json({ error: "Invalid ncxid" }, { status: 400 });
+    }
+
+    // 1. Get current week from S9 to determine which faction field to use
+    const [currentWeekRows] = await pool.query<any[]>(
+      `SELECT week_label FROM S9.current_week LIMIT 1`
+    );
+    const currentWeekStr = norm(currentWeekRows?.[0]?.week_label || "WEEK 1");
+    const currentWeekNum = parseInt(
+      currentWeekStr.match(/\d+/)?.[0] || "1",
+      10
+    );
+
+    // 2. Fetch faction info from both S9 and S8
+    const [factionRowsS9] = await pool.query<any[]>(
+      `SELECT faction_h, faction_i FROM S9.ncxid WHERE ncxid = ?`,
+      [ncxid]
+    );
+    const [factionRowsS8] = await pool.query<any[]>(
+      `SELECT faction_h, faction_i FROM S8.ncxid WHERE ncxid = ?`,
+      [ncxid]
+    );
+
+    const factionRowS9 = factionRowsS9?.[0];
+    const factionRowS8 = factionRowsS8?.[0];
+
+    // Use S9 faction if available, otherwise S8 (since S9 may not have started)
+    const playerFaction = norm(
+      currentWeekNum >= 5
+        ? factionRowS9?.faction_i || factionRowS9?.faction_h || factionRowS8?.faction_i || factionRowS8?.faction_h || ""
+        : factionRowS9?.faction_h || factionRowS9?.faction_i || factionRowS8?.faction_h || factionRowS8?.faction_i || ""
+    );
+
+    // 2. Fetch all matches - S9 first (descending), then S8 (descending)
+    const [matchRowsS9] = await pool.query<any[]>(
+      `
+      SELECT
+        week_label,
+        game,
+        awayId,
+        homeId,
+        awayTeam,
+        homeTeam,
+        awayPts,
+        homePts
+      FROM S9.weekly_matchups
+      WHERE (awayId = ? OR homeId = ?)
+        AND awayPts IS NOT NULL
+        AND homePts IS NOT NULL
+      ORDER BY
+        CAST(SUBSTRING_INDEX(week_label, ' ', -1) AS UNSIGNED) DESC,
+        CAST(game AS UNSIGNED) DESC
+      `,
+      [ncxid, ncxid]
+    );
+
+    const [matchRowsS8] = await pool.query<any[]>(
+      `
+      SELECT
+        week_label,
+        game,
+        awayId,
+        homeId,
+        awayTeam,
+        homeTeam,
+        awayPts,
+        homePts
+      FROM S8.weekly_matchups
+      WHERE (awayId = ? OR homeId = ?)
+        AND awayPts IS NOT NULL
+        AND homePts IS NOT NULL
+      ORDER BY
+        CAST(SUBSTRING_INDEX(week_label, ' ', -1) AS UNSIGNED) DESC,
+        CAST(game AS UNSIGNED) DESC
+      `,
+      [ncxid, ncxid]
+    );
+
+    // Combine: S9 matches first (newest), then S8 matches
+    const matchRows = [...(matchRowsS9 || []), ...(matchRowsS8 || [])];
+
+    // 3. Process matches for recent list and streaks
+    const recentMatches: RecentMatch[] = [];
+    const matchResults: ("W" | "L")[] = [];
+
+    // Build a map of opponent names from both databases
+    const [allPlayersS9] = await pool.query<any[]>(
+      `SELECT ncxid, first_name, last_name FROM S9.all_time_stats`
+    );
+    const [allPlayersS8] = await pool.query<any[]>(
+      `SELECT ncxid, first_name, last_name FROM S8.all_time_stats`
+    );
+
+    const playerNames = new Map<string, string>();
+    for (const p of [...(allPlayersS9 || []), ...(allPlayersS8 || [])]) {
+      const id = norm(p.ncxid);
+      const first = norm(p.first_name);
+      const last = norm(p.last_name);
+      const name = first && last ? `${first} ${last}` : first || last || id;
+      if (!playerNames.has(id)) {
+        playerNames.set(id, name);
+      }
+    }
+
+    for (const m of matchRows || []) {
+      const isAway = norm(m.awayId) === ncxid;
+      const opponentId = isAway ? norm(m.homeId) : norm(m.awayId);
+      const playerPts = Number(isAway ? m.awayPts : m.homePts) || 0;
+      const opponentPts = Number(!isAway ? m.awayPts : m.homePts) || 0;
+      const outcome: "W" | "L" = playerPts > opponentPts ? "W" : "L";
+
+      matchResults.push(outcome);
+
+      if (recentMatches.length < 5) {
+        // Determine season based on which database it came from
+        const isS9 = matchRowsS9?.some(
+          (row) =>
+            norm(row.awayId) === ncxid &&
+            norm(row.homeId) === opponentId &&
+            norm(row.week_label) === norm(m.week_label)
+        ) ||
+        matchRowsS9?.some(
+          (row) =>
+            norm(row.homeId) === ncxid &&
+            norm(row.awayId) === opponentId &&
+            norm(row.week_label) === norm(m.week_label)
+        );
+        const season: "S8" | "S9" = isS9 ? "S9" : "S8";
+
+        const opponentName = playerNames.get(opponentId) || opponentId;
+
+        // Get team names from the match
+        const playerTeam = isAway ? norm(m.awayTeam) : norm(m.homeTeam);
+        const opponentTeam = !isAway ? norm(m.awayTeam) : norm(m.homeTeam);
+
+        // Parse week number (e.g. "WEEK 11" -> 11)
+        const matchWeekMatch = norm(m.week_label).match(/\d+/);
+        const matchWeekNum = matchWeekMatch ? parseInt(matchWeekMatch[0], 10) : 0;
+
+        // Determine player's faction during THIS match
+        let matchPlayerFaction = "";
+        if (season === "S9") {
+          matchPlayerFaction = matchWeekNum >= 5
+            ? norm(factionRowS9?.faction_i || "")
+            : norm(factionRowS9?.faction_h || "");
+        } else {
+          matchPlayerFaction = matchWeekNum >= 5
+            ? norm(factionRowS8?.faction_i || "")
+            : norm(factionRowS8?.faction_h || "");
+        }
+
+        // Get opponent faction
+        const [oppFactionRowsS9] = await pool.query<any[]>(
+          `SELECT faction_h, faction_i FROM S9.ncxid WHERE ncxid = ?`,
+          [opponentId]
+        );
+        const [oppFactionRowsS8] = await pool.query<any[]>(
+          `SELECT faction_h, faction_i FROM S8.ncxid WHERE ncxid = ?`,
+          [opponentId]
+        );
+        const opponentFactionRow9 = oppFactionRowsS9?.[0];
+        const opponentFactionRow8 = oppFactionRowsS8?.[0];
+        const opponentFaction = norm(
+          (season === "S9" && matchWeekNum >= 5 ? opponentFactionRow9?.faction_i : undefined) ||
+          opponentFactionRow9?.faction_h ||
+          (season === "S8" && matchWeekNum >= 5 ? opponentFactionRow8?.faction_i : undefined) ||
+          opponentFactionRow8?.faction_h ||
+          ""
+        );
+
+        recentMatches.push({
+          season,
+          week: norm(m.week_label),
+          playerFaction: matchPlayerFaction,
+          playerTeam,
+          opponentName,
+          opponentId,
+          opponentFaction,
+          opponentTeam,
+          outcome,
+          playerPts,
+          opponentPts,
+        });
+      }
+    }
+
+    // 4. Calculate current streaks (from most recent game)
+    let currentWinStreak = 0;
+    let currentLossStreak = 0;
+
+    if (matchResults.length > 0) {
+      const mostRecent = matchResults[0];
+      for (const result of matchResults) {
+        if (result === mostRecent) {
+          if (mostRecent === "W") {
+            currentWinStreak++;
+          } else {
+            currentLossStreak++;
+          }
+        } else {
+          break; // Stop when streak breaks
+        }
+      }
+    }
+
+    // 5. Calculate Record Last 10
+    let recordLast10 = { wins: 0, losses: 0 };
+    for (let i = 0; i < Math.min(10, matchResults.length); i++) {
+      if (matchResults[i] === "W") {
+        recordLast10.wins++;
+      } else {
+        recordLast10.losses++;
+      }
+    }
+
+    // 6. Calculate faction W/L - record while in CURRENT faction
+    let factionWins = 0;
+    let factionLosses = 0;
+
+    for (const m of matchRows || []) {
+      const isAway = norm(m.awayId) === ncxid;
+      const playerPts = Number(isAway ? m.awayPts : m.homePts) || 0;
+      const opponentPts = Number(!isAway ? m.awayPts : m.homePts) || 0;
+      const isWin = playerPts > opponentPts;
+
+      // Determine season
+      const isS9Match = matchRowsS9?.some(
+        (row) =>
+          norm(row.week_label) === norm(m.week_label) &&
+          norm(row.game) === norm(m.game)
+      );
+      const season = isS9Match ? "S9" : "S8";
+
+      // Parse week number (e.g. "WEEK 11" -> 11)
+      const weekMatch = norm(m.week_label).match(/\d+/);
+      const weekNum = weekMatch ? parseInt(weekMatch[0], 10) : 0;
+
+      // Determine player's faction during THIS match
+      let matchFaction = "";
+      if (season === "S9") {
+        matchFaction = weekNum >= 5
+          ? norm(factionRowS9?.faction_i || "")
+          : norm(factionRowS9?.faction_h || "");
+      } else {
+        matchFaction = weekNum >= 5
+          ? norm(factionRowS8?.faction_i || "")
+          : norm(factionRowS8?.faction_h || "");
+      }
+
+      // Only count if player was in CURRENT faction during this match
+      if (matchFaction && matchFaction === playerFaction) {
+        if (isWin) {
+          factionWins++;
+        } else {
+          factionLosses++;
+        }
+      }
+    }
+
+    // 7. Calculate NEMESIS - opponent with worst record
+    const opponentRecords = new Map<string, { wins: number; losses: number }>();
+
+    for (const m of matchRows || []) {
+      const isAway = norm(m.awayId) === ncxid;
+      const opponentId = isAway ? norm(m.homeId) : norm(m.awayId);
+      const playerPts = Number(isAway ? m.awayPts : m.homePts) || 0;
+      const opponentPts = Number(!isAway ? m.awayPts : m.homePts) || 0;
+      const isWin = playerPts > opponentPts;
+
+      const current = opponentRecords.get(opponentId) || { wins: 0, losses: 0 };
+      if (isWin) {
+        current.wins++;
+      } else {
+        current.losses++;
+      }
+      opponentRecords.set(opponentId, current);
+    }
+
+    let nemesis: Nemesis | null = null;
+    if (opponentRecords.size > 0) {
+      let mostLosses = -1;
+      for (const [oppId, record] of opponentRecords.entries()) {
+        // Find opponent with most losses (nemesis = who you've lost to the most)
+        if (record.losses > mostLosses) {
+          mostLosses = record.losses;
+          nemesis = {
+            opponentId: oppId,
+            wins: record.wins,
+            losses: record.losses,
+          };
+        }
+      }
+    }
+
+    const details: PlayerDetails = {
+      ncxid,
+      playerFaction,
+      recentMatches,
+      recordLast10,
+      factionWins,
+      factionLosses,
+      currentWinStreak,
+      currentLossStreak,
+      nemesis,
+    };
+
+    return NextResponse.json(details);
+  } catch (err: any) {
+    console.error("GET /api/players/[ncxid]/details error:", err);
+    return NextResponse.json(
+      { error: err?.message || "Failed to load player details" },
+      { status: 500 }
+    );
+  }
+}

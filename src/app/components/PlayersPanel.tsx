@@ -4,6 +4,34 @@ import { useEffect, useMemo, useState } from "react";
 import type { PlayerRow } from "./PlayersPanelServer";
 import PlayerVideos from "./PlayerVideos";
 
+type PlayerDetails = {
+  ncxid: string;
+  playerFaction: string;
+  recentMatches: Array<{
+    season: "S8" | "S9";
+    week: string;
+    playerFaction: string;
+    playerTeam: string;
+    opponentName: string;
+    opponentId: string;
+    opponentFaction: string;
+    opponentTeam: string;
+    outcome: "W" | "L";
+    playerPts: number;
+    opponentPts: number;
+  }>;
+  recordLast10: { wins: number; losses: number };
+  factionWins: number;
+  factionLosses: number;
+  currentWinStreak: number;
+  currentLossStreak: number;
+  nemesis: {
+    opponentId: string;
+    wins: number;
+    losses: number;
+  } | null;
+};
+
 function fullName(p: PlayerRow) {
   const f = (p.first || "").trim();
   const l = (p.last || "").trim();
@@ -47,6 +75,9 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const selected = filtered[selectedIdx] ?? filtered[0] ?? null;
 
+  const [details, setDetails] = useState<PlayerDetails | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+
   useEffect(() => {
     if (!filtered.length) {
       if (selectedIdx !== 0) setSelectedIdx(0);
@@ -54,6 +85,23 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
     }
     if (selectedIdx >= filtered.length) setSelectedIdx(0);
   }, [filtered.length, selectedIdx]);
+
+  // Fetch details when selected player changes
+  useEffect(() => {
+    if (!selected) {
+      setDetails(null);
+      return;
+    }
+
+    // Clear old details immediately when switching players
+    setDetails(null);
+    setDetailsLoading(true);
+    fetch(`/api/players/${selected.ncxid}/details`)
+      .then((res) => res.json())
+      .then((data) => setDetails(data))
+      .catch(() => setDetails(null))
+      .finally(() => setDetailsLoading(false));
+  }, [selected?.ncxid]);
 
   return (
     <div className="relative left-1/2 -translate-x-1/2 w-screen px-4">
@@ -182,6 +230,150 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                     ));
                   })()}
                 </div>
+
+                {/* STREAKS & FACTION W/L */}
+                {details && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {details.currentWinStreak > 0 && (
+                      <div className="rounded-lg bg-[rgb(34_197_94/0.10)] border border-[rgb(34_197_94/0.40)] p-3">
+                        <div className="text-xs uppercase text-[rgb(34_197_94)]">
+                          Win Streak
+                        </div>
+                        <div className="text-lg font-mono text-[rgb(34_197_94)] font-semibold">
+                          {details.currentWinStreak}
+                        </div>
+                      </div>
+                    )}
+
+                    {details.currentLossStreak > 0 && (
+                      <div className="rounded-lg bg-[rgb(239_68_68/0.10)] border border-[rgb(239_68_68/0.40)] p-3">
+                        <div className="text-xs uppercase text-[rgb(239_68_68)]">
+                          Loss Streak
+                        </div>
+                        <div className="text-lg font-mono text-[rgb(239_68_68)] font-semibold">
+                          {details.currentLossStreak}
+                        </div>
+                      </div>
+                    )}
+
+                    {details.recordLast10 && (
+                      <div className="rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] p-3">
+                        <div className="text-xs uppercase text-[var(--ncx-text-muted)]">
+                          Record Last 10
+                        </div>
+                        <div className="text-lg font-mono text-[var(--ncx-text-primary)] font-semibold">
+                          {details.recordLast10.wins}-{details.recordLast10.losses}
+                        </div>
+                      </div>
+                    )}
+
+                    {details.playerFaction && (
+                      <div className="rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] p-3 flex items-center gap-3">
+                        <img
+                          src={`/factions/${details.playerFaction}.webp`}
+                          alt={details.playerFaction}
+                          className="w-8 h-8 object-contain"
+                        />
+                        <div className="flex-1">
+                          <div className="text-xs uppercase text-[var(--ncx-text-muted)]">
+                            Current Faction
+                          </div>
+                          <div className="text-lg font-mono text-[var(--ncx-text-primary)] font-semibold">
+                            {details.factionWins}-{details.factionLosses}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {details.nemesis && (
+                      <div className="rounded-lg bg-[rgb(168_85_247/0.10)] border border-[rgb(168_85_247/0.40)] p-3">
+                        <div className="text-xs uppercase text-[rgb(168_85_247)]">
+                          Nemesis
+                        </div>
+                        <div className="text-lg font-mono text-[rgb(168_85_247)] font-semibold">
+                          {details.nemesis.opponentId}
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+                {/* RECENT MATCHES */}
+                {details && details.recentMatches && details.recentMatches.length > 0 && (
+                  <div className="rounded-xl border border-[var(--ncx-border)] overflow-x-auto">
+                    <div className="bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] px-4 py-2 text-sm font-semibold">
+                      Recent Matches
+                    </div>
+
+                    <table className="w-full text-sm">
+                      <thead className="bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] text-[var(--ncx-text-muted)] sticky top-0">
+                        <tr>
+                          <th className="text-left px-3 py-2 whitespace-nowrap">Week</th>
+                          <th className="text-center px-3 py-2 whitespace-nowrap">Your Faction</th>
+                          <th className="text-left px-3 py-2 whitespace-nowrap">Your Team</th>
+                          <th className="text-left px-3 py-2 whitespace-nowrap">Opponent</th>
+                          <th className="text-center px-3 py-2 whitespace-nowrap">Opp Faction</th>
+                          <th className="text-left px-3 py-2 whitespace-nowrap">Opp Team</th>
+                          <th className="text-center px-3 py-2 whitespace-nowrap">Result</th>
+                          <th className="text-right px-3 py-2 whitespace-nowrap">Score</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--ncx-border)]">
+                        {details.recentMatches.map((match, idx) => (
+                          <tr key={idx}>
+                            <td className="px-3 py-2 text-[var(--ncx-text-muted)] text-xs whitespace-nowrap">
+                              {match.season} {match.week}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {match.playerFaction && (
+                                <img
+                                  src={`/factions/${match.playerFaction}.webp`}
+                                  alt={match.playerFaction}
+                                  className="w-6 h-6 mx-auto object-contain"
+                                  title={match.playerFaction}
+                                />
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-xs">
+                              {match.playerTeam}
+                            </td>
+                            <td className="px-3 py-2 text-sm">
+                              {match.opponentName}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {match.opponentFaction && (
+                                <img
+                                  src={`/factions/${match.opponentFaction}.webp`}
+                                  alt={match.opponentFaction}
+                                  className="w-6 h-6 mx-auto object-contain"
+                                  title={match.opponentFaction}
+                                />
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-xs">
+                              {match.opponentTeam}
+                            </td>
+                            <td className="text-center px-3 py-2">
+                              <span
+                                className={
+                                  match.outcome === "W"
+                                    ? "font-semibold text-[rgb(34_197_94)]"
+                                    : "font-semibold text-[rgb(239_68_68)]"
+                                }
+                              >
+                                {match.outcome}
+                              </span>
+                            </td>
+                            <td className="text-right px-3 py-2 tabular-nums font-mono text-xs">
+                              {match.playerPts} - {match.opponentPts}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {/* SEASONS TABLE */}
                 <div className="rounded-xl border border-[var(--ncx-border)] overflow-hidden">
