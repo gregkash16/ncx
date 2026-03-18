@@ -12,6 +12,21 @@ function norm(v: unknown): string {
   return String(v ?? "").trim();
 }
 
+// Map database faction values to exact file names in public/factions/
+const FACTION_NORMALIZE: Record<string, string> = {
+  "cis": "CIS",
+  "empire": "Empire",
+  "first order": "First Order",
+  "rebels": "Rebels",
+  "republic": "Republic",
+  "resistance": "Resistance",
+  "scum": "Scum",
+};
+
+function normalizeFaction(v: string): string {
+  return FACTION_NORMALIZE[v.trim().toLowerCase()] || v;
+}
+
 type RecentMatch = {
   season: "S8" | "S9";
   week: string;
@@ -80,11 +95,12 @@ export async function GET(
     const factionRowS8 = factionRowsS8?.[0];
 
     // Use S9 faction if available, otherwise S8 (since S9 may not have started)
-    const playerFaction = norm(
+    const playerFactionRaw = norm(
       currentWeekNum >= 5
         ? factionRowS9?.faction_i || factionRowS9?.faction_h || factionRowS8?.faction_i || factionRowS8?.faction_h || ""
         : factionRowS9?.faction_h || factionRowS9?.faction_i || factionRowS8?.faction_h || factionRowS8?.faction_i || ""
     );
+    const playerFaction = normalizeFaction(playerFactionRaw);
 
     // 2. Fetch all matches - S9 first (descending), then S8 (descending)
     const [matchRowsS9] = await pool.query<any[]>(
@@ -195,13 +211,13 @@ export async function GET(
         // Determine player's faction during THIS match
         let matchPlayerFaction = "";
         if (season === "S9") {
-          matchPlayerFaction = matchWeekNum >= 5
+          matchPlayerFaction = normalizeFaction(matchWeekNum >= 5
             ? norm(factionRowS9?.faction_i || "")
-            : norm(factionRowS9?.faction_h || "");
+            : norm(factionRowS9?.faction_h || ""));
         } else {
-          matchPlayerFaction = matchWeekNum >= 5
+          matchPlayerFaction = normalizeFaction(matchWeekNum >= 5
             ? norm(factionRowS8?.faction_i || "")
-            : norm(factionRowS8?.faction_h || "");
+            : norm(factionRowS8?.faction_h || ""));
         }
 
         // Get opponent faction
@@ -215,13 +231,14 @@ export async function GET(
         );
         const opponentFactionRow9 = oppFactionRowsS9?.[0];
         const opponentFactionRow8 = oppFactionRowsS8?.[0];
-        const opponentFaction = norm(
+        const opponentFactionRaw = norm(
           (season === "S9" && matchWeekNum >= 5 ? opponentFactionRow9?.faction_i : undefined) ||
           opponentFactionRow9?.faction_h ||
           (season === "S8" && matchWeekNum >= 5 ? opponentFactionRow8?.faction_i : undefined) ||
           opponentFactionRow8?.faction_h ||
           ""
         );
+        const opponentFaction = normalizeFaction(opponentFactionRaw);
 
         recentMatches.push({
           season,
