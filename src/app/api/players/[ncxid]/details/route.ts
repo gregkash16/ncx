@@ -231,13 +231,22 @@ export async function GET(
         );
         const opponentFactionRow9 = oppFactionRowsS9?.[0];
         const opponentFactionRow8 = oppFactionRowsS8?.[0];
-        const opponentFactionRaw = norm(
-          (season === "S9" && matchWeekNum >= 5 ? opponentFactionRow9?.faction_i : undefined) ||
-          opponentFactionRow9?.faction_h ||
-          (season === "S8" && matchWeekNum >= 5 ? opponentFactionRow8?.faction_i : undefined) ||
-          opponentFactionRow8?.faction_h ||
-          ""
-        );
+
+        // Get opponent faction from the SAME season as the match
+        let opponentFactionRaw = "";
+        if (season === "S9") {
+          opponentFactionRaw = norm(
+            matchWeekNum >= 5
+              ? opponentFactionRow9?.faction_i || ""
+              : opponentFactionRow9?.faction_h || ""
+          );
+        } else {
+          opponentFactionRaw = norm(
+            matchWeekNum >= 5
+              ? opponentFactionRow8?.faction_i || ""
+              : opponentFactionRow8?.faction_h || ""
+          );
+        }
         const opponentFaction = normalizeFaction(opponentFactionRaw);
 
         recentMatches.push({
