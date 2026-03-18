@@ -38,6 +38,22 @@ function fullName(p: PlayerRow) {
   return f && l ? `${f} ${l}` : f || l || p.ncxid;
 }
 
+// Map faction names to exact filenames in public/factions/
+const FACTION_FILE: Record<string, string> = {
+  REBELS: "Rebels.webp",
+  EMPIRE: "Empire.webp",
+  REPUBLIC: "Republic.webp",
+  CIS: "CIS.webp",
+  RESISTANCE: "Resistance.webp",
+  "FIRST ORDER": "First Order.webp",
+  SCUM: "Scum.webp",
+};
+
+function factionImage(faction: string): string {
+  const key = (faction || "").toUpperCase().trim();
+  return FACTION_FILE[key] || faction;
+}
+
 const CHAMPIONS_BY_SEASON: Record<number, string> = {
   1: "HAVOC",
   2: "HAVOC",
@@ -270,7 +286,7 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                     {details.playerFaction && (
                       <div className="rounded-lg bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.10)] border border-[var(--ncx-border)] p-3 flex items-center gap-3">
                         <img
-                          src={`/factions/${details.playerFaction}.webp`}
+                          src={`/factions/${factionImage(details.playerFaction)}`}
                           alt={details.playerFaction}
                           className="w-8 h-8 object-contain"
                         />
@@ -328,7 +344,7 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                             <td className="px-3 py-2 text-center">
                               {match.playerFaction && (
                                 <img
-                                  src={`/factions/${match.playerFaction}.webp`}
+                                  src={`/factions/${factionImage(match.playerFaction)}`}
                                   alt={match.playerFaction}
                                   className="w-6 h-6 mx-auto object-contain"
                                   title={match.playerFaction}
@@ -344,7 +360,7 @@ export default function PlayersPanel({ data }: { data: PlayerRow[] }) {
                             <td className="px-3 py-2 text-center">
                               {match.opponentFaction && (
                                 <img
-                                  src={`/factions/${match.opponentFaction}.webp`}
+                                  src={`/factions/${factionImage(match.opponentFaction)}`}
                                   alt={match.opponentFaction}
                                   className="w-6 h-6 mx-auto object-contain"
                                   title={match.opponentFaction}
