@@ -11,6 +11,10 @@ const globalForDB = globalThis as unknown as {
   mysqlPool: mysql.Pool | undefined;
 };
 
+// Default pool size: 5 for dev/prod, override with DB_POOL_LIMIT
+// Vercel serverless functions should use smaller pools
+const DEFAULT_POOL_LIMIT = process.env.NODE_ENV === "production" ? 3 : 5;
+
 export const pool =
   globalForDB.mysqlPool ??
   mysql.createPool({
@@ -21,7 +25,7 @@ export const pool =
     database: DB_NAME,
 
     waitForConnections: true,
-    connectionLimit: Number(process.env.DB_POOL_LIMIT ?? "10"),
+    connectionLimit: Number(process.env.DB_POOL_LIMIT ?? DEFAULT_POOL_LIMIT),
     queueLimit: 0,
 
     // optional but helpful:

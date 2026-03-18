@@ -173,6 +173,37 @@ export async function GET(
       }
     }
 
+    // Pre-fetch all opponent factions to avoid N+1 queries
+    const oppIds = new Set<string>();
+    for (const m of matchRows || []) {
+      const isAway = norm(m.awayId) === ncxid;
+      const opponentId = isAway ? norm(m.homeId) : norm(m.awayId);
+      oppIds.add(opponentId);
+    }
+
+    const opponentFactionsMap = new Map<
+      string,
+      { faction_h?: string; faction_i?: string; season: "S8" | "S9" }
+    >();
+
+    for (const oppId of oppIds) {
+      const [oppRowsS9] = await pool.query<any[]>(
+        `SELECT faction_h, faction_i FROM S9.ncxid WHERE ncxid = ?`,
+        [oppId]
+      );
+      const [oppRowsS8] = await pool.query<any[]>(
+        `SELECT faction_h, faction_i FROM S8.ncxid WHERE ncxid = ?`,
+        [oppId]
+      );
+      const s9Row = oppRowsS9?.[0];
+      const s8Row = oppRowsS8?.[0];
+      opponentFactionsMap.set(oppId, {
+        faction_h: s9Row?.faction_h || s8Row?.faction_h,
+        faction_i: s9Row?.faction_i || s8Row?.faction_i,
+        season: s9Row ? "S9" : "S8",
+      });
+    }
+
     for (const m of matchRows || []) {
       const isAway = norm(m.awayId) === ncxid;
       const opponentId = isAway ? norm(m.homeId) : norm(m.awayId);
@@ -220,31 +251,20 @@ export async function GET(
             : norm(factionRowS8?.faction_h || ""));
         }
 
-        // Get opponent faction
-        const [oppFactionRowsS9] = await pool.query<any[]>(
-          `SELECT faction_h, faction_i FROM S9.ncxid WHERE ncxid = ?`,
-          [opponentId]
-        );
-        const [oppFactionRowsS8] = await pool.query<any[]>(
-          `SELECT faction_h, faction_i FROM S8.ncxid WHERE ncxid = ?`,
-          [opponentId]
-        );
-        const opponentFactionRow9 = oppFactionRowsS9?.[0];
-        const opponentFactionRow8 = oppFactionRowsS8?.[0];
-
-        // Get opponent faction from the SAME season as the match
+        // Get opponent faction from pre-fetched cache
+        const oppFactionData = opponentFactionsMap.get(opponentId);
         let opponentFactionRaw = "";
         if (season === "S9") {
           opponentFactionRaw = norm(
             matchWeekNum >= 5
-              ? opponentFactionRow9?.faction_i || ""
-              : opponentFactionRow9?.faction_h || ""
+              ? oppFactionData?.faction_i || ""
+              : oppFactionData?.faction_h || ""
           );
         } else {
           opponentFactionRaw = norm(
             matchWeekNum >= 5
-              ? opponentFactionRow8?.faction_i || ""
-              : opponentFactionRow8?.faction_h || ""
+              ? oppFactionData?.faction_i || ""
+              : oppFactionData?.faction_h || ""
           );
         }
         const opponentFaction = normalizeFaction(opponentFactionRaw);
