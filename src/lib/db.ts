@@ -21,7 +21,7 @@ export const pool =
     database: DB_NAME,
 
     waitForConnections: true,
-    connectionLimit: Number(process.env.DB_POOL_LIMIT ?? "3"), // 👈 LOWER THIS
+    connectionLimit: Number(process.env.DB_POOL_LIMIT ?? "10"),
     queueLimit: 0,
 
     // optional but helpful:
