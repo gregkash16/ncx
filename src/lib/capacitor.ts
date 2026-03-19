@@ -30,16 +30,72 @@ export const openInSafari = async (url: string) => {
 /**
  * Setup deeplink handler for OAuth callbacks
  * Call this on app initialization to handle Discord auth redirects
+ *
+ * Example usage:
+ * setupDeeplinkHandler((deeplink) => {
+ *   if (deeplink.includes('auth-callback')) {
+ *     // Handle auth callback
+ *     const params = new URLSearchParams(deeplink.split('?')[1]);
+ *     const success = params.get('success');
+ *     const error = params.get('error');
+ *     // ... handle success/error
+ *   }
+ * });
  */
 export const setupDeeplinkHandler = (onDeeplink: (url: string) => void) => {
   if (!isCapacitor()) return;
 
-  App.addListener('appUrlOpen', (event: any) => {
-    const slug = event.url.split('.app').pop();
-    if (slug) {
-      onDeeplink(slug);
+  // Handle app launch with deeplink
+  App.getDeepLinkData().then((data) => {
+    if (data.url) {
+      onDeeplink(data.url);
     }
   });
+
+  // Handle deeplinks while app is already open
+  App.addListener('appUrlOpen', (event: any) => {
+    const url = event.url;
+    if (url) {
+      onDeeplink(url);
+    }
+  });
+};
+
+/**
+ * Initiate Discord login with Safari
+ * Opens Discord OAuth in Safari and returns a promise that resolves when user completes auth
+ */
+export const startDiscordLogin = async (
+  clientId: string,
+  redirectUrl: string = 'ncxapp://auth-callback'
+): Promise<{ success: boolean; error?: string }> => {
+  if (!isCapacitor()) {
+    // In browser, use normal OAuth flow (NextAuth handles it)
+    return { success: true };
+  }
+
+  const state = Math.random().toString(36).substring(7);
+  const scopes = 'identify';
+
+  const discordAuthUrl = new URL('https://discord.com/api/oauth2/authorize');
+  discordAuthUrl.searchParams.set('client_id', clientId);
+  discordAuthUrl.searchParams.set('redirect_uri', redirectUrl);
+  discordAuthUrl.searchParams.set('response_type', 'code');
+  discordAuthUrl.searchParams.set('scope', scopes);
+  discordAuthUrl.searchParams.set('state', state);
+
+  try {
+    // Open Discord auth in Safari
+    await openInSafari(discordAuthUrl.toString());
+
+    // Return and let the deeplink handler manage the callback
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to open Discord login',
+    };
+  }
 };
 
 /**
