@@ -63,26 +63,23 @@ export const setupDeeplinkHandler = (onDeeplink: (url: string) => void) => {
 
 /**
  * Initiate Discord login with Safari
- * Opens Discord OAuth in Safari and returns a promise that resolves when user completes auth
+ * Opens Discord OAuth in Safari and handles the callback via deep link
  */
-export const startDiscordLogin = async (
-  clientId: string
-): Promise<{ success: boolean; error?: string }> => {
+export const startDiscordLogin = async (clientId: string): Promise<{ success: boolean; error?: string }> => {
   if (!isCapacitor()) {
     // In browser, use normal OAuth flow (NextAuth handles it)
     return { success: true };
   }
 
   const baseUrl = getApiBaseUrl() || 'http://localhost:3000';
-  const callbackUrl = `${baseUrl}/api/auth/capacitor-callback`;
+  const redirectUri = `${baseUrl}/api/auth/ios-callback`;
   const state = Math.random().toString(36).substring(7);
-  const scopes = 'identify';
 
   const discordAuthUrl = new URL('https://discord.com/api/oauth2/authorize');
   discordAuthUrl.searchParams.set('client_id', clientId);
-  discordAuthUrl.searchParams.set('redirect_uri', callbackUrl);
+  discordAuthUrl.searchParams.set('redirect_uri', redirectUri);
   discordAuthUrl.searchParams.set('response_type', 'code');
-  discordAuthUrl.searchParams.set('scope', scopes);
+  discordAuthUrl.searchParams.set('scope', 'identify');
   discordAuthUrl.searchParams.set('state', state);
 
   try {
