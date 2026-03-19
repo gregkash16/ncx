@@ -339,13 +339,13 @@ export async function GET(
       // Determine player's faction during THIS match
       let matchFaction = "";
       if (season === "S9") {
-        matchFaction = weekNum >= 5
+        matchFaction = normalizeFaction(weekNum >= 5
           ? norm(factionRowS9?.faction_i || "")
-          : norm(factionRowS9?.faction_h || "");
+          : norm(factionRowS9?.faction_h || ""));
       } else {
-        matchFaction = weekNum >= 5
+        matchFaction = normalizeFaction(weekNum >= 5
           ? norm(factionRowS8?.faction_i || "")
-          : norm(factionRowS8?.faction_h || "");
+          : norm(factionRowS8?.faction_h || ""));
       }
 
       // Only count if player was in CURRENT faction during this match

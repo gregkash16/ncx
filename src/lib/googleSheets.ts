@@ -56,7 +56,7 @@ function normalizeWeekLabel(label: string): string {
 
 async function getCurrentWeekFromDB(): Promise<string> {
   const rows = await dbQuery<{ week_label: string }>(
-    "SELECT week_label FROM current_week LIMIT 1"
+    "SELECT week_label FROM S9.current_week LIMIT 1"
   );
   return rows[0]?.week_label || "WEEK 1";
 }
@@ -355,7 +355,7 @@ export type FactionMap = Record<string, string>;
 export async function fetchFactionMapCached(): Promise<FactionMap> {
   const rows = await dbQuery<any>(`
     SELECT ncxid, faction_h, faction_i
-    FROM ncxid
+    FROM S9.ncxid
   `);
 
   const map: FactionMap = {};
