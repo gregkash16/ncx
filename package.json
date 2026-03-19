@@ -10,6 +10,12 @@
     "vercel-build": "npm run typecheck && npm run lint && npm run build"
   },
   "dependencies": {
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/browser": "^8.0.2",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/ios": "^8.2.0",
+    "@capacitor/push-notifications": "^8.0.2",
     "@radix-ui/react-dialog": "^1.1.15",
     "@vercel/postgres": "^0.10.0",
     "class-variance-authority": "^0.7.1",
