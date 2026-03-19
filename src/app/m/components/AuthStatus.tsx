@@ -1,6 +1,8 @@
 "use client";
 
 import { signIn, signOut, useSession } from "next-auth/react";
+import { isCapacitor, startDiscordLogin } from "@/lib/capacitor";
+import { useEffect } from "react";
 
 export default function AuthStatus() {
   const { data: session, status } = useSession();
@@ -55,9 +57,20 @@ export default function AuthStatus() {
   }
 
   // ❌ Not signed in
+  const handleSignIn = async () => {
+    if (isCapacitor()) {
+      // In native app, use custom Discord OAuth with Safari
+      const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || '';
+      await startDiscordLogin(clientId);
+    } else {
+      // In browser, use NextAuth's normal flow
+      signIn("discord", { callbackUrl: "/m" });
+    }
+  };
+
   return (
     <button
-      onClick={() => signIn("discord", { callbackUrl: "/m" })}
+      onClick={handleSignIn}
       className="
         rounded-lg
         border border-[var(--ncx-border)]

@@ -2,11 +2,12 @@
  * iOS OAuth callback handler
  *
  * Discord redirects here after user authenticates.
- * Since Safari is a separate app, we can't use cookies.
- * Instead, we handle the OAuth flow and redirect back to the app with the session.
+ * Since Safari is a separate app without cookies, we handle the OAuth flow
+ * and store the session info in the response.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { sql } from '@vercel/postgres';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -17,13 +18,13 @@ export async function GET(req: NextRequest) {
   if (error) {
     const errorDesc = searchParams.get('error_description') || error;
     return NextResponse.redirect(
-      `ncxapp://auth?error=${encodeURIComponent(errorDesc)}`
+      `com.ncx.app://auth?error=${encodeURIComponent(errorDesc)}`
     );
   }
 
   // Validate code
   if (!code) {
-    return NextResponse.redirect('ncxapp://auth?error=Missing+code');
+    return NextResponse.redirect('com.ncx.app://auth?error=Missing+code');
   }
 
   try {
@@ -62,22 +63,24 @@ export async function GET(req: NextRequest) {
 
     const user = await userResponse.json();
 
-    // Create a session by calling NextAuth's callback
-    // For now, just redirect back to the app with user info
-    // In production, you'd want to create a proper session here
-    const userData = encodeURIComponent(JSON.stringify({
-      id: user.id,
-      name: user.global_name || user.username,
-      avatar: user.avatar
-        ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
-        : undefined,
-    }));
+    // Create response with session cookie
+    const response = NextResponse.redirect(
+      `com.ncx.app://auth?success=true&userId=${user.id}&userName=${encodeURIComponent(user.global_name || user.username)}`
+    );
 
-    return NextResponse.redirect(`ncxapp://auth?user=${userData}&success=true`);
+    // Set a session cookie so the app can use it
+    response.cookies.set('discord-user-id', user.id, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
+    return response;
   } catch (err: any) {
     console.error('iOS auth callback error:', err);
     return NextResponse.redirect(
-      `ncxapp://auth?error=${encodeURIComponent(err.message || 'Authentication failed')}`
+      `com.ncx.app://auth?error=${encodeURIComponent(err.message || 'Authentication failed')}`
     );
   }
 }
