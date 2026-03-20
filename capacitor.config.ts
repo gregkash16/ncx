@@ -8,8 +8,8 @@ const config: CapacitorConfig = {
   webDir: isDev ? 'public' : '.next/standalone/public',
   server: isDev
     ? {
-        url: 'http://localhost:3000',
-        cleartext: true,
+        url: 'https://6e211c86e8ca.ngrok.app',
+        cleartext: false,
       }
     : undefined,
   plugins: {

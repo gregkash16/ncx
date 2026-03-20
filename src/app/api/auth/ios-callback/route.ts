@@ -28,6 +28,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Determine redirect_uri based on environment
+    // In development, use ngrok URL; in production, use actual domain
+    const isProd = process.env.NODE_ENV === 'production';
+    const redirectUri = isProd
+      ? 'https://nickelcityxwing.com/api/auth/ios-callback'
+      : 'https://6e211c86e8ca.ngrok.app/api/auth/ios-callback';
+
     // Exchange code for token with Discord
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
@@ -39,7 +46,7 @@ export async function GET(req: NextRequest) {
         client_secret: process.env.DISCORD_CLIENT_SECRET || '',
         grant_type: 'authorization_code',
         code,
-        redirect_uri: `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}/api/auth/ios-callback`,
+        redirect_uri: redirectUri,
       }),
     });
 
@@ -63,7 +70,7 @@ export async function GET(req: NextRequest) {
 
     const user = await userResponse.json();
 
-    // Create response with session cookie
+    // Create response with deep link redirect
     const response = NextResponse.redirect(
       `com.ncx.app://auth?success=true&userId=${user.id}&userName=${encodeURIComponent(user.global_name || user.username)}`
     );

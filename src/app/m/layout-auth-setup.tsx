@@ -2,7 +2,9 @@
 
 import { useEffect } from "react";
 import { setupDeeplinkHandler, isCapacitor } from "@/lib/capacitor";
+import { triggerSessionRefresh } from "@/lib/useIOSSession";
 import { useSession } from "next-auth/react";
+import { Browser } from "@capacitor/browser";
 
 /**
  * Set up auth deeplink handler for iOS OAuth callbacks
@@ -13,7 +15,7 @@ export function AuthSetup() {
   useEffect(() => {
     if (!isCapacitor()) return;
 
-    setupDeeplinkHandler((url) => {
+    setupDeeplinkHandler(async (url) => {
       console.log("Received deeplink:", url);
 
       const urlObj = new URL(url);
@@ -33,15 +35,59 @@ export function AuthSetup() {
 
       if (success && (userId || userData)) {
         try {
-          console.log("Auth successful");
+          console.log("Auth successful, userId:", userId);
 
-          // Refresh the session from NextAuth
-          // This will trigger a re-fetch of /api/auth/session which should pick up the new auth
-          setTimeout(() => {
-            updateSession();
-          }, 500);
+          // Call ios-verify endpoint to create session
+          // The WebView makes this request, so the Set-Cookie response
+          // will be stored in the WebView's cookie jar (not Safari's)
+          const verifyResponse = await fetch("/api/auth/ios-verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,
+              userName,
+            }),
+          });
+
+          if (!verifyResponse.ok) {
+            throw new Error("Failed to verify session");
+          }
+
+          console.log("Session created successfully");
+
+          // Fetch the iOS session (custom endpoint for iOS auth)
+          const sessionResponse = await fetch("/api/auth/ios-session");
+          const session = await sessionResponse.json();
+          console.log("iOS Session check:", session);
+
+          if (session?.user) {
+            console.log("User logged in:", session.user.name);
+            // Trigger session refresh in the hook
+            console.log("Triggering session refresh...");
+            triggerSessionRefresh();
+            // Also refresh NextAuth session to sync UI
+            console.log("Updating NextAuth session...");
+            await updateSession();
+            console.log("Session update complete");
+            // Close Safari immediately
+            try {
+              console.log("Attempting to close browser...");
+              await Browser.close();
+              console.log("Safari closed successfully");
+            } catch (err) {
+              console.error("Failed to close browser:", err);
+            }
+            // Refresh page to show updated session
+            setTimeout(() => {
+              console.log("Refreshing page to show new session...");
+              window.location.reload();
+            }, 500);
+          } else {
+            console.error("No user data in session response");
+          }
         } catch (err) {
           console.error("Auth setup error:", err);
+          alert("Failed to create session: " + (err instanceof Error ? err.message : "Unknown error"));
         }
       }
     });

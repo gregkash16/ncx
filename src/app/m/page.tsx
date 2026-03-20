@@ -1,8 +1,7 @@
 // src/app/m/page.tsx
 import HomeLanding from "../components/HomeLanding";
 import { teamSlug } from "@/lib/slug";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getIOSServerSession } from "@/lib/getIOSServerSession";
 import { getDiscordMapCached, fetchFactionMapCached, fetchIndStatsDataCached, type IndRow } from "@/lib/googleSheets";
 
 export const revalidate = 60;
@@ -35,7 +34,7 @@ export default async function MobileHomePage({
   }
 
   // --- Welcome banner (same logic as desktop, but simplified) ---
-  const session = await getServerSession(authOptions);
+  const session = await getIOSServerSession();
   let message = "Please log in with your Discord.";
   let playerStats: IndRow | null = null;
   let targetNcxId: string | null = devNcxId;

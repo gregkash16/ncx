@@ -73,7 +73,7 @@ export const startDiscordLogin = async (clientId: string): Promise<{ success: bo
 
   // Use ngrok tunnel for OAuth redirect during development (Safari can't reach localhost)
   // Update this URL if you restart ngrok and get a new one
-  const redirectUri = 'https://d965e26a3d7b.ngrok.app/api/auth/ios-callback';
+  const redirectUri = 'https://6e211c86e8ca.ngrok.app/api/auth/ios-callback';
   const state = Math.random().toString(36).substring(7);
 
   const discordAuthUrl = new URL('https://discord.com/api/oauth2/authorize');

@@ -1,40 +1,39 @@
 /**
- * iOS session confirmation endpoint
+ * iOS Session Check Endpoint
  *
- * Called after NextAuth creates the session.
- * Redirects back to the app via deep link with a success signal.
+ * Reads the custom iOS session cookie and returns user data
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    // Get the newly created session from NextAuth
-    const session = await getServerSession(authOptions);
+    const iosSessionCookie = req.cookies.get('ios-session')?.value;
 
-    if (!session?.user) {
-      return NextResponse.redirect(
-        'com.ncx.app://auth?error=No+session+created'
+    if (!iosSessionCookie) {
+      return NextResponse.json(
+        { user: null },
+        { status: 200 }
       );
     }
 
-    const user = session.user;
-    const userData = encodeURIComponent(
-      JSON.stringify({
-        id: (user as any).discordId || (user as any).id,
-        name: user.name,
-        avatar: user.image,
-      })
-    );
+    const userData = JSON.parse(iosSessionCookie);
 
-    // Redirect back to the app with session data
-    return NextResponse.redirect(`com.ncx.app://auth?user=${userData}&success=true`);
+    return NextResponse.json(
+      {
+        user: {
+          id: userData.userId,
+          discordId: userData.userId,
+          name: userData.userName,
+        },
+      },
+      { status: 200 }
+    );
   } catch (err: any) {
-    console.error('iOS session error:', err);
-    return NextResponse.redirect(
-      `com.ncx.app://auth?error=${encodeURIComponent(err.message || 'Session error')}`
+    console.error('iOS session check error:', err);
+    return NextResponse.json(
+      { user: null },
+      { status: 200 }
     );
   }
 }
