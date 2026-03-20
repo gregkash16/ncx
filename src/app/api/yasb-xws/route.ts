@@ -15,7 +15,7 @@ function buildPatternAnalyzerUrl(yasbUrl: string): string | null {
   const parts = yasbUrl.split("yasb.app/");
   if (parts.length < 2) return null;
   const dataLink = parts[1]; // "?f=...&d=..."
-  return `https://www.pattern-analyzer.app/api/yasb/xws${dataLink}`;
+  return `http://5.161.202.51:3001/api/yasb/xws${dataLink}`;
 }
 
 function buildLaunchBayUrl(lbxValue: string): string | null {
