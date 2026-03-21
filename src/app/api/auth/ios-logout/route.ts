@@ -12,11 +12,16 @@ export async function POST(req: NextRequest) {
     { status: 200 }
   );
 
-  // Clear the iOS session cookie
+  // Clear the iOS session cookie (must match the settings from ios-verify)
+  const isProd = process.env.NODE_ENV === 'production';
+  const cookieDomain = isProd ? '.nickelcityxwing.com' : undefined;
+
   response.cookies.set('ios-session', '', {
     httpOnly: true,
+    secure: isProd,
     sameSite: 'lax',
     maxAge: 0, // Delete cookie
+    ...(isProd && { domain: cookieDomain }),
     path: '/',
   });
 
