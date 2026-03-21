@@ -42,8 +42,8 @@ export async function GET(req: NextRequest) {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: process.env.DISCORD_CLIENT_ID || '',
-        client_secret: process.env.DISCORD_CLIENT_SECRET || '',
+        client_id: process.env.IOS_DISCORD_CLIENT_ID || '',
+        client_secret: process.env.IOS_DISCORD_CLIENT_SECRET || '',
         grant_type: 'authorization_code',
         code,
         redirect_uri: redirectUri,
