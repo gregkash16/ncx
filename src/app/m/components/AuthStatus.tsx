@@ -1,9 +1,13 @@
 "use client";
 
 import { signIn, signOut, useSession } from "next-auth/react";
+import { isCapacitor, startDiscordLogin } from "@/lib/capacitor";
+import { useIOSSession } from "@/lib/useIOSSession";
+import { useEffect } from "react";
 
 export default function AuthStatus() {
-  const { data: session, status } = useSession();
+  // Use custom hook that checks both NextAuth and iOS sessions
+  const { data: session, status } = useIOSSession();
 
   // Loading
   if (status === "loading") {
@@ -37,7 +41,17 @@ export default function AuthStatus() {
 
         {/* Sign out */}
         <button
-          onClick={() => signOut({ callbackUrl: "/m" })}
+          onClick={async () => {
+            if (isCapacitor()) {
+              // In iOS app, clear custom session cookie
+              await fetch('/api/auth/ios-logout', { method: 'POST' });
+              // Force page reload to update UI
+              window.location.href = '/m';
+            } else {
+              // In browser, use NextAuth's sign out
+              signOut({ callbackUrl: "/m" });
+            }
+          }}
           className="
             rounded-lg
             border border-[var(--ncx-border)]
@@ -55,9 +69,20 @@ export default function AuthStatus() {
   }
 
   // ❌ Not signed in
+  const handleSignIn = async () => {
+    if (isCapacitor()) {
+      // In native app, use custom Discord OAuth with Safari
+      const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || '';
+      await startDiscordLogin(clientId);
+    } else {
+      // In browser, use NextAuth's normal flow
+      signIn("discord", { callbackUrl: "/m" });
+    }
+  };
+
   return (
     <button
-      onClick={() => signIn("discord", { callbackUrl: "/m" })}
+      onClick={handleSignIn}
       className="
         rounded-lg
         border border-[var(--ncx-border)]

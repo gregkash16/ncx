@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getIOSServerSession } from "@/lib/getIOSServerSession";
 import { getSheets } from "@/lib/googleSheets";
 import { sql } from "@vercel/postgres";
 import webpush from "web-push";
@@ -1208,7 +1207,7 @@ async function syncLists(
 /* --------------------------- GET /report-game ------------------------- */
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getIOSServerSession();
     if (!session?.user) {
       return NextResponse.json<LookupResult>({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
@@ -1417,7 +1416,7 @@ export async function GET() {
 /* --------------------------- POST /report-game ------------------------ */
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getIOSServerSession();
     if (!session?.user) {
       return NextResponse.json({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
