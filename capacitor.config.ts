@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
   webDir: isDev ? 'public' : '.next/standalone/public',
   server: isDev
     ? {
-        url: 'https://6e211c86e8ca.ngrok.app',
+        url: 'https://nickelcityxwing.com',
         cleartext: false,
       }
     : undefined,
