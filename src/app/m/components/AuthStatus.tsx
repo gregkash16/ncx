@@ -46,7 +46,7 @@ export default function AuthStatus() {
               // In iOS app, clear custom session cookie
               await fetch('/api/auth/ios-logout', { method: 'POST' });
               // Force page reload to update UI
-              window.location.href = '/m';
+              window.location.reload();
             } else {
               // In browser, use NextAuth's sign out
               signOut({ callbackUrl: "/m" });
