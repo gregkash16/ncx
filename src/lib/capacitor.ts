@@ -123,35 +123,56 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');
 
-    // Request notification permissions
-    const result = await PushNotifications.requestPermissions();
-    console.log('Push notification permission result:', result);
+    // Request permissions
+    const permResult = await PushNotifications.requestPermissions();
+    console.log('[APNS] Permission result:', permResult);
 
-    // Register for push notifications
+    if (permResult?.receive !== 'granted') {
+      console.warn('[APNS] Permission not granted');
+      return null;
+    }
+
+    // Register
     await PushNotifications.register();
-    console.log('Push notifications registered');
+    console.log('[APNS] Register called');
 
-    // Get the device token
+    // Wait for registration event or timeout
     return new Promise((resolve) => {
-      PushNotifications.addListener(
-        'registration',
-        (token: any) => {
-          console.log('Push registration token:', token.value);
+      let resolved = false;
+
+      const registrationHandler = (token: any) => {
+        console.log('[APNS] Registration event fired:', token);
+        if (!resolved) {
+          resolved = true;
           if (typeof window !== 'undefined') {
             localStorage.setItem('ncx_apns_token', token.value);
           }
-          resolve(token.value);
+          resolve(token.value || null);
         }
-      );
+      };
 
-      // Timeout after 5 seconds if no token received
+      const errorHandler = (error: any) => {
+        console.error('[APNS] Registration error:', error);
+        if (!resolved) {
+          resolved = true;
+          resolve(null);
+        }
+      };
+
+      PushNotifications.addListener('registration', registrationHandler);
+      PushNotifications.addListener('registrationError', errorHandler);
+
+      // If event doesn't fire within 3 seconds, give up
       setTimeout(() => {
-        console.warn('Push registration timeout');
-        resolve(null);
-      }, 5000);
+        if (!resolved) {
+          console.warn('[APNS] Timeout waiting for registration event');
+          resolved = true;
+          resolve(null);
+        }
+      }, 3000);
     });
   } catch (error) {
-    console.error('Failed to register for push notifications:', error);
+    console.error('[APNS] Setup failed:', error);
     return null;
   }
 };
