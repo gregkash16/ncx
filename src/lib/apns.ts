@@ -1,0 +1,82 @@
+/**
+ * APNs (Apple Push Notification service) utilities for sending notifications to iOS devices
+ */
+
+import apn from 'node-apn';
+
+/**
+ * Send APNs push notifications to device tokens
+ * @param deviceTokens Array of APNs device tokens
+ * @param payload Notification payload with title, body, and optional url
+ */
+export async function sendAPNsToDevices(
+  deviceTokens: string[],
+  payload: { title: string; body: string; url?: string }
+): Promise<{ sent: number; failed: number }> {
+  const keyId = process.env.APNS_KEY_ID;
+  const teamId = process.env.APNS_TEAM_ID;
+  const keyP8 = process.env.APNS_KEY_P8;
+  const bundleId = process.env.APNS_BUNDLE_ID || 'com.ncx.app';
+
+  if (!keyId || !teamId || !keyP8) {
+    console.error('Missing APNs credentials in environment');
+    return { sent: 0, failed: deviceTokens.length };
+  }
+
+  const provider = new apn.Provider({
+    key: keyP8,
+    keyId,
+    teamId,
+    production: true, // Use production APNs
+    requestTimeout: 5000,
+  });
+
+  const notification = new apn.Notification({
+    alert: {
+      title: payload.title,
+      body: payload.body,
+    },
+    sound: 'default',
+    badge: 1,
+    contentAvailable: true,
+    mutableContent: true,
+    topic: bundleId,
+    // Custom data
+    payload: {
+      url: payload.url || '/m/current',
+      title: payload.title,
+      body: payload.body,
+    },
+  });
+
+  let sent = 0;
+  let failed = 0;
+
+  try {
+    const results = await provider.send(notification, deviceTokens);
+
+    // Process results for failed tokens
+    if (results.failed && results.failed.length > 0) {
+      for (const failure of results.failed) {
+        if (failure.error) {
+          console.error(
+            `APNs send failed for token ${failure.device}: ${failure.error.message}`
+          );
+          // Optionally delete stale tokens from database
+          // For now, just log
+        }
+        failed++;
+      }
+    }
+
+    sent = deviceTokens.length - failed;
+    console.log(`APNs notifications sent: ${sent}, failed: ${failed}`);
+  } catch (error) {
+    console.error('APNs provider error:', error);
+    failed = deviceTokens.length;
+  } finally {
+    provider.shutdown();
+  }
+
+  return { sent, failed };
+}

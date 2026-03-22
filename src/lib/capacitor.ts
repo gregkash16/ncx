@@ -110,3 +110,48 @@ export const getApiBaseUrl = () => {
   }
   return '';
 };
+
+/**
+ * Register for APNs push notifications on iOS
+ * Returns the device token on success, null on failure
+ */
+export const registerForPushNotifications = async (): Promise<string | null> => {
+  if (!isCapacitor() || !isIOS()) {
+    return null;
+  }
+
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+
+    // Request notification permissions
+    const result = await PushNotifications.requestPermissions();
+    console.log('Push notification permission result:', result);
+
+    // Register for push notifications
+    await PushNotifications.register();
+    console.log('Push notifications registered');
+
+    // Get the device token
+    return new Promise((resolve) => {
+      PushNotifications.addListener(
+        'registration',
+        (token: any) => {
+          console.log('Push registration token:', token.value);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('ncx_apns_token', token.value);
+          }
+          resolve(token.value);
+        }
+      );
+
+      // Timeout after 5 seconds if no token received
+      setTimeout(() => {
+        console.warn('Push registration timeout');
+        resolve(null);
+      }, 5000);
+    });
+  } catch (error) {
+    console.error('Failed to register for push notifications:', error);
+    return null;
+  }
+};

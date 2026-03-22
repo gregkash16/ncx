@@ -4,6 +4,7 @@ import { getSheets } from "@/lib/googleSheets";
 import { sql } from "@vercel/postgres";
 import webpush from "web-push";
 import mysql from "mysql2/promise";
+import { sendAPNsToDevices } from "@/lib/apns";
 
 /* ------------------------- Shared helpers ------------------------- */
 
@@ -170,6 +171,7 @@ async function sendPushForTeams(
     teams.map((t) => (t ?? "").trim()).filter(Boolean)
   );
 
+  // Get web push subscriptions
   const { rows } = await sql`
     SELECT endpoint, p256dh, auth
     FROM push_subscriptions
@@ -189,6 +191,7 @@ async function sendPushForTeams(
 
   const msg = JSON.stringify(payload);
 
+  // Send web push notifications
   await Promise.allSettled(
     subs.map(async (s) => {
       try {
@@ -201,7 +204,31 @@ async function sendPushForTeams(
     })
   );
 
-  return subs.length;
+  // Get APNs device tokens
+  const { rows: apnsRows } = await sql`
+    SELECT device_token
+    FROM apns_subscriptions
+    WHERE
+      all_teams = TRUE
+      OR EXISTS (
+        SELECT 1
+        FROM json_array_elements_text(${teamsJson}::json) j
+        WHERE j = ANY(apns_subscriptions.teams)
+      )
+  `;
+
+  const deviceTokens = apnsRows.map((r) => r.device_token);
+
+  // Send APNs notifications
+  if (deviceTokens.length > 0) {
+    try {
+      await sendAPNsToDevices(deviceTokens, payload);
+    } catch (e) {
+      console.error("Failed to send APNs notifications:", e);
+    }
+  }
+
+  return subs.length + deviceTokens.length;
 }
 
 /* ------------------------- Role helpers ------------------------- */

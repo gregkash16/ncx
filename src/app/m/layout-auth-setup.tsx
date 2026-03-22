@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { setupDeeplinkHandler, isCapacitor } from "@/lib/capacitor";
+import { useRouter } from "next/navigation";
+import { setupDeeplinkHandler, isCapacitor, registerForPushNotifications } from "@/lib/capacitor";
 import { triggerSessionRefresh } from "@/lib/useIOSSession";
 import { useSession } from "next-auth/react";
 import { Browser } from "@capacitor/browser";
@@ -11,9 +12,26 @@ import { Browser } from "@capacitor/browser";
  */
 export function AuthSetup() {
   const { data: session, update: updateSession } = useSession();
+  const router = useRouter();
 
   useEffect(() => {
     if (!isCapacitor()) return;
+
+    // Register for push notifications on app launch
+    registerForPushNotifications();
+
+    // Listen for push notification taps
+    (async () => {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      PushNotifications.addListener(
+        'pushNotificationActionPerformed',
+        (notification: any) => {
+          const url = notification?.notification?.data?.url || '/m/current';
+          console.log('Push notification tapped, navigating to:', url);
+          router.push(url);
+        }
+      );
+    })();
 
     setupDeeplinkHandler(async (url) => {
       console.log("Received deeplink:", url);
