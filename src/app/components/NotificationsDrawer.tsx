@@ -113,11 +113,14 @@ export default function NotificationsDrawer({
   useEffect(() => {
     const inCapacitor = isCapacitor();
     setIsCapacitorApp(inCapacitor);
-    if (inCapacitor && typeof window !== "undefined") {
-      const token = localStorage.getItem("ncx_apns_token");
-      setApnsToken(token);
-    }
   }, []);
+
+  // Check for APNs token when drawer opens
+  useEffect(() => {
+    if (!open || !isCapacitorApp) return;
+    const token = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_token") : null;
+    setApnsToken(token);
+  }, [open, isCapacitorApp]);
 
   // Load team list via /api/teams
   useEffect(() => {
