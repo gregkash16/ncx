@@ -11,6 +11,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDiscordMapCached } from "@/lib/googleSheets";
 import ServiceWorkerBoot from "@/app/components/ServiceWorkerBoot";
+import ViewportFix from "./viewport-fix";
 
 export const metadata = {
   title: "NCX (Mobile)",
@@ -56,6 +57,9 @@ export default async function MobileLayout({
 
   return (
     <div className="w-full overflow-x-hidden min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
+      {/* iOS viewport height fix for PWA white space */}
+      <ViewportFix />
+
       {/* Service Worker for PWA push notifications */}
       <ServiceWorkerBoot />
 
