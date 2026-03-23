@@ -60,24 +60,24 @@ export async function sendAPNsToDevices(
   let failed = 0;
 
   try {
+    console.log(`[APNs] Sending to ${deviceTokens.length} devices`);
     const results = await provider.send(notification, deviceTokens);
+
+    console.log(`[APNs] Send results:`, {
+      sent: results.sent?.length || 0,
+      failed: results.failed?.length || 0,
+    });
 
     // Process results for failed tokens
     if (results.failed && results.failed.length > 0) {
       for (const failure of results.failed) {
-        if (failure.error) {
-          console.error(
-            `APNs send failed for token ${failure.device}: ${failure.error.message}`
-          );
-          // Optionally delete stale tokens from database
-          // For now, just log
-        }
+        console.error(`[APNs] Failed for token ${failure.device}:`, failure.error);
         failed++;
       }
     }
 
     sent = deviceTokens.length - failed;
-    console.log(`APNs notifications sent: ${sent}, failed: ${failed}`);
+    console.log(`[APNs] Summary: sent=${sent}, failed=${failed}`);
   } catch (error) {
     console.error('APNs provider error:', error);
     failed = deviceTokens.length;
