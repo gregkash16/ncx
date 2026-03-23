@@ -122,6 +122,10 @@ export const clearBadgeCount = async () => {
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');
     await PushNotifications.removeAllDelivered();
+    // Set badge count to 0 to clear the iOS app icon badge
+    await PushNotifications.setLaunchDetails({ badge: 0 } as any).catch(() => {
+      // Fallback if setLaunchDetails doesn't work
+    });
     console.log('[APNS] Badge cleared');
   } catch (error) {
     console.error('[APNS] Failed to clear badge:', error);

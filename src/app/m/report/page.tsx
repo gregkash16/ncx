@@ -444,7 +444,7 @@ export default function MobileReportPage() {
             min={0}
             value={awayPts}
             onChange={(e) => setAwayPts(e.target.value)}
-            className={`mt-1 ${inputBase} text-sm`}
+            className={`mt-1 ${inputBase}`}
           />
         </label>
 
@@ -455,7 +455,7 @@ export default function MobileReportPage() {
             min={0}
             value={homePts}
             onChange={(e) => setHomePts(e.target.value)}
-            className={`mt-1 ${inputBase} text-sm`}
+            className={`mt-1 ${inputBase}`}
           />
         </label>
 
