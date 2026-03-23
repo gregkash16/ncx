@@ -71,7 +71,7 @@ export async function sendAPNsToDevices(
     // Process results for failed tokens
     if (results.failed && results.failed.length > 0) {
       for (const failure of results.failed) {
-        console.error(`[APNs] Failed for token ${failure.device}:`, failure.error);
+        console.error(`[APNs] Failed for token ${failure.device}:`, JSON.stringify(failure));
         failed++;
       }
     }
