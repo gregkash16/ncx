@@ -119,7 +119,11 @@ export default function NotificationsDrawer({
   useEffect(() => {
     if (!open || !isCapacitorApp) return;
     const token = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_token") : null;
+    const subscribed = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_subscribed") === "true" : false;
     setApnsToken(token);
+    if (token || subscribed) {
+      setSubscribed(subscribed || !!token);
+    }
   }, [open, isCapacitorApp]);
 
   // Load team list via /api/teams
@@ -167,10 +171,16 @@ export default function NotificationsDrawer({
     if (!open) return;
     (async () => {
       try {
-        if (isCapacitorApp && apnsToken) {
-          setSubscribed(true);
-          const loadedPrefs = await loadAPNsPrefs(apnsToken);
-          setPrefs(loadedPrefs);
+        if (isCapacitorApp) {
+          // Check both localStorage flag and if token exists
+          const savedSubscribed = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_subscribed") === "true" : false;
+          if (apnsToken || savedSubscribed) {
+            setSubscribed(true);
+            if (apnsToken) {
+              const loadedPrefs = await loadAPNsPrefs(apnsToken);
+              setPrefs(loadedPrefs);
+            }
+          }
         } else {
           const reg = await navigator.serviceWorker?.ready;
           const sub = await reg?.pushManager.getSubscription();
@@ -207,9 +217,15 @@ export default function NotificationsDrawer({
         if (!subscribed) {
           await saveAPNsTokenAndPrefs(apnsToken, prefs);
           setSubscribed(true);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("ncx_apns_subscribed", "true");
+          }
         } else {
           await deleteAPNsToken(apnsToken);
           setSubscribed(false);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("ncx_apns_subscribed", "false");
+          }
         }
       } else {
         // Web Push path

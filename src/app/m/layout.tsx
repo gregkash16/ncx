@@ -10,6 +10,8 @@ import { AuthSetup } from "./layout-auth-setup";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDiscordMapCached } from "@/lib/googleSheets";
+import ServiceWorkerBoot from "@/app/components/ServiceWorkerBoot";
+import ViewportFix from "./viewport-fix";
 
 export const metadata = {
   title: "NCX (Mobile)",
@@ -54,7 +56,13 @@ export default async function MobileLayout({
   const NAV_PX = 64;
 
   return (
-    <div className="min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
+    <div className="w-full overflow-x-hidden flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]" style={{ height: '100dvh' }}>
+      {/* iOS viewport height fix for PWA white space */}
+      <ViewportFix />
+
+      {/* Service Worker for PWA push notifications */}
+      <ServiceWorkerBoot />
+
       {/* Auth setup for iOS deeplinks */}
       <AuthSetup />
 
@@ -90,13 +98,13 @@ export default async function MobileLayout({
 
       {/* Main Content */}
       <main
-        className="flex-1"
+        className="flex-1 w-full overflow-x-hidden"
         style={{
           paddingTop: `calc(65px + env(safe-area-inset-top))`,
-          paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
+          paddingBottom: `${NAV_PX}px`,
         }}
       >
-        <div className="mx-auto max-w-screen-sm px-3">{children}</div>
+        <div className="w-full mx-auto max-w-screen-sm px-3 box-border overflow-x-hidden">{children}</div>
       </main>
 
       {/* Bottom Nav (single fixed owner) */}

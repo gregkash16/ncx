@@ -94,7 +94,7 @@ export default function IndStatsSearch() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="e.g. Luke, NCX123, Rebels…"
-            className="w-full rounded-lg border border-[var(--ncx-border)] bg-[var(--ncx-bg-panel)] px-3 py-2 text-sm text-[var(--ncx-text-primary)] placeholder:text-[var(--ncx-text-dim)] outline-none focus:ring-2 focus:ring-[rgb(var(--ncx-secondary-rgb)/0.35)]"
+            className="w-full max-w-full box-border rounded-lg border border-[var(--ncx-border)] bg-[var(--ncx-bg-panel)] px-3 py-2 text-base text-[var(--ncx-text-primary)] placeholder:text-[var(--ncx-text-dim)] outline-none focus:ring-2 focus:ring-[rgb(var(--ncx-secondary-rgb)/0.35)]"
           />
           <button
             type="submit"
