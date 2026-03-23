@@ -171,10 +171,16 @@ export default function NotificationsDrawer({
     if (!open) return;
     (async () => {
       try {
-        if (isCapacitorApp && apnsToken) {
-          setSubscribed(true);
-          const loadedPrefs = await loadAPNsPrefs(apnsToken);
-          setPrefs(loadedPrefs);
+        if (isCapacitorApp) {
+          // Check both localStorage flag and if token exists
+          const savedSubscribed = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_subscribed") === "true" : false;
+          if (apnsToken || savedSubscribed) {
+            setSubscribed(true);
+            if (apnsToken) {
+              const loadedPrefs = await loadAPNsPrefs(apnsToken);
+              setPrefs(loadedPrefs);
+            }
+          }
         } else {
           const reg = await navigator.serviceWorker?.ready;
           const sub = await reg?.pushManager.getSubscription();
