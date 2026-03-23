@@ -29,12 +29,14 @@ export async function sendAPNsToDevices(
   }
 
   const provider = new apn.Provider({
-    key: keyP8,
-    keyId,
-    teamId,
+    token: {
+      key: keyP8,
+      keyId,
+      teamId,
+    },
     production: true, // Use production APNs
     requestTimeout: 5000,
-  } as any);
+  });
 
   const notification = new apn.Notification({
     alert: {
