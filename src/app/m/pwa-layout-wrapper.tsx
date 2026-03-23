@@ -35,12 +35,16 @@ export default function PWALayoutWrapper({ children }: { children: ReactNode }) 
           /* Fix nav positioning on PWA - stick to bottom of viewport */
           [data-pwa-layout] nav[aria-label="Mobile tabs"] {
             position: fixed;
-            bottom: env(safe-area-inset-bottom, 0px);
+            bottom: 0;
             left: 0;
             right: 0;
             height: 64px;
             width: 100%;
             z-index: 30;
+            /* iOS PWA fix - ensure it's actually at viewport bottom */
+            margin-bottom: 0;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            box-sizing: border-box;
           }
         `}</style>
       )}
