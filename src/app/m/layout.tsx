@@ -6,6 +6,7 @@ import MobileNavButton from "./mobile/MobileNavButton";
 import AuthStatus from "./components/AuthStatus";
 import MobileHeaderTitle from "./components/MobileHeaderTitle";
 import { AuthSetup } from "./layout-auth-setup";
+import ServiceWorkerBoot from "@/app/components/ServiceWorkerBoot";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -55,6 +56,9 @@ export default async function MobileLayout({
 
   return (
     <div className="w-full overflow-x-hidden min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
+      {/* Service Worker for PWA push notifications */}
+      <ServiceWorkerBoot />
+
       {/* Auth setup for iOS deeplinks */}
       <AuthSetup />
 
