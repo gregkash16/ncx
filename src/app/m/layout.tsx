@@ -90,13 +90,18 @@ export default async function MobileLayout({
 
       {/* Main Content */}
       <main
-        className="flex-1 w-full overflow-x-hidden"
+        className="flex-1 w-full overflow-hidden"
         style={{
           paddingTop: `calc(65px + env(safe-area-inset-top))`,
           paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
         }}
       >
-        <div className="w-full mx-auto max-w-screen-sm px-3 box-border overflow-x-hidden">{children}</div>
+        <div
+          className="w-full mx-auto max-w-screen-sm px-3 box-border h-full"
+          style={{ maxWidth: '100%', overflow: 'hidden' }}
+        >
+          {children}
+        </div>
       </main>
 
       {/* Bottom Nav (single fixed owner) */}
