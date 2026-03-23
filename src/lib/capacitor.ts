@@ -112,6 +112,23 @@ export const getApiBaseUrl = () => {
 };
 
 /**
+ * Clear the app badge count (notification indicator)
+ */
+export const clearBadgeCount = async () => {
+  if (!isCapacitor() || !isIOS()) {
+    return;
+  }
+
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+    await PushNotifications.removeAllDelivered();
+    console.log('[APNS] Badge cleared');
+  } catch (error) {
+    console.error('[APNS] Failed to clear badge:', error);
+  }
+};
+
+/**
  * Register for APNs push notifications on iOS
  * Returns the device token on success, null on failure
  */
@@ -132,6 +149,20 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
       return null;
     }
 
+    // Set up listener for push notification open/tap
+    PushNotifications.addListener('pushNotificationActionPerformed', (action: any) => {
+      console.log('[APNS] Notification tapped:', action);
+      // Clear badge when user taps notification
+      clearBadgeCount();
+    });
+
+    // Set up listener for notification received while app is in foreground
+    PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
+      console.log('[APNS] Notification received in foreground:', notification);
+      // Clear badge when app is foregrounded with notification
+      clearBadgeCount();
+    });
+
     // CRITICAL: Set up listeners BEFORE calling register()
     // The registration event fires very fast natively and can be dropped if listeners aren't attached yet
     const token = await new Promise<string | null>((resolve) => {
@@ -141,10 +172,21 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
         console.log('[APNS] Registration token received:', token.value);
         if (!resolved) {
           resolved = true;
+          const deviceToken = token.value;
           if (typeof window !== 'undefined') {
-            localStorage.setItem('ncx_apns_token', token.value);
+            localStorage.setItem('ncx_apns_token', deviceToken);
+
+            // Auto-save token to database with default "all teams" preference
+            fetch('/api/push/apns-save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                deviceToken,
+                prefs: { allTeams: true, teams: [] }
+              })
+            }).catch(e => console.error('[APNS] Failed to save token to database:', e));
           }
-          resolve(token.value || null);
+          resolve(deviceToken || null);
         }
       });
 

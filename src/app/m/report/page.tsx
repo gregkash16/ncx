@@ -511,15 +511,21 @@ export default function MobileReportPage() {
         </p>
       </div>
 
-      {alreadyFilled && editingScores && (
-        <label className="flex items-center gap-2 text-sm text-[var(--ncx-text-primary)]/85">
-          <input
-            type="checkbox"
-            checked={confirmOverwrite}
-            onChange={(e) => setConfirmOverwrite(e.target.checked)}
-          />
-          Confirm overwrite (scores already exist for this game)
-        </label>
+      {alreadyFilled && (
+        <div className="rounded-lg border border-[rgb(var(--ncx-primary-rgb)/0.4)] bg-[rgb(var(--ncx-primary-rgb)/0.08)] p-3 space-y-2">
+          <p className="text-xs font-medium text-[rgb(var(--ncx-primary-rgb)/0.9)]">
+            ⚠️ This game already has reported scores
+          </p>
+          <label className="flex items-center gap-3 text-sm text-[var(--ncx-text-primary)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmOverwrite}
+              onChange={(e) => setConfirmOverwrite(e.target.checked)}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <span>I confirm I want to update the scores</span>
+          </label>
+        </div>
       )}
 
       <button

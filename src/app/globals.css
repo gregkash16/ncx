@@ -96,7 +96,8 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  min-height: 100svh;
+  height: 100%;
+  overflow-x: hidden;
   background: linear-gradient(
     to bottom,
     var(--ncx-bg-start),
@@ -111,6 +112,7 @@ body {
   background: transparent;
   color: var(--ncx-text-primary);
   overscroll-behavior: none;
+  min-height: 100svh;
 }
 
 /* Next.js root */

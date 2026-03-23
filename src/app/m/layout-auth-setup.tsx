@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { setupDeeplinkHandler, isCapacitor, registerForPushNotifications } from "@/lib/capacitor";
+import { setupDeeplinkHandler, isCapacitor, registerForPushNotifications, clearBadgeCount } from "@/lib/capacitor";
 import { triggerSessionRefresh } from "@/lib/useIOSSession";
 import { useSession } from "next-auth/react";
 import { Browser } from "@capacitor/browser";
@@ -28,6 +28,7 @@ export function AuthSetup() {
         (notification: any) => {
           const url = notification?.notification?.data?.url || '/m/current';
           console.log('Push notification tapped, navigating to:', url);
+          clearBadgeCount();
           router.push(url);
         }
       );
