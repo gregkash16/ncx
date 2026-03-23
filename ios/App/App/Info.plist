@@ -60,5 +60,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>NCX sends push notifications to alert you about league activity, score reports, and matchup updates.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
