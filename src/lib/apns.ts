@@ -44,7 +44,7 @@ export async function sendAPNsToDevices(
       body: payload.body,
     },
     sound: 'default',
-    badge: 1,
+    badge: 0,
     contentAvailable: true,
     mutableContent: true,
     topic: bundleId,
