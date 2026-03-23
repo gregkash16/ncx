@@ -28,6 +28,14 @@ export async function sendAPNsToDevices(
     return { sent: 0, failed: deviceTokens.length };
   }
 
+  console.log('APNs credentials loaded:', {
+    keyId,
+    teamId,
+    keyP8Start: keyP8.substring(0, 50),
+    keyP8End: keyP8.substring(keyP8.length - 30),
+    keyP8Length: keyP8.length,
+  });
+
   const provider = new apn.Provider({
     token: {
       key: keyP8,
