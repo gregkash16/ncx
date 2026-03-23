@@ -87,7 +87,7 @@ export default function PlayersSearch() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="e.g. NCX12, Leia, @discord…"
-            className="w-full rounded-lg border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.28)] px-3 py-2 text-sm text-[var(--ncx-text-primary)] placeholder:text-[var(--ncx-text-muted)]/70 outline-none focus:ring-2 focus:ring-[rgb(var(--ncx-primary-rgb)/0.40)]"
+            className="w-full max-w-full rounded-lg border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.28)] px-3 py-2 text-base text-[var(--ncx-text-primary)] placeholder:text-[var(--ncx-text-muted)]/70 outline-none focus:ring-2 focus:ring-[rgb(var(--ncx-primary-rgb)/0.40)] box-border"
           />
           <button
             type="submit"
