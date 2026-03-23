@@ -299,7 +299,7 @@ export default function MobileReportPage() {
   const { game, away, home, alreadyFilled, canEditAwayId, canEditHomeId } = selectedGame;
 
   const inputBase =
-    "w-full rounded-lg bg-[rgb(0_0_0/0.28)] border border-[var(--ncx-border)] px-3 py-2 outline-none focus:border-[rgb(var(--ncx-primary-rgb)/0.65)]";
+    "w-full rounded-lg bg-[rgb(0_0_0/0.28)] border border-[var(--ncx-border)] px-3 py-2 outline-none focus:border-[rgb(var(--ncx-primary-rgb)/0.65)] text-base";
 
   return (
     <div className="space-y-5 p-3 text-[var(--ncx-text-primary)]">

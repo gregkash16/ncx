@@ -54,7 +54,7 @@ export default async function MobileLayout({
   const NAV_PX = 64;
 
   return (
-    <div className="w-screen max-w-screen overflow-x-hidden min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
+    <div className="w-full overflow-x-hidden min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
       {/* Auth setup for iOS deeplinks */}
       <AuthSetup />
 
@@ -96,7 +96,7 @@ export default async function MobileLayout({
           paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
         }}
       >
-        <div className="w-full mx-auto max-w-screen-sm px-3 box-border">{children}</div>
+        <div className="w-full mx-auto max-w-screen-sm px-3 box-border overflow-x-hidden">{children}</div>
       </main>
 
       {/* Bottom Nav (single fixed owner) */}
