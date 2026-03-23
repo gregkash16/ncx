@@ -34,7 +34,7 @@ export async function sendAPNsToDevices(
       keyId,
       teamId,
     },
-    production: true, // Use production APNs
+    production: false, // Use sandbox (development) APNs
     requestTimeout: 5000,
   });
 
