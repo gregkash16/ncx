@@ -119,7 +119,11 @@ export default function NotificationsDrawer({
   useEffect(() => {
     if (!open || !isCapacitorApp) return;
     const token = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_token") : null;
+    const subscribed = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_subscribed") === "true" : false;
     setApnsToken(token);
+    if (token || subscribed) {
+      setSubscribed(subscribed || !!token);
+    }
   }, [open, isCapacitorApp]);
 
   // Load team list via /api/teams
@@ -207,9 +211,15 @@ export default function NotificationsDrawer({
         if (!subscribed) {
           await saveAPNsTokenAndPrefs(apnsToken, prefs);
           setSubscribed(true);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("ncx_apns_subscribed", "true");
+          }
         } else {
           await deleteAPNsToken(apnsToken);
           setSubscribed(false);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("ncx_apns_subscribed", "false");
+          }
         }
       } else {
         // Web Push path

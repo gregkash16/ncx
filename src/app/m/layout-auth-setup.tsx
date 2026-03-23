@@ -18,7 +18,12 @@ export function AuthSetup() {
     if (!isCapacitor()) return;
 
     // Register for push notifications on app launch
-    registerForPushNotifications();
+    (async () => {
+      const token = await registerForPushNotifications();
+      if (token) {
+        console.log('[Auth Setup] APNs token received and saved:', token);
+      }
+    })();
 
     // Listen for push notification taps
     (async () => {
