@@ -132,16 +132,13 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
       return null;
     }
 
-    // Register
-    await PushNotifications.register();
-    console.log('[APNS] Register called');
-
-    // Wait for registration event or timeout
-    return new Promise((resolve) => {
+    // CRITICAL: Set up listeners BEFORE calling register()
+    // The registration event fires very fast natively and can be dropped if listeners aren't attached yet
+    const token = await new Promise<string | null>((resolve) => {
       let resolved = false;
 
-      const registrationHandler = (token: any) => {
-        console.log('[APNS] Registration event fired:', token);
+      PushNotifications.addListener('registration', (token: any) => {
+        console.log('[APNS] Registration token received:', token.value);
         if (!resolved) {
           resolved = true;
           if (typeof window !== 'undefined') {
@@ -149,33 +146,32 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
           }
           resolve(token.value || null);
         }
-      };
+      });
 
-      const errorHandler = (error: any) => {
+      PushNotifications.addListener('registrationError', (error: any) => {
         console.error('[APNS] Registration error:', error);
         if (!resolved) {
           resolved = true;
           resolve(null);
         }
-      };
+      });
 
-      PushNotifications.addListener('registration', registrationHandler);
-      PushNotifications.addListener('registrationError', errorHandler);
+      // Now call register — listeners are already attached
+      PushNotifications.register().then(() => {
+        console.log('[APNS] Register called');
+      });
 
-      // If event doesn't fire within 3 seconds, use a test token for development
+      // Timeout fallback for genuine failures (e.g. simulator, no entitlement)
       setTimeout(() => {
         if (!resolved) {
-          console.warn('[APNS] Timeout waiting for registration event - using test token for development');
-          const testToken = 'dev_test_token_' + Math.random().toString(36).substr(2, 9);
-          console.log('[APNS] Test token:', testToken);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('ncx_apns_token', testToken);
-          }
+          console.warn('[APNS] Timeout - no token received (check entitlements/provisioning profile)');
           resolved = true;
-          resolve(testToken);
+          resolve(null);
         }
-      }, 3000);
+      }, 10000);
     });
+
+    return token;
   } catch (error) {
     console.error('[APNS] Setup failed:', error);
     return null;
