@@ -112,8 +112,7 @@ export const getApiBaseUrl = () => {
 };
 
 /**
- * Register for push notifications via Firebase Cloud Messaging on iOS
- * Firebase bridges to Apple Push Notifications (APNs) automatically
+ * Register for APNs push notifications on iOS
  * Returns the device token on success, null on failure
  */
 export const registerForPushNotifications = async (): Promise<string | null> => {
@@ -122,44 +121,59 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
   }
 
   try {
-    const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+    const { PushNotifications } = await import('@capacitor/push-notifications');
 
-    // Request notification permissions
-    const permResult = await FirebaseMessaging.requestPermission();
-    console.log('[FCM] Permission result:', permResult);
+    // Request permissions
+    const permResult = await PushNotifications.requestPermissions();
+    console.log('[APNS] Permission result:', permResult);
 
-    if (permResult?.granted !== true) {
-      console.warn('[FCM] Permission not granted');
+    if (permResult?.receive !== 'granted') {
+      console.warn('[APNS] Permission not granted');
       return null;
     }
 
-    // Get the device token from Firebase
-    const tokenResult = await FirebaseMessaging.getToken();
-    const token = tokenResult?.token;
+    // CRITICAL: Set up listeners BEFORE calling register()
+    // The registration event fires very fast natively and can be dropped if listeners aren't attached yet
+    const token = await new Promise<string | null>((resolve) => {
+      let resolved = false;
 
-    if (!token) {
-      console.warn('[FCM] No token received');
-      return null;
-    }
+      PushNotifications.addListener('registration', (token: any) => {
+        console.log('[APNS] Registration token received:', token.value);
+        if (!resolved) {
+          resolved = true;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('ncx_apns_token', token.value);
+          }
+          resolve(token.value || null);
+        }
+      });
 
-    console.log('[FCM] Device token received:', token);
+      PushNotifications.addListener('registrationError', (error: any) => {
+        console.error('[APNS] Registration error:', error);
+        if (!resolved) {
+          resolved = true;
+          resolve(null);
+        }
+      });
 
-    // Save token to localStorage for the app to use
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ncx_fcm_token', token);
-    }
+      // Now call register — listeners are already attached
+      PushNotifications.register().then(() => {
+        console.log('[APNS] Register called');
+      });
 
-    // Set up listener for token refresh (Firebase may refresh the token periodically)
-    FirebaseMessaging.addListener('tokenReceived', (event: any) => {
-      console.log('[FCM] Token refreshed:', event.token);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('ncx_fcm_token', event.token);
-      }
+      // Timeout fallback for genuine failures (e.g. simulator, no entitlement)
+      setTimeout(() => {
+        if (!resolved) {
+          console.warn('[APNS] Timeout - no token received (check entitlements/provisioning profile)');
+          resolved = true;
+          resolve(null);
+        }
+      }, 10000);
     });
 
     return token;
   } catch (error) {
-    console.error('[FCM] Setup failed:', error);
+    console.error('[APNS] Setup failed:', error);
     return null;
   }
 };

@@ -20,11 +20,11 @@ export function AuthSetup() {
     // Register for push notifications on app launch
     registerForPushNotifications();
 
-    // Listen for push notification taps (Firebase Messaging)
+    // Listen for push notification taps
     (async () => {
-      const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
-      FirebaseMessaging.addListener(
-        'notificationActionPerformed',
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      PushNotifications.addListener(
+        'pushNotificationActionPerformed',
         (notification: any) => {
           const url = notification?.notification?.data?.url || '/m/current';
           console.log('Push notification tapped, navigating to:', url);
