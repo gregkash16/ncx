@@ -15,6 +15,7 @@ import {
   ClipboardEdit,
   X,
   Mic,
+  Shield,
 } from "lucide-react";
 
 type Props = {
@@ -180,6 +181,18 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
             </div>
           </div>
         </nav>
+
+        {/* Footer */}
+        <div className="border-t border-[var(--ncx-border)] p-3">
+          <Link
+            href="/m/privacy"
+            onClick={onClose}
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition text-[var(--ncx-text-primary)]/80 hover:bg-[rgb(0_0_0/0.24)] hover:text-[var(--ncx-text-primary)] border border-transparent"
+          >
+            <Shield className="h-5 w-5" />
+            Privacy
+          </Link>
+        </div>
       </aside>
     </div>
   );
