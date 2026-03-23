@@ -97,7 +97,7 @@ export default async function MobileLayout({
         className="flex-1 w-full overflow-x-hidden"
         style={{
           paddingTop: `calc(65px + env(safe-area-inset-top))`,
-          paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
+          paddingBottom: `${NAV_PX}px`,
         }}
       >
         <div className="w-full mx-auto max-w-screen-sm px-3 box-border overflow-x-hidden">{children}</div>
