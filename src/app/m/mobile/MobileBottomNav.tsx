@@ -33,8 +33,7 @@ export default function MobileBottomNav() {
       aria-label="Mobile tabs"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--ncx-border)] bg-[rgb(0_0_0/0.45)] backdrop-blur supports-[backdrop-filter]:backdrop-blur-md"
       style={{
-        height: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
-        paddingBottom: "env(safe-area-inset-bottom)",
+        height: `${NAV_PX}px`,
       }}
     >
       <ul className="mx-auto flex h-[64px] max-w-screen-sm justify-between px-3">
