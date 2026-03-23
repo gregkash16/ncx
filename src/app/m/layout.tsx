@@ -94,7 +94,7 @@ export default async function MobileLayout({
 
       {/* Main Content */}
       <main
-        className="flex-1 w-full overflow-y-auto overflow-x-hidden"
+        className="flex-1 w-full overflow-y-auto overflow-x-hidden bg-transparent"
         style={{
           paddingTop: `calc(65px + env(safe-area-inset-top))`,
           paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
