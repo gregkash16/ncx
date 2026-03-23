@@ -90,15 +90,15 @@ export default async function MobileLayout({
 
       {/* Main Content */}
       <main
-        className="flex-1 w-full overflow-hidden"
+        className="flex-1 w-full overflow-y-auto overflow-x-hidden"
         style={{
           paddingTop: `calc(65px + env(safe-area-inset-top))`,
           paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
         }}
       >
         <div
-          className="w-full mx-auto max-w-screen-sm px-3 box-border h-full"
-          style={{ maxWidth: '100%', overflow: 'hidden' }}
+          className="w-full mx-auto max-w-screen-sm px-3 box-border"
+          style={{ maxWidth: '100%' }}
         >
           {children}
         </div>
