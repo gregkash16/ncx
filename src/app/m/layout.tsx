@@ -101,7 +101,7 @@ export default async function MobileLayout({
         }}
       >
         <div
-          className="w-full mx-auto max-w-screen-sm px-3 box-border"
+          className="w-full mx-auto max-w-screen-sm px-3 box-border min-h-full"
           style={{ maxWidth: '100%' }}
         >
           {children}
