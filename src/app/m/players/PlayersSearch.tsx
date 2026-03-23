@@ -187,16 +187,16 @@ export default function PlayersSearch() {
                                 : ""
                             }
                           >
-                            <div className="flex items-center justify-between px-3 py-2">
-                              <div className="text-[var(--ncx-text-primary)]/80">
+                            <div className="flex items-center justify-between gap-2 px-3 py-2 min-w-0">
+                              <div className="text-[var(--ncx-text-primary)]/80 shrink-0">
                                 Season {seasonNum}
                               </div>
                               <div
-                                className={
+                                className={`truncate text-right ${
                                   champ
                                     ? "font-semibold text-[rgb(var(--ncx-secondary-rgb))]"
                                     : "text-[var(--ncx-text-primary)]"
-                                }
+                                }`}
                               >
                                 {team && team.trim() ? (
                                   team
