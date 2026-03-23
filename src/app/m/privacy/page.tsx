@@ -72,16 +72,25 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold mb-3">3. How We Use Your Information</h2>
           <ul className="space-y-2 text-[var(--ncx-text-primary)]/80 leading-relaxed">
             <li>• Authenticate and authorize access to the App</li>
-            <li>• Deliver and manage push notifications</li>
+            <li>• Deliver and manage push notifications (opt-in only)</li>
             <li>• Improve and optimize App functionality</li>
             <li>• Personalize your experience</li>
-            <li>• Analyze usage trends and user behavior</li>
+            <li>• Maintain league statistics and player records</li>
             <li>• Maintain security and prevent fraud</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">4. Information Sharing</h2>
+          <h2 className="text-lg font-semibold mb-3">4. Push Notifications</h2>
+          <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
+            Push notifications are opt-in only. You must explicitly authorize push notifications when
+            prompted by the App. You can disable push notifications at any time through your device settings
+            or the App settings without affecting your ability to use other features.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold mb-3">5. Information Sharing</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
             We do not sell your personal information. We do not use third-party services to process
             your data. Information is only shared with Discord for authentication purposes and when
@@ -90,7 +99,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">5. Data Security</h2>
+          <h2 className="text-lg font-semibold mb-3">6. Data Security</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
             We implement appropriate technical and organizational measures to protect your personal
             information from unauthorized access, alteration, disclosure, or destruction.
@@ -98,26 +107,54 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">6. Your Rights</h2>
+          <h2 className="text-lg font-semibold mb-3">7. Data Retention</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
-            Depending on your location, you may have certain rights regarding your personal
-            information, including the right to access, correct, or delete your data. Contact us
-            to exercise these rights.
+            We retain your personal information indefinitely for the purpose of maintaining league
+            statistics and player records. You may request deletion of your account and associated data
+            by contacting us at the email address provided in the Contact Us section.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">7. Age Restriction</h2>
+          <h2 className="text-lg font-semibold mb-3">8. Children's Privacy (COPPA Compliance)</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
-            The App is not intended for children under 13 years of age. We do not knowingly collect
+            The App is not directed to children under 13 years of age. We do not knowingly collect
             personal information from children under 13. If we become aware that a child under 13 has
-            provided us with personal information, we will take steps to delete such information and
-            terminate the child's account.
+            provided us with personal information, we will promptly delete such information and terminate
+            the child's account. Parents or guardians who believe their child has provided information to
+            us should contact us immediately at the email address provided below.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">8. Changes to This Policy</h2>
+          <h2 className="text-lg font-semibold mb-3">9. Your Privacy Rights</h2>
+          <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
+            Depending on your location, you may have certain rights regarding your personal information:
+          </p>
+          <ul className="space-y-2 text-[var(--ncx-text-primary)]/80 leading-relaxed mt-3">
+            <li>
+              <strong>Right to Access:</strong> You can request access to the personal information we hold about you.
+            </li>
+            <li>
+              <strong>Right to Correct:</strong> You can request that we correct inaccurate personal information.
+            </li>
+            <li>
+              <strong>Right to Delete:</strong> You can request deletion of your personal information, subject to legal obligations.
+            </li>
+            <li>
+              <strong>Right to Data Portability:</strong> You can request a copy of your personal information in a portable format.
+            </li>
+            <li>
+              <strong>Right to Opt-Out:</strong> You can opt out of push notifications at any time.
+            </li>
+          </ul>
+          <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed mt-3">
+            Contact us to exercise any of these rights.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold mb-3">10. Changes to This Policy</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
             We may update this Privacy Policy from time to time. We will notify you of any material
             changes by updating the "Last updated" date above.
@@ -125,7 +162,7 @@ export default function PrivacyPage() {
         </section>
 
         <section className="border-t border-[var(--ncx-border)] pt-6">
-          <h2 className="text-lg font-semibold mb-3">9. Contact Us</h2>
+          <h2 className="text-lg font-semibold mb-3">11. Contact Us</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
             If you have questions about this Privacy Policy or our privacy practices, please contact us at:
           </p>
