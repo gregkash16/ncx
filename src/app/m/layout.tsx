@@ -11,7 +11,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDiscordMapCached } from "@/lib/googleSheets";
 import ServiceWorkerBoot from "@/app/components/ServiceWorkerBoot";
-import PWALayoutWrapper from "./pwa-layout-wrapper";
 
 export const metadata = {
   title: "NCX (Mobile)",
@@ -56,7 +55,6 @@ export default async function MobileLayout({
   const NAV_PX = 64;
 
   return (
-    <PWALayoutWrapper>
     <div className="w-full overflow-x-hidden min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
       {/* Service Worker for PWA push notifications */}
       <ServiceWorkerBoot />
@@ -113,6 +111,5 @@ export default async function MobileLayout({
       {/* Bottom Nav (single fixed owner) */}
       <MobileBottomNav />
     </div>
-    </PWALayoutWrapper>
   );
 }
