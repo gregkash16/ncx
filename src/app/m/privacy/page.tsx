@@ -45,10 +45,10 @@ export default function PrivacyPage() {
               </p>
             </div>
             <div>
-              <h3 className="font-semibold text-[var(--ncx-text-primary)]">Usage Data</h3>
+              <h3 className="font-semibold text-[var(--ncx-text-primary)]">League Statistics Data</h3>
               <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
-                We automatically collect information about your interactions with the App, including
-                pages viewed, features used, and timestamps of your activity.
+                We collect your name and email address for the purposes of maintaining and managing
+                league statistics and player records.
               </p>
             </div>
             <div>
@@ -83,13 +83,10 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">4. Information Sharing</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
-            We do not sell your personal information. We may share information with:
+            We do not sell your personal information. We do not use third-party services to process
+            your data. Information is only shared with Discord for authentication purposes and when
+            required by law or regulation.
           </p>
-          <ul className="space-y-2 text-[var(--ncx-text-primary)]/80 leading-relaxed mt-3">
-            <li>• Service providers who assist in operating the App</li>
-            <li>• Discord for authentication purposes</li>
-            <li>• When required by law or regulation</li>
-          </ul>
         </section>
 
         <section>
@@ -110,7 +107,17 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">7. Changes to This Policy</h2>
+          <h2 className="text-lg font-semibold mb-3">7. Age Restriction</h2>
+          <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
+            The App is not intended for children under 13 years of age. We do not knowingly collect
+            personal information from children under 13. If we become aware that a child under 13 has
+            provided us with personal information, we will take steps to delete such information and
+            terminate the child's account.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold mb-3">8. Changes to This Policy</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
             We may update this Privacy Policy from time to time. We will notify you of any material
             changes by updating the "Last updated" date above.
@@ -118,9 +125,12 @@ export default function PrivacyPage() {
         </section>
 
         <section className="border-t border-[var(--ncx-border)] pt-6">
-          <h2 className="text-lg font-semibold mb-3">8. Contact Us</h2>
+          <h2 className="text-lg font-semibold mb-3">9. Contact Us</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
-            If you have questions about this Privacy Policy or our privacy practices, please contact us.
+            If you have questions about this Privacy Policy or our privacy practices, please contact us at:
+          </p>
+          <p className="mt-3 font-semibold text-[var(--ncx-primary)]">
+            gregkash@gmail.com
           </p>
         </section>
 
