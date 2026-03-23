@@ -24,7 +24,7 @@ export async function sendAPNsToDevices(
   }
 
   const provider = new apn.Provider({
-    key: keyP8,
+    key: Buffer.from(keyP8, 'utf8'),
     keyId,
     teamId,
     production: true, // Use production APNs
