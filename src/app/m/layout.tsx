@@ -6,11 +6,11 @@ import MobileNavButton from "./mobile/MobileNavButton";
 import AuthStatus from "./components/AuthStatus";
 import MobileHeaderTitle from "./components/MobileHeaderTitle";
 import { AuthSetup } from "./layout-auth-setup";
-import ServiceWorkerBoot from "@/app/components/ServiceWorkerBoot";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDiscordMapCached } from "@/lib/googleSheets";
+import ServiceWorkerBoot from "@/app/components/ServiceWorkerBoot";
 import PWALayoutWrapper from "./pwa-layout-wrapper";
 
 export const metadata = {
@@ -57,7 +57,7 @@ export default async function MobileLayout({
 
   return (
     <PWALayoutWrapper>
-    <div className="w-full overflow-hidden h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
+    <div className="w-full overflow-x-hidden min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
       {/* Service Worker for PWA push notifications */}
       <ServiceWorkerBoot />
 
@@ -96,15 +96,15 @@ export default async function MobileLayout({
 
       {/* Main Content */}
       <main
-        className="flex-1 w-full overflow-y-auto overflow-x-hidden bg-transparent"
+        className="flex-1 w-full overflow-hidden"
         style={{
           paddingTop: `calc(65px + env(safe-area-inset-top))`,
           paddingBottom: `calc(${NAV_PX}px + env(safe-area-inset-bottom))`,
         }}
       >
         <div
-          className="w-full mx-auto max-w-screen-sm px-3 box-border min-h-full"
-          style={{ maxWidth: '100%' }}
+          className="w-full mx-auto max-w-screen-sm px-3 box-border h-full"
+          style={{ maxWidth: '100%', overflow: 'hidden' }}
         >
           {children}
         </div>
