@@ -1,15 +1,19 @@
 import UIKit
 import Capacitor
 import FirebaseCore
+import FirebaseMessaging
 
 @UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, MessagingDelegate {
 
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Initialize Firebase
         FirebaseApp.configure()
+
+        // Set Messaging delegate for FCM token handling
+        Messaging.messaging().delegate = self
 
         // Override point for customization after application launch.
         return true
@@ -60,6 +64,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         NotificationCenter.default.post(name: Notification.Name.init("didReceiveRemoteNotification"), object: completionHandler, userInfo: userInfo)
+    }
+
+    // MARK: - MessagingDelegate
+
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        // This is called when FCM token is generated or refreshed
+        if let fcmToken = fcmToken {
+            NSLog("FCM Token received: %@", fcmToken)
+            NotificationCenter.default.post(name: Notification.Name.init("FCMTokenReceived"), object: fcmToken)
+        }
     }
 
 }
