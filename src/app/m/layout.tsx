@@ -55,7 +55,7 @@ export default async function MobileLayout({
   const NAV_PX = 64;
 
   return (
-    <div className="w-full overflow-x-hidden min-h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
+    <div className="w-full overflow-x-hidden h-[100dvh] flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]">
       {/* Service Worker for PWA push notifications */}
       <ServiceWorkerBoot />
 
