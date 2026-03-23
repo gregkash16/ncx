@@ -19,17 +19,22 @@ export async function sendAPNsToDevices(
   const bundleId = process.env.APNS_BUNDLE_ID || 'com.ncx.app';
 
   if (!keyId || !teamId || !keyP8) {
-    console.error('Missing APNs credentials in environment');
+    console.error('Missing APNs credentials:', {
+      hasKeyId: !!keyId,
+      hasTeamId: !!teamId,
+      hasKeyP8: !!keyP8,
+      keyP8Length: keyP8?.length,
+    });
     return { sent: 0, failed: deviceTokens.length };
   }
 
   const provider = new apn.Provider({
-    key: Buffer.from(keyP8, 'utf8'),
+    key: keyP8,
     keyId,
     teamId,
     production: true, // Use production APNs
     requestTimeout: 5000,
-  });
+  } as any);
 
   const notification = new apn.Notification({
     alert: {
