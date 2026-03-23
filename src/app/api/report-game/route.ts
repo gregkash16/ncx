@@ -1031,7 +1031,6 @@ async function syncAllTimeStats(
       games,
       win_pct,
       ppg,
-      extra,
       s1,
       s2,
       s3,
@@ -1041,7 +1040,7 @@ async function syncAllTimeStats(
       s7,
       s8,
       championships
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `;
 
   for (const r0 of rows) {
@@ -1067,7 +1066,7 @@ async function syncAllTimeStats(
       "",
       "",
       "",
-    ].slice(0, 21);
+    ].slice(0, 20);
 
     const [
       ncxid,
@@ -1081,7 +1080,6 @@ async function syncAllTimeStats(
       games,
       win_pct,
       ppg,
-      extra,
       s1,
       s2,
       s3,
@@ -1107,7 +1105,6 @@ async function syncAllTimeStats(
       games,
       toDecimalOrNone(win_pct),
       toDecimalOrNone(ppg),
-      extra,
       s1,
       s2,
       s3,
