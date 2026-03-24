@@ -46,6 +46,13 @@ export async function sendAPNsToDevices(
     requestTimeout: 5000,
   });
 
+  console.log('[APNs] Provider created:', {
+    production: true,
+    keyIdLength: keyId.length,
+    teamIdLength: teamId.length,
+    bundleId,
+  });
+
   const notification = new apn.Notification({
     alert: {
       title: payload.title,
