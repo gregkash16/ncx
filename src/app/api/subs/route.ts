@@ -5,7 +5,7 @@ import { getSheets } from "@/lib/googleSheets";
 import { pool } from "@/lib/db";
 
 /* ------------------------- helpers ------------------------- */
-const ADMIN_DISCORD_ID = "349349801076195329" as const;
+const ADMIN_DISCORD_ID = "986330724212801557" as const;
 
 function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
