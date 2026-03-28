@@ -78,7 +78,7 @@ function normalizeWeekLabel(label: string): string {
 
 /* ------------------------- Types / constants ------------------------- */
 
-const ADMIN_DISCORD_ID = "986330724212801557" as const;
+const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"] as const;
 
 type Role = "player" | "captain" | "admin";
 
@@ -292,7 +292,7 @@ function resolveRole(
   who: { ncxid: string; first: string; last: string } | null,
   captainTeams: string[]
 ): Role | null {
-  if (discordId === ADMIN_DISCORD_ID) return "admin";
+  if (ADMIN_DISCORD_IDS.includes(discordId)) return "admin";
   if (captainTeams.length > 0) return "captain";
   if (who?.ncxid) return "player";
   return null;

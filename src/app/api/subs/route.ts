@@ -5,7 +5,7 @@ import { getSheets } from "@/lib/googleSheets";
 import { pool } from "@/lib/db";
 
 /* ------------------------- helpers ------------------------- */
-const ADMIN_DISCORD_ID = "986330724212801557" as const;
+const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"] as const;
 
 function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
@@ -53,7 +53,7 @@ export async function GET() {
     const sheets = getSheets();
 
     const captainTeams = await getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId);
-    const isAdmin = discordId === ADMIN_DISCORD_ID;
+    const isAdmin = ADMIN_DISCORD_IDS.includes(discordId);
     const isCaptain = captainTeams.length > 0;
 
     if (!isAdmin && !isCaptain) {
