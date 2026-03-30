@@ -21,12 +21,23 @@ export interface AppleSignInCredential {
  * Initiate Sign in with Apple from the web view
  * Calls native iOS code to show Apple's authorization UI
  */
-export function initiateAppleSignIn() {
-  if (typeof (window as any).capacitorAppleSignIn !== "undefined") {
-    (window as any).capacitorAppleSignIn.initiateSignIn();
-  } else {
+export async function initiateAppleSignIn() {
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+
+    if (!Capacitor.isNativePlatform()) {
+      console.warn("Not running on native platform");
+      return;
+    }
+
+    const plugin = Capacitor.registerPlugin("NCXAppleSignIn");
+
+    console.log("Calling NCXAppleSignIn.initiateSignIn");
+    await plugin.initiateSignIn();
+  } catch (error) {
     console.warn(
-      "Capacitor Apple SignIn plugin not available. Make sure app is running on iOS."
+      "Capacitor Apple SignIn plugin not available. Make sure app is running on iOS.",
+      error
     );
   }
 }

@@ -10,9 +10,10 @@ import AuthenticationServices
 public class NCXAppleSignInPlugin: CAPPlugin, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
 
     var authController: ASAuthorizationController?
+    var call: CAPPluginCall?
 
     @objc func initiateSignIn(_ call: CAPPluginCall) {
-        print("NCXAppleSignInPlugin.initiateSignIn called")
+        self.call = call
 
         let request = ASAuthorizationAppleIDProvider().createRequest()
         request.requestedScopes = [.fullName, .email]
@@ -88,13 +89,13 @@ public class NCXAppleSignInPlugin: CAPPlugin, ASAuthorizationControllerDelegate,
             return
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            // Call the global JavaScript function
-            let escapedName = name.replacingOccurrences(of: "\"", with: "\\\"")
-            let escapedEmail = email.replacingOccurrences(of: "\"", with: "\\\"")
-            let script = "window.signInWithAppleComplete && window.signInWithAppleComplete({name: '\(escapedName)', email: '\(escapedEmail)'})"
+        let jsonString = """
+        {"name": "\(name.replacingOccurrences(of: "\"", with: "\\\""))", "email": "\(email.replacingOccurrences(of: "\"", with: "\\\""))"}
+        """
 
-            print("Executing JS: \(script)")
+        let script = "window.signInWithAppleComplete && window.signInWithAppleComplete(\(jsonString))"
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.evaluateJavaScript(script)
         }
     }
