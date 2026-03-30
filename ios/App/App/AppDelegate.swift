@@ -10,8 +10,43 @@ class AppDelegate: UIResponder, UIApplicationDelegate, ASAuthorizationController
     var appleAuthController: ASAuthorizationController?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Inject Apple SignIn handler into window at startup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.injectAppleSignInHandler()
+        }
         return true
+    }
+
+    private func injectAppleSignInHandler() {
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow }),
+              let viewController = window.rootViewController as? CAPBridgeViewController,
+              let webView = viewController.bridge?.webView else {
+            print("WebView not available for injection")
+            return
+        }
+
+        // Add message handler for Apple SignIn
+        let userContentController = webView.configuration.userContentController
+        userContentController.add(self, name: "initiateAppleSignIn")
+
+        // Inject global function
+        let script = """
+        window.initiateAppleSignInNative = function() {
+            console.log('[Calling native] initiateAppleSignIn');
+            webkit.messageHandlers.initiateAppleSignIn.postMessage({});
+        };
+        """
+
+        webView.evaluateJavaScript(script) { result, error in
+            if let error = error {
+                print("Failed to inject Apple SignIn handler: \(error)")
+            } else {
+                print("Apple SignIn handler injected successfully")
+            }
+        }
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -37,14 +72,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, ASAuthorizationController
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Handle custom Apple SignIn URL scheme
-        if url.scheme == "applesignin" && url.host == "signin" {
-            DispatchQueue.main.async {
-                self.initiateAppleSignIn()
-            }
-            return true
-        }
-
         // Called when the app was launched with a url. Feel free to add additional processing here,
         // but if you want the App API to support tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
