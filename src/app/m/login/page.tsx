@@ -16,7 +16,8 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const { AppleSignIn } = await import("@capacitor-community/apple-sign-in");
+      const { registerPlugin } = await import("@capacitor/core");
+      const AppleSignIn = registerPlugin("AppleSignIn");
 
       const response = await AppleSignIn.authorize({
         clientId: "com.nickelcityxwing.app",
