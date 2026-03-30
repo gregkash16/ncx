@@ -65,6 +65,12 @@ export const authOptions: NextAuthOptions = {
             clientId: process.env.APPLE_ID,
             clientSecret: process.env.APPLE_SECRET,
             allowDangerousEmailAccountLinking: true,
+            authorization: {
+              params: {
+                // Disable PKCE for Capacitor (cookies don't transfer to/from external Safari)
+                response_mode: "form_post",
+              },
+            },
           }),
         ]
       : []),
