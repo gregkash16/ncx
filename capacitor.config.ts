@@ -5,7 +5,7 @@ const isDev = process.env.NODE_ENV === 'development';
 const config: CapacitorConfig = {
   appId: 'com.ncx.app',
   appName: 'NCX',
-  webDir: isDev ? 'public' : '.next/standalone/public',
+  webDir: 'public',
   server: isDev
     ? {
         url: 'https://nickelcityxwing.com',

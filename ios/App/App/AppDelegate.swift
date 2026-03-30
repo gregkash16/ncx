@@ -1,10 +1,12 @@
 import UIKit
 import Capacitor
+import AuthenticationServices
 
 @UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
 
     var window: UIWindow?
+    var appleAuthController: ASAuthorizationController?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
@@ -56,6 +58,104 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         NotificationCenter.default.post(name: Notification.Name.init("didReceiveRemoteNotification"), object: completionHandler, userInfo: userInfo)
+    }
+
+    // MARK: - Sign in with Apple
+
+    /// Called from JavaScript when user taps "Sign in with Apple" button
+    func initiateAppleSignIn() {
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = self
+        controller.presentationContextProvider = self
+
+        self.appleAuthController = controller
+        controller.performRequests()
+    }
+
+    // MARK: - ASAuthorizationControllerDelegate
+
+    func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithAuthorization authorization: ASAuthorization
+    ) {
+        guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+            return
+        }
+
+        // Extract user information
+        let fullName = appleIDCredential.fullName
+        let email = appleIDCredential.email ?? "unknown@apple.com"
+
+        // Build name string
+        var nameComponents: [String] = []
+        if let givenName = fullName?.givenName {
+            nameComponents.append(givenName)
+        }
+        if let familyName = fullName?.familyName {
+            nameComponents.append(familyName)
+        }
+
+        let name = nameComponents.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        let finalName = !name.isEmpty ? name : "Apple User"
+
+        // Send to web view
+        sendAppleSignInToWebView(name: finalName, email: email)
+    }
+
+    func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithError error: Error
+    ) {
+        print("Sign in with Apple error: \(error.localizedDescription)")
+        // Notify web view of error
+        notifyWebViewOfAppleSignInError(error.localizedDescription)
+    }
+
+    // MARK: - ASAuthorizationControllerPresentationContextProviding
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        return self.window ?? ASPresentationAnchor()
+    }
+
+    // MARK: - Web View Communication
+
+    private func sendAppleSignInToWebView(name: String, email: String) {
+        DispatchQueue.main.async {
+            let jsonString = """
+            {"name": "\(name.replacingOccurrences(of: "\"", with: "\\\""))", "email": "\(email.replacingOccurrences(of: "\"", with: "\\\""))"}
+            """
+
+            let script = "window.signInWithAppleComplete && window.signInWithAppleComplete(\(jsonString))"
+
+            if let webView = self.window?.rootViewController?.view as? UIView {
+                // For WKWebView
+                if let wkWebView = webView as? UIView {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        // Try to find the WKWebView
+                        self.executeJavaScriptInWebView(script)
+                    }
+                }
+            }
+        }
+    }
+
+    private func notifyWebViewOfAppleSignInError(_ errorMessage: String) {
+        DispatchQueue.main.async {
+            let escapedError = errorMessage.replacingOccurrences(of: "\"", with: "\\\"")
+            let script = "window.signInWithAppleError && window.signInWithAppleError('\(escapedError)')"
+            self.executeJavaScriptInWebView(script)
+        }
+    }
+
+    private func executeJavaScriptInWebView(_ script: String) {
+        // This will be called from Capacitor's bridge
+        NotificationCenter.default.post(
+            name: NSNotification.Name("executeAppleSignInScript"),
+            object: script
+        )
     }
 
 }
