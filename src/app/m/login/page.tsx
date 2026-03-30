@@ -16,38 +16,17 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const { registerPlugin } = await import("@capacitor/core");
-      const AppleSignIn = registerPlugin("AppleSignIn");
+      // Redirect to Apple's OAuth endpoint
+      // Apple will prompt for auth, then redirect to our callback
+      const clientId = "com.nickelcityxwing.app";
+      const redirectUri = encodeURIComponent("https://nickelcityxwing.com/api/auth/apple-callback");
+      const responseType = "code id_token";
+      const scope = encodeURIComponent("name email");
+      const responseMode = "form_post";
 
-      const response = await AppleSignIn.authorize({
-        clientId: "com.nickelcityxwing.app",
-        teamId: process.env.NEXT_PUBLIC_APPLE_TEAM_ID || "",
-        redirectUrl: "https://nickelcityxwing.com/api/auth/apple-callback",
-        scopes: ["email", "name"],
-        usePopupFlow: false,
-      });
+      const appleAuthUrl = `https://appleid.apple.com/auth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=${responseType}&scope=${scope}&response_mode=${responseMode}`;
 
-      // Send credentials to backend
-      const res = await fetch("/api/auth/apple-callback", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-app-platform": "ios",
-        },
-        body: JSON.stringify({
-          name: response.user?.name?.firstName
-            ? `${response.user.name.firstName} ${response.user.name.lastName || ""}`.trim()
-            : "Apple User",
-          email: response.user?.email || "unknown@apple.com",
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to complete sign in");
-      }
-
-      // Redirect to home
-      window.location.href = "/m";
+      window.location.href = appleAuthUrl;
     } catch (err) {
       console.error("Apple SignIn error:", err);
       setError(err instanceof Error ? err.message : "Sign in failed");
