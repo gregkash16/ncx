@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import AuthenticationServices
+import WebKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
@@ -36,6 +37,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, ASAuthorizationController
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        // Handle custom Apple SignIn URL scheme
+        if url.scheme == "applesignin" && url.host == "signin" {
+            DispatchQueue.main.async {
+                self.initiateAppleSignIn()
+            }
+            return true
+        }
+
         // Called when the app was launched with a url. Feel free to add additional processing here,
         // but if you want the App API to support tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
@@ -151,11 +160,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate, ASAuthorizationController
     }
 
     private func executeJavaScriptInWebView(_ script: String) {
-        // This will be called from Capacitor's bridge
-        NotificationCenter.default.post(
-            name: NSNotification.Name("executeAppleSignInScript"),
-            object: script
-        )
+        DispatchQueue.main.async {
+            guard let window = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .flatMap({ $0.windows })
+                .first(where: { $0.isKeyWindow }) else {
+                return
+            }
+
+            if let viewController = window.rootViewController as? CAPBridgeViewController {
+                viewController.bridge?.webView?.evaluateJavaScript(script) { result, error in
+                    if let error = error {
+                        print("JavaScript execution error: \(error)")
+                    }
+                }
+            }
+        }
     }
 
 }
