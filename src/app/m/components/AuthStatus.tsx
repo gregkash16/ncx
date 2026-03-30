@@ -69,11 +69,10 @@ export default function AuthStatus() {
   }
 
   // ❌ Not signed in
-  const handleSignIn = async () => {
+  const handleSignIn = () => {
+    // In iOS app with both Apple + Discord options, go to login page
     if (isCapacitor()) {
-      // In native app, use custom Discord OAuth with Safari
-      const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || '';
-      await startDiscordLogin(clientId);
+      window.location.href = '/m/login';
     } else {
       // In browser, use NextAuth's normal flow
       signIn("discord", { callbackUrl: "/m" });
