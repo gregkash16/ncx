@@ -1,6 +1,7 @@
 // src/lib/auth.ts
 import type { NextAuthOptions } from "next-auth";
 import DiscordProvider from "next-auth/providers/discord";
+import AppleProvider from "next-auth/providers/apple";
 
 const isProd = process.env.NODE_ENV === "production";
 // Only set a cookie domain in prod so localhost/dev still works
@@ -58,12 +59,25 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    ...(process.env.APPLE_ID && process.env.APPLE_SECRET
+      ? [
+          AppleProvider({
+            clientId: process.env.APPLE_ID,
+            clientSecret: process.env.APPLE_SECRET,
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
   ],
 
   callbacks: {
     async jwt({ token, account, profile, trigger, session }) {
       if (account?.provider === "discord") {
         token.discordId = account.providerAccountId;
+      }
+      if (account?.provider === "apple") {
+        token.provider = "apple";
+        token.appleEmail = account.providerAccountId;
       }
       if (profile && (profile as any).global_name) {
         token.discordDisplay = (profile as any).global_name;
@@ -80,6 +94,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).discordId = token.discordId as string | undefined;
         (session.user as any).id = token.discordId as string | undefined;
+        (session.user as any).provider = token.provider as string | undefined;
+        (session.user as any).appleEmail = token.appleEmail as string | undefined;
         if (token.ncxid) (session.user as any).ncxid = token.ncxid as string;
         if (!session.user.name && token.discordDisplay) {
           session.user.name = token.discordDisplay as string;

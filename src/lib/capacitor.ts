@@ -7,6 +7,32 @@ import { Browser } from '@capacitor/browser';
 import { App } from '@capacitor/app';
 
 /**
+ * Initialize Capacitor on app startup
+ * Adds x-app-platform header to all fetch requests in iOS app
+ */
+export const initCapacitor = () => {
+  if (!isCapacitor()) return;
+
+  // Wrap fetch to add x-app-platform header
+  const originalFetch = window.fetch;
+  window.fetch = function (resource, init = {}) {
+    const url =
+      typeof resource === 'string' ? resource : resource instanceof Request ? resource.url : String(resource);
+
+    // Only add header for same-domain requests (don't add to external APIs)
+    const isLocalRequest = typeof url === 'string' && (url.startsWith('/') || url.includes(window.location.hostname));
+
+    if (isLocalRequest) {
+      const headers = (init.headers as Record<string, string>) || {};
+      headers['x-app-platform'] = 'ios';
+      init.headers = headers;
+    }
+
+    return originalFetch.apply(this, [resource, init]);
+  };
+};
+
+/**
  * Check if running in Capacitor native app
  */
 export const isCapacitor = () => Capacitor.isNativePlatform();

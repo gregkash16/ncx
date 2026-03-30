@@ -290,8 +290,13 @@ function teamKey(s: string): string {
 function resolveRole(
   discordId: string,
   who: { ncxid: string; first: string; last: string } | null,
-  captainTeams: string[]
+  captainTeams: string[],
+  isAppleAuth?: boolean
 ): Role | null {
+  // Apple auth users are admins if enabled via env var (iOS app only)
+  if (isAppleAuth && process.env.APPLE_AUTH_GRANT_ADMIN === "true") {
+    return "admin";
+  }
   if (ADMIN_DISCORD_IDS.includes(discordId)) return "admin";
   if (captainTeams.length > 0) return "captain";
   if (who?.ncxid) return "player";
@@ -1229,16 +1234,20 @@ async function syncLists(
 
 
 /* --------------------------- GET /report-game ------------------------- */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getIOSServerSession();
     if (!session?.user) {
       return NextResponse.json<LookupResult>({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
+    // Check if this is Apple auth on iOS
+    const appPlatform = request.headers.get("x-app-platform");
+    const isAppleAuth = (session.user as any).provider === "apple" && appPlatform === "ios";
+
     const raw = (session.user as any).discordId ?? (session.user as any).id;
     const discordId = normalizeDiscordId(raw);
-    if (!discordId) {
+    if (!discordId && !isAppleAuth) {
       return NextResponse.json<LookupResult>(
         { ok: false, reason: "NO_DISCORD_ID" },
         { status: 400 }
@@ -1249,11 +1258,11 @@ export async function GET() {
     const sheets = getSheets();
 
     const [who, captainTeams] = await Promise.all([
-      getNcxIdForDiscord(sheets, spreadsheetId, discordId),
-      getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId),
+      getNcxIdForDiscord(sheets, spreadsheetId, discordId || ""),
+      getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId || ""),
     ]);
 
-    const role = resolveRole(discordId, who, captainTeams);
+    const role = resolveRole(discordId || "", who, captainTeams, isAppleAuth);
     if (!role) {
       // No admin, no captain entry, no NCXID map
       return NextResponse.json<LookupResult>(
@@ -1438,12 +1447,16 @@ export async function GET() {
 }
 
 /* --------------------------- POST /report-game ------------------------ */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const session = await getIOSServerSession();
     if (!session?.user) {
       return NextResponse.json({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
+
+    // Check if this is Apple auth on iOS
+    const appPlatform = req.headers.get("x-app-platform");
+    const isAppleAuth = (session.user as any).provider === "apple" && appPlatform === "ios";
 
     const body = await req.json().catch(() => ({}));
     const {
@@ -1515,11 +1528,11 @@ export async function POST(req: Request) {
     const discordId = normalizeDiscordId(raw);
 
     const [who, captainTeams] = await Promise.all([
-      getNcxIdForDiscord(sheets, spreadsheetId, discordId),
-      getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId),
+      getNcxIdForDiscord(sheets, spreadsheetId, discordId || ""),
+      getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId || ""),
     ]);
 
-    const role = resolveRole(discordId, who, captainTeams);
+    const role = resolveRole(discordId || "", who, captainTeams, isAppleAuth);
     if (!role) {
       return NextResponse.json(
         { ok: false, reason: "NO_NCXID" },
