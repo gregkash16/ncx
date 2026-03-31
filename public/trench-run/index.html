@@ -348,7 +348,7 @@ function update(){
         e.hp--; bullets.splice(j,1); spark(b.x,b.y);
         if(e.hp<=0){
           score+=100; explode(e.x,e.y,true); sfxExplode(true);
-          PL.hp=Math.min(PL.hp+15,PL.maxHp);
+          PL.hp=Math.min(PL.hp+5,PL.maxHp);
           enemies.splice(i,1); hit=true; break;
         }
       }
@@ -382,7 +382,7 @@ function update(){
       const b=bullets[j];
       if(Math.abs(b.x-sx)<14&&Math.abs(b.y-ty)<14){
         t.hp--; bullets.splice(j,1); spark(b.x,b.y);
-        if(t.hp<=0){ t.dead=true; score+=50; explode(sx,ty,false); sfxExplode(false); PL.hp=Math.min(PL.hp+10,PL.maxHp); }
+        if(t.hp<=0){ t.dead=true; score+=50; explode(sx,ty,false); sfxExplode(false); PL.hp=Math.min(PL.hp+3,PL.maxHp); }
         break;
       }
     }
