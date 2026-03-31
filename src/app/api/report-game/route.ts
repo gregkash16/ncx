@@ -498,7 +498,10 @@ async function syncSingleListXwsAndLetters(
     [weekLabel, game]
   )) as any;
 
-  if (!rows || rows.length === 0) return;
+  if (!rows || rows.length === 0) {
+    console.log(`[XWS] No row found for ${weekLabel} / ${game}`);
+    return;
+  }
 
   const row = rows[0];
   const awayListUrl = String(row.away_list ?? "").trim();
@@ -506,11 +509,14 @@ async function syncSingleListXwsAndLetters(
   const currentAwayXws = row.away_xws;
   const currentHomeXws = row.home_xws;
 
+  console.log(`[XWS] Processing ${weekLabel}/${game}: away="${awayListUrl}" home="${homeListUrl}"`);
+
   // Skip if both sides are already complete (have XWS data)
   const awayComplete = awayListUrl && currentAwayXws;
   const homeComplete = homeListUrl && currentHomeXws;
 
   if (awayComplete && homeComplete) {
+    console.log(`[XWS] Both sides complete, skipping`);
     return; // Both sides already have XWS, nothing to do
   }
 
@@ -539,58 +545,72 @@ async function syncSingleListXwsAndLetters(
 
   // Only fetch away XWS if missing or URL provided
   if (!awayComplete && awayListUrl && isValidListLink(awayListUrl)) {
+    console.log(`[XWS] Fetching away XWS from: ${awayListUrl}`);
     const xws = await fetchXwsFromListUrlServer(awayListUrl);
     if (xws) {
+      console.log(`[XWS] Away XWS fetched, ${xws.pilots?.length ?? 0} pilots`);
       awayXwsJson = JSON.stringify(xws);
       awayLetters = shipsToGlyphs(xws.pilots ?? []) ?? null;
 
       const res = computeCountAndAverageInitFromXws(xws, initByXws);
       awayCount = res.count;
       awayAvgInit = res.avgInit;
+    } else {
+      console.log(`[XWS] Away XWS fetch failed or returned null`);
     }
   }
 
   // Only fetch home XWS if missing or URL provided
   if (!homeComplete && homeListUrl && isValidListLink(homeListUrl)) {
+    console.log(`[XWS] Fetching home XWS from: ${homeListUrl}`);
     const xws = await fetchXwsFromListUrlServer(homeListUrl);
     if (xws) {
+      console.log(`[XWS] Home XWS fetched, ${xws.pilots?.length ?? 0} pilots`);
       homeXwsJson = JSON.stringify(xws);
       homeLetters = shipsToGlyphs(xws.pilots ?? []) ?? null;
 
       const res = computeCountAndAverageInitFromXws(xws, initByXws);
       homeCount = res.count;
       homeAvgInit = res.avgInit;
+    } else {
+      console.log(`[XWS] Home XWS fetch failed or returned null`);
     }
   }
 
   // If no valid list/XWS, leave count/avg as null (your requirement)
-  await conn.execute(
-    `
-    UPDATE lists
-    SET
-      away_xws = ?,
-      away_letters = ?,
-      home_xws = ?,
-      home_letters = ?,
-      away_count = ?,
-      home_count = ?,
-      away_average_init = ?,
-      home_average_init = ?
-    WHERE week_label = ? AND game = ?
-  `,
-    [
-      awayXwsJson,
-      awayLetters,
-      homeXwsJson,
-      homeLetters,
-      awayCount,
-      homeCount,
-      awayAvgInit,
-      homeAvgInit,
-      weekLabel,
-      game,
-    ]
-  );
+  console.log(`[XWS] Updating ${weekLabel}/${game}: away_xws=${!!awayXwsJson} home_xws=${!!homeXwsJson}`);
+  try {
+    await conn.execute(
+      `
+      UPDATE lists
+      SET
+        away_xws = ?,
+        away_letters = ?,
+        home_xws = ?,
+        home_letters = ?,
+        away_count = ?,
+        home_count = ?,
+        away_average_init = ?,
+        home_average_init = ?
+      WHERE week_label = ? AND game = ?
+    `,
+      [
+        awayXwsJson,
+        awayLetters,
+        homeXwsJson,
+        homeLetters,
+        awayCount,
+        homeCount,
+        awayAvgInit,
+        homeAvgInit,
+        weekLabel,
+        game,
+      ]
+    );
+    console.log(`[XWS] Update successful`);
+  } catch (updateErr) {
+    console.error(`[XWS] Update failed:`, updateErr);
+  }
 }
 
 /* --------------------------- MySQL sync helpers ------------------------- */
