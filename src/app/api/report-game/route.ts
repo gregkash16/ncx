@@ -454,12 +454,12 @@ async function fetchXwsFromListUrlServer(listUrl: string): Promise<XwsResponse |
   try {
     let upstreamUrl: string | null = null;
 
-    // YASB: proxy via pattern-analyzer
+    // YASB: proxy via local XWS parser
     if (listUrl.startsWith("https://yasb.app")) {
       const parts = listUrl.split("yasb.app/");
       if (parts.length >= 2) {
         const dataLink = parts[1]; // "?f=...&d=..."
-        upstreamUrl = `https://www.pattern-analyzer.app/api/yasb/xws${dataLink}`;
+        upstreamUrl = `http://5.161.202.51:3001/api/yasb/xws${dataLink}`;
       }
     } else if (listUrl.startsWith("https://launchbaynext.app")) {
       // LaunchBayNext: pull lbx=... piece
