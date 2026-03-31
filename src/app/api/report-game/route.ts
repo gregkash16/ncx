@@ -494,7 +494,7 @@ async function syncSingleListXwsAndLetters(
 ) {
   // Read current row from lists table
   const [rows] = (await conn.execute(
-    "SELECT away_list, home_list FROM lists WHERE week_label = ? AND game = ?",
+    "SELECT away_list, home_list, away_xws, home_xws FROM lists WHERE week_label = ? AND game = ?",
     [weekLabel, game]
   )) as any;
 
@@ -503,6 +503,16 @@ async function syncSingleListXwsAndLetters(
   const row = rows[0];
   const awayListUrl = String(row.away_list ?? "").trim();
   const homeListUrl = String(row.home_list ?? "").trim();
+  const currentAwayXws = row.away_xws;
+  const currentHomeXws = row.home_xws;
+
+  // Skip if both sides are already complete (have XWS data)
+  const awayComplete = awayListUrl && currentAwayXws;
+  const homeComplete = homeListUrl && currentHomeXws;
+
+  if (awayComplete && homeComplete) {
+    return; // Both sides already have XWS, nothing to do
+  }
 
   // Build xws -> init map from railway.IDs (0001–0726)
   const [idRows] = (await conn.execute(
@@ -517,9 +527,9 @@ async function syncSingleListXwsAndLetters(
     initByXws.set(String(key), Number(initVal));
   }
 
-  let awayXwsJson: string | null = null;
+  let awayXwsJson: string | null = currentAwayXws || null;
   let awayLetters: string | null = null;
-  let homeXwsJson: string | null = null;
+  let homeXwsJson: string | null = currentHomeXws || null;
   let homeLetters: string | null = null;
 
   let awayCount: number | null = null;
@@ -527,7 +537,8 @@ async function syncSingleListXwsAndLetters(
   let homeCount: number | null = null;
   let homeAvgInit: number | null = null;
 
-  if (awayListUrl && isValidListLink(awayListUrl)) {
+  // Only fetch away XWS if missing or URL provided
+  if (!awayComplete && awayListUrl && isValidListLink(awayListUrl)) {
     const xws = await fetchXwsFromListUrlServer(awayListUrl);
     if (xws) {
       awayXwsJson = JSON.stringify(xws);
@@ -539,7 +550,8 @@ async function syncSingleListXwsAndLetters(
     }
   }
 
-  if (homeListUrl && isValidListLink(homeListUrl)) {
+  // Only fetch home XWS if missing or URL provided
+  if (!homeComplete && homeListUrl && isValidListLink(homeListUrl)) {
     const xws = await fetchXwsFromListUrlServer(homeListUrl);
     if (xws) {
       homeXwsJson = JSON.stringify(xws);
