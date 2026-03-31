@@ -240,56 +240,65 @@ export default async function CurrentWeekCard({
                 }}
               >
                 <div
-                  className="grid grid-cols-[1fr_260px_1fr] items-center gap-4 rounded-xl px-6 py-4 transition-colors"
+                  className="flex flex-col gap-2 rounded-xl px-6 py-4 transition-colors"
                   style={{
                     background: "rgb(0 0 0 / 0.25)",
                     border: "1px solid var(--ncx-border)",
                   }}
                 >
-                  {/* Away */}
-                  <div
-                    className="flex items-center"
-                    style={{ color: "var(--ncx-text-muted)" }}
-                  >
-                    <Logo name={m.awayTeam} side="left" />
-                    <span className="break-words">{m.awayTeam}</span>
-                  </div>
+                  {/* Match row */}
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                    {/* Away */}
+                    <div
+                      className="flex items-center gap-2"
+                      style={{ color: "var(--ncx-text-muted)" }}
+                    >
+                      <Logo name={m.awayTeam} side="left" />
+                      <span className="break-words">{m.awayTeam}</span>
+                      <div
+                        className="font-bold text-lg ml-auto"
+                        style={{ color: "var(--ncx-text-primary)" }}
+                      >
+                        {m.awayWins}
+                      </div>
+                    </div>
 
-                  {/* Center */}
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="flex items-center gap-4">
+                    {/* Center boxes */}
+                    <div className="flex items-center gap-2">
                       <WinBoxes
                         wins={m.awayWins}
                         direction="left"
                         color={getTeamPrimaryHex(m.awayTeam) ?? "#0f172a"}
                       />
-                      <div
-                        className="font-bold text-xl"
-                        style={{ color: "var(--ncx-text-primary)" }}
-                      >
-                        {m.awayWins} : {m.homeWins}
-                      </div>
                       <WinBoxes
                         wins={m.homeWins}
                         direction="right"
                         color={getTeamPrimaryHex(m.homeTeam) ?? "#0f172a"}
                       />
                     </div>
+
+                    {/* Home */}
                     <div
-                      className="text-xs"
+                      className="flex items-center justify-end gap-2"
                       style={{ color: "var(--ncx-text-muted)" }}
                     >
-                      {gamesLeft} game{gamesLeft === 1 ? "" : "s"} remaining
+                      <div
+                        className="font-bold text-lg"
+                        style={{ color: "var(--ncx-text-primary)" }}
+                      >
+                        {m.homeWins}
+                      </div>
+                      <span className="break-words">{m.homeTeam}</span>
+                      <Logo name={m.homeTeam} side="right" />
                     </div>
                   </div>
 
-                  {/* Home */}
+                  {/* Games remaining */}
                   <div
-                    className="flex items-center justify-end"
+                    className="text-xs text-center"
                     style={{ color: "var(--ncx-text-muted)" }}
                   >
-                    <span className="break-words">{m.homeTeam}</span>
-                    <Logo name={m.homeTeam} side="right" />
+                    {gamesLeft} game{gamesLeft === 1 ? "" : "s"} remaining
                   </div>
                 </div>
               </Link>
