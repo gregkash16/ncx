@@ -93,10 +93,39 @@ function getTrench(screenX){
 }
 
 // ── STATE ────────────────────────────────────────────────────────────────
-let state='title'; // title|playing|dead|win
-let frame=0, dist=0, score=0, highScore=0;
+let state='title'; // title|playing|dead|win|enter_name|leaderboard
+let frame=0, dist=0, score=0;
+let highScore=0; // set after leaderboard loads below
 let spd=2; // scroll speed px/frame
 const TOTAL_DIST = TOTAL_PX;
+
+// ── LEADERBOARD ───────────────────────────────────────────────────────────
+const LB_KEY = 'trenchRunLB';
+let leaderboard = (()=>{ try{ return JSON.parse(localStorage.getItem(LB_KEY))||[]; }catch(e){ return []; } })();
+highScore = leaderboard.length ? leaderboard[0].score : 0;
+let nameEntry = { chars:['A','A','A'], pos:0, afterState:'title' };
+const CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+function isHighScore(s){ return leaderboard.length<5 || s>leaderboard[leaderboard.length-1].score; }
+
+function saveScore(name, s){
+  leaderboard.push({name, score:s});
+  leaderboard.sort((a,b)=>b.score-a.score);
+  if(leaderboard.length>5) leaderboard.length=5;
+  highScore = leaderboard[0].score;
+  try{ localStorage.setItem(LB_KEY, JSON.stringify(leaderboard)); }catch(e){}
+}
+
+function beginNameEntry(afterSt){
+  nameEntry = { chars:['A','A','A'], pos:0, afterState:afterSt };
+  state='enter_name';
+}
+
+function confirmName(){
+  const name = nameEntry.chars.join('').trim()||'???';
+  saveScore(name, score);
+  state='leaderboard';
+}
 
 // ── PLAYER ───────────────────────────────────────────────────────────────
 const PL = {
@@ -118,9 +147,36 @@ document.addEventListener('keydown',e=>{
   resumeAC();
   K[e.key]=true;
   if(e.key===' ') e.preventDefault();
-  if((e.key==='Enter'||e.key===' ')){
+
+  if(state==='enter_name'){
+    const ci = CHARS.indexOf(nameEntry.chars[nameEntry.pos]);
+    if(e.key==='ArrowUp'||e.key==='w'||e.key==='W'){
+      nameEntry.chars[nameEntry.pos] = CHARS[(ci+1)%CHARS.length];
+    } else if(e.key==='ArrowDown'||e.key==='s'||e.key==='S'){
+      nameEntry.chars[nameEntry.pos] = CHARS[(ci-1+CHARS.length)%CHARS.length];
+    } else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D'){
+      nameEntry.pos = Math.min(2, nameEntry.pos+1);
+    } else if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'){
+      nameEntry.pos = Math.max(0, nameEntry.pos-1);
+    } else if(e.key==='Enter'||e.key===' '){
+      if(nameEntry.pos<2){ nameEntry.pos++; }
+      else { confirmName(); }
+    }
+    return;
+  }
+
+  if(state==='leaderboard'){
+    if(e.key==='Enter'||e.key===' ') state='title';
+    return;
+  }
+
+  if(e.key==='Enter'||e.key===' '){
     if(state==='title') startGame();
     else if(state==='dead'||state==='win') state='title';
+  }
+
+  if(e.key==='l'||e.key==='L'){
+    if(state==='title') state='leaderboard';
   }
 });
 document.addEventListener('keyup',e=>{ K[e.key]=false; });
@@ -189,7 +245,7 @@ function damage(amt){
   if(PL.hp<=0){
     PL.hp=0; explode(PL.x,PL.y,true); sfxExplode(true);
     highScore=Math.max(highScore,score);
-    setTimeout(()=>state='dead',1200);
+    setTimeout(()=>{ if(isHighScore(score)) beginNameEntry('dead'); else state='dead'; },1200);
   }
 }
 
@@ -285,6 +341,7 @@ function update(){
         e.hp--; bullets.splice(j,1); spark(b.x,b.y);
         if(e.hp<=0){
           score+=100; explode(e.x,e.y,true); sfxExplode(true);
+          PL.hp=Math.min(PL.hp+15,PL.maxHp);
           enemies.splice(i,1); hit=true; break;
         }
       }
@@ -318,7 +375,7 @@ function update(){
       const b=bullets[j];
       if(Math.abs(b.x-sx)<14&&Math.abs(b.y-ty)<14){
         t.hp--; bullets.splice(j,1); spark(b.x,b.y);
-        if(t.hp<=0){ t.dead=true; score+=50; explode(sx,ty,false); sfxExplode(false); }
+        if(t.hp<=0){ t.dead=true; score+=50; explode(sx,ty,false); sfxExplode(false); PL.hp=Math.min(PL.hp+10,PL.maxHp); }
         break;
       }
     }
@@ -348,7 +405,7 @@ function update(){
           sfxExplode(true); sfxWin();
           score+=1000;
           highScore=Math.max(highScore,score);
-          setTimeout(()=>state='win',2500);
+          setTimeout(()=>{ if(isHighScore(score)) beginNameEntry('win'); else state='win'; },2500);
         }
         break;
       }
@@ -764,10 +821,12 @@ function renderTitle(){
   if(Math.sin(frame*0.06)>0) ctx.fillText('PRESS ENTER OR SPACE',W/2,H/2+112);
   noGlow();
 
-  if(highScore>0){
+  if(leaderboard.length>0){
     ctx.fillStyle='#ffcc00'; ctx.font='14px Courier New';
-    ctx.fillText(`HIGH SCORE: ${highScore}`,W/2,H/2+150);
+    ctx.fillText(`HIGH SCORE: ${leaderboard[0].score}  ${leaderboard[0].name}`,W/2,H/2+148);
   }
+  ctx.fillStyle='#444'; ctx.font='13px Courier New';
+  ctx.fillText('L — LEADERBOARD',W/2,H/2+178);
 
   ctx.textAlign='left';
 }
@@ -807,6 +866,79 @@ function renderWin(){
   ctx.textAlign='left';
 }
 
+function renderNameEntry(){
+  ctx.fillStyle='rgba(0,0,0,0.88)'; ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center';
+
+  glow('#ffcc00',20);
+  ctx.fillStyle='#ffcc00'; ctx.font='bold 36px Courier New';
+  ctx.fillText('NEW HIGH SCORE!',W/2,H/2-110);
+  noGlow();
+
+  ctx.fillStyle='#fff'; ctx.font='bold 24px Courier New';
+  ctx.fillText(`SCORE: ${score}`,W/2,H/2-68);
+
+  ctx.fillStyle='#aaa'; ctx.font='16px Courier New';
+  ctx.fillText('ENTER YOUR NAME',W/2,H/2-30);
+
+  // 3-char name boxes
+  const boxW=60, boxH=64, gap=14;
+  const totalW=boxW*3+gap*2;
+  const bx=W/2-totalW/2;
+  const by=H/2-8;
+  for(let i=0;i<3;i++){
+    const x=bx+i*(boxW+gap);
+    const active=i===nameEntry.pos;
+    ctx.strokeStyle=active?'#ffcc00':'#555';
+    ctx.lineWidth=active?3:1;
+    ctx.strokeRect(x,by,boxW,boxH);
+    if(active){ ctx.fillStyle='rgba(255,204,0,0.12)'; ctx.fillRect(x,by,boxW,boxH); }
+    // blink cursor underline
+    if(active && Math.sin(frame*0.12)>0){
+      ctx.fillStyle='#ffcc00'; ctx.fillRect(x+8,by+boxH-8,boxW-16,3);
+    }
+    ctx.fillStyle=active?'#ffcc00':'#fff';
+    ctx.font='bold 38px Courier New';
+    ctx.fillText(nameEntry.chars[i],x+boxW/2,by+boxH-12);
+  }
+
+  ctx.fillStyle='#555'; ctx.font='13px Courier New';
+  ctx.fillText('W/S or \u2191\u2193 to change  \u2190\u2192 to move  SPACE/ENTER to confirm',W/2,H/2+80);
+  ctx.textAlign='left';
+}
+
+function renderLeaderboard(){
+  ctx.fillStyle='rgba(0,0,0,0.92)'; ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center';
+
+  glow('#ffcc00',20);
+  ctx.fillStyle='#ffcc00'; ctx.font='bold 38px Courier New';
+  ctx.fillText('HIGH SCORES',W/2,H/2-140);
+  noGlow();
+
+  ctx.fillStyle='#555'; ctx.font='14px Courier New';
+  ctx.fillText('── TOP 5 ──',W/2,H/2-108);
+
+  const colors=['#ffcc00','#cccccc','#cd7f32','#aaa','#888'];
+  if(leaderboard.length===0){
+    ctx.fillStyle='#555'; ctx.font='18px Courier New';
+    ctx.fillText('NO SCORES YET',W/2,H/2-40);
+  } else {
+    leaderboard.forEach((entry,i)=>{
+      const y = H/2-70+i*44;
+      ctx.fillStyle=colors[i];
+      ctx.font=`bold 22px Courier New`;
+      const rank=['1ST','2ND','3RD','4TH','5TH'][i];
+      const name=(entry.name||'???').toUpperCase().padEnd(3,' ');
+      ctx.fillText(`${rank}  ${name}  ${String(entry.score).padStart(6,' ')}`,W/2,y);
+    });
+  }
+
+  ctx.fillStyle='#00ff88'; ctx.font='bold 16px Courier New';
+  if(Math.sin(frame*0.07)>0) ctx.fillText('PRESS ENTER OR SPACE',W/2,H/2+160);
+  ctx.textAlign='left';
+}
+
 // ── MAIN LOOP ─────────────────────────────────────────────────────────────
 function loop(){
   frame++;
@@ -816,6 +948,8 @@ function loop(){
     case 'title': renderTitle(); break;
     case 'dead': renderDead(); break;
     case 'win': renderWin(); break;
+    case 'enter_name': renderNameEntry(); break;
+    case 'leaderboard': renderLeaderboard(); break;
   }
   requestAnimationFrame(loop);
 }
