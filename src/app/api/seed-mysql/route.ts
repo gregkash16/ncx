@@ -823,6 +823,7 @@ async function loadAllTimeStats(sheets: any, conn: mysql.Connection) {
       ncxid,
       first_name,
       last_name,
+      discord,
       wins,
       losses,
       points,
@@ -841,20 +842,21 @@ async function loadAllTimeStats(sheets: any, conn: mysql.Connection) {
       s8,
       s9,
       championships
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `;
 
 
   for (const r0 of rows) {
-    const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(
+    const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(
       0,
-      21
+      22
     );
 
     const [
       ncxid,
       first_name,
       last_name,
+      discord,
       wins,
       losses,
       points,
@@ -881,6 +883,7 @@ async function loadAllTimeStats(sheets: any, conn: mysql.Connection) {
       ncxid,
       first_name,
       last_name,
+      discord,
       wins,
       losses,
       points,
