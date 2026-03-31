@@ -100,21 +100,21 @@ let spd=2; // scroll speed px/frame
 const TOTAL_DIST = TOTAL_PX;
 
 // ── LEADERBOARD ───────────────────────────────────────────────────────────
-const LB_KEY = 'trenchRunLB';
-let leaderboard = (()=>{ try{ return JSON.parse(localStorage.getItem(LB_KEY))||[]; }catch(e){ return []; } })();
-highScore = leaderboard.length ? leaderboard[0].score : 0;
+let leaderboard = [];
+let lbLoaded = false;
 let nameEntry = { chars:['A','A','A'], pos:0, afterState:'title' };
 const CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
-function isHighScore(s){ return leaderboard.length<5 || s>leaderboard[leaderboard.length-1].score; }
-
-function saveScore(name, s){
-  leaderboard.push({name, score:s});
-  leaderboard.sort((a,b)=>b.score-a.score);
-  if(leaderboard.length>5) leaderboard.length=5;
-  highScore = leaderboard[0].score;
-  try{ localStorage.setItem(LB_KEY, JSON.stringify(leaderboard)); }catch(e){}
+function fetchLeaderboard(){
+  fetch('/api/trench-run').then(r=>r.json()).then(rows=>{
+    leaderboard = rows;
+    if(rows.length) highScore = rows[0].score;
+    lbLoaded = true;
+  }).catch(()=>{ lbLoaded = true; });
 }
+fetchLeaderboard();
+
+function isHighScore(s){ return leaderboard.length<5 || s>leaderboard[leaderboard.length-1].score; }
 
 function beginNameEntry(afterSt){
   nameEntry = { chars:['A','A','A'], pos:0, afterState:afterSt };
@@ -123,8 +123,15 @@ function beginNameEntry(afterSt){
 
 function confirmName(){
   const name = nameEntry.chars.join('').trim()||'???';
-  saveScore(name, score);
   state='leaderboard';
+  fetch('/api/trench-run', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, score})
+  }).then(r=>r.json()).then(rows=>{
+    leaderboard = rows;
+    if(rows.length) highScore = rows[0].score;
+  }).catch(()=>{});
 }
 
 // ── PLAYER ───────────────────────────────────────────────────────────────
