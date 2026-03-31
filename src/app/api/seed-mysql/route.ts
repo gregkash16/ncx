@@ -228,7 +228,7 @@ function buildPatternAnalyzerUrlFromList(listUrl: string): string | null {
   const parts = listUrl.split("yasb.app/");
   if (parts.length < 2) return null;
   const dataLink = parts[1]; // "?f=...&d=..."
-  return `https://www.pattern-analyzer.app/api/yasb/xws${dataLink}`;
+  return `http://5.161.202.51:3001/api/yasb/xws${dataLink}`;
 }
 
 function buildLaunchBayUrlFromList(listUrl: string): string | null {
@@ -255,14 +255,23 @@ async function fetchXwsFromListUrl(listUrl: string): Promise<XwsResponse | null>
     upstream = buildLaunchBayUrlFromList(listUrl);
   }
 
-  if (!upstream) return null;
+  if (!upstream) {
+    console.log(`[SEED-XWS] No upstream URL for: ${listUrl}`);
+    return null;
+  }
 
   try {
+    console.log(`[SEED-XWS] Fetching from: ${upstream}`);
     const res = await fetch(upstream, { cache: "no-store" });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.log(`[SEED-XWS] Fetch failed with status ${res.status}`);
+      return null;
+    }
     const data = (await res.json()) as XwsResponse;
+    console.log(`[SEED-XWS] Fetch successful: ${data.pilots?.length ?? 0} pilots`);
     return data;
-  } catch {
+  } catch (err) {
+    console.error(`[SEED-XWS] Fetch error:`, err);
     return null;
   }
 }
@@ -1028,6 +1037,8 @@ async function syncListsIncremental(sheets: any, conn: mysql.Connection) {
       )
     `
   );
+
+  console.log(`[SEED-LISTS] Found ${dirtyRows.length} dirty rows to process`);
 
   // per-run URL->XWS dedupe cache
   const xwsCache = new Map<string, XwsResponse | null>();
