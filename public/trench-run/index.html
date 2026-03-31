@@ -53,9 +53,51 @@ function sfxWin(){
   [523,659,784,1047].forEach((f,i)=>setTimeout(()=>playTone(f,f,0.3,'sine',0.4),i*200));
 }
 
+// ── MUSIC ──────────────────────────────────────────────────────────────────
+let _musicOn=false, _musicVader=false, _musicNext=0, _musicIdx=0;
+let _droneA=null,_droneB=null,_droneGA=null,_droneGB=null;
+const MUS_NORM={notes:[110,147,165,220,165,147,110,196],tempo:0.9,vol:0.026,type:'sine'};
+const MUS_VADER={notes:[73.4,87.3,73.4,65.4,73.4,98,82.4,73.4],tempo:0.38,vol:0.034,type:'triangle'};
+
+function startMusic(){
+  if(_musicOn) return; _musicOn=true; _musicVader=false; _musicIdx=0; _musicNext=AC.currentTime+0.4;
+  _droneGA=AC.createGain(); _droneGA.gain.value=0.05;
+  _droneA=AC.createOscillator(); _droneA.type='sine'; _droneA.frequency.value=55;
+  _droneA.connect(_droneGA); _droneGA.connect(AC.destination); _droneA.start();
+  _droneGB=AC.createGain(); _droneGB.gain.value=0.03;
+  _droneB=AC.createOscillator(); _droneB.type='sine'; _droneB.frequency.value=82.4;
+  _droneB.connect(_droneGB); _droneGB.connect(AC.destination); _droneB.start();
+}
+
+function stopMusic(){
+  if(!_musicOn) return; _musicOn=false; _musicVader=false;
+  try{_droneA.stop();}catch(e){} try{_droneB.stop();}catch(e){}
+  _droneA=_droneB=_droneGA=_droneGB=null;
+}
+
+function shiftMusicVader(){
+  if(_musicVader) return; _musicVader=true; _musicIdx=0; _musicNext=AC.currentTime+0.05;
+  if(_droneA) _droneA.frequency.setTargetAtTime(36.7,AC.currentTime,2);
+  if(_droneB) _droneB.frequency.setTargetAtTime(55,AC.currentTime,2);
+  if(_droneGA) _droneGA.gain.setTargetAtTime(0.07,AC.currentTime,0.7);
+  if(_droneGB) _droneGB.gain.setTargetAtTime(0.05,AC.currentTime,0.7);
+}
+
+function updateMusic(){
+  if(!_musicOn||AC.state==='suspended'||AC.currentTime<_musicNext) return;
+  const m=_musicVader?MUS_VADER:MUS_NORM;
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type=m.type; o.frequency.value=m.notes[_musicIdx%m.notes.length];
+  o.connect(g); g.connect(AC.destination);
+  g.gain.setValueAtTime(m.vol,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+m.tempo*0.88);
+  o.start(AC.currentTime); o.stop(AC.currentTime+m.tempo);
+  _musicNext=AC.currentTime+m.tempo; _musicIdx++;
+}
+
 // ── TRENCH GENERATION ────────────────────────────────────────────────────
 const SEG = 16; // pixels per segment
-const TOTAL_PX = 14000;
+const TOTAL_PX = 18000;
 const NUM_SEGS = Math.ceil(TOTAL_PX/SEG) + Math.ceil(W/SEG) + 10;
 let trench = []; // {top, bot}
 
@@ -137,7 +179,7 @@ function confirmName(){
 // ── PLAYER ───────────────────────────────────────────────────────────────
 const PL = {
   x:160, y:H/2, vy:0,
-  hp:250, maxHp:250,
+  hp:180, maxHp:180,
   inv:0, // invincibility frames
   shotCD:0
 };
@@ -147,6 +189,10 @@ let bullets=[], eBullets=[], enemies=[], turrets=[], parts=[], stars=[];
 let exhaustActive=false, exhaustX=0, exhaustHp=8, exhaustDead=false;
 let winTimer=0;
 let enemyTimer=0;
+let vader=null, vaderSpawned=false;
+let falconSaved=false;
+let cine=null;
+let hanSave=null;
 
 // ── INPUT ─────────────────────────────────────────────────────────────────
 const K={};
@@ -199,7 +245,7 @@ function initStars(){
 
 function placeTurrets(){
   turrets=[];
-  const n=40;
+  const n=65;
   for(let i=0;i<n;i++){
     const p = 600 + (TOTAL_DIST/SEG)*(i/n)*SEG + Math.random()*200;
     turrets.push({
@@ -214,10 +260,14 @@ function placeTurrets(){
 
 function startGame(){
   state='playing'; frame=0; dist=0; score=0; spd=1;
-  PL.x=160; PL.y=H/2; PL.vy=0; PL.hp=250; PL.inv=120; PL.shotCD=0; // 2s start invincibility
+  PL.x=160; PL.y=H/2; PL.vy=0; PL.hp=180; PL.inv=120; PL.shotCD=0; // 2s start invincibility
   bullets=[]; eBullets=[]; enemies=[]; parts=[];
   exhaustActive=false; exhaustX=0; exhaustHp=8; exhaustDead=false; winTimer=0;
   enemyTimer=0;
+  vader=null; vaderSpawned=false;
+  falconSaved=false;
+  cine=null; hanSave=null;
+  stopMusic(); startMusic();
   generateTrench();
   initStars();
   placeTurrets();
@@ -247,17 +297,27 @@ function spark(x,y){
 // ── UPDATE ────────────────────────────────────────────────────────────────
 function damage(amt){
   if(PL.inv>0) return;
-  PL.hp-=amt; PL.inv=90; // ~1.5s invincibility after each hit
+  const threshold=Math.ceil(PL.maxHp*0.05);
+  // Han save: any hit that would drop us to/below 5% after Vader spawns
+  if(!falconSaved && PL.hp-amt<=threshold){
+    PL.hp=threshold; PL.inv=9999;
+    sfxHit();
+    triggerHanSave();
+    return;
+  }
+  PL.hp-=amt; PL.inv=70;
   sfxHit();
   if(PL.hp<=0){
     PL.hp=0; explode(PL.x,PL.y,true); sfxExplode(true);
     highScore=Math.max(highScore,score);
+    stopMusic();
     setTimeout(()=>{ if(isHighScore(score)) beginNameEntry('dead'); else state='dead'; },1200);
   }
 }
 
 function update(){
   if(state!=='playing') return;
+  updateMusic();
 
   // Speed ramps from 1→3 over the run
   spd = 1 + (dist/TOTAL_DIST)*2;
@@ -279,8 +339,8 @@ function update(){
 
   // Wall collision
   const seg=getTrench(PL.x);
-  if(PL.y<seg.top+14){ PL.y=seg.top+14; PL.vy=Math.abs(PL.vy)*0.3; damage(4); }
-  if(PL.y>seg.bot-14){ PL.y=seg.bot-14; PL.vy=-Math.abs(PL.vy)*0.3; damage(4); }
+  if(PL.y<seg.top+14){ PL.y=seg.top+14; PL.vy=Math.abs(PL.vy)*0.3; damage(5); }
+  if(PL.y>seg.bot-14){ PL.y=seg.bot-14; PL.vy=-Math.abs(PL.vy)*0.3; damage(5); }
 
   // Shoot
   if(PL.shotCD>0) PL.shotCD--;
@@ -308,7 +368,7 @@ function update(){
     b.x+=b.vx; b.y+=b.vy;
     if(b.x<-20||b.x>W+20||b.y<0||b.y>H){ eBullets.splice(i,1); continue; }
     if(Math.abs(b.x-PL.x)<22&&Math.abs(b.y-PL.y)<14){
-      damage(8); spark(b.x,b.y); eBullets.splice(i,1);
+      damage(b.dmg||8); spark(b.x,b.y); eBullets.splice(i,1);
     }
   }
 
@@ -327,7 +387,7 @@ function update(){
     else{
       const dx=PL.x-e.x, dy=PL.y-e.y, dd=Math.sqrt(dx*dx+dy*dy);
       if(dd<500){
-        const sp=5;
+        const sp=6;
         eBullets.push({x:e.x,y:e.y,vx:dx/dd*sp,vy:dy/dd*sp});
         sfxEnemyShoot();
         e.cd=110+Math.random()*70|0;
@@ -336,7 +396,7 @@ function update(){
 
     // Collide with player
     if(Math.abs(e.x-PL.x)<38&&Math.abs(e.y-PL.y)<22){
-      damage(15); explode(e.x,e.y,true); sfxExplode(true);
+      damage(18); explode(e.x,e.y,true); sfxExplode(true);
       enemies.splice(i,1); continue;
     }
 
@@ -348,7 +408,7 @@ function update(){
         e.hp--; bullets.splice(j,1); spark(b.x,b.y);
         if(e.hp<=0){
           score+=100; explode(e.x,e.y,true); sfxExplode(true);
-          PL.hp=Math.min(PL.hp+5,PL.maxHp);
+          PL.hp=Math.min(PL.hp+(PL.maxHp-PL.hp)*0.10,PL.maxHp);
           enemies.splice(i,1); hit=true; break;
         }
       }
@@ -369,11 +429,11 @@ function update(){
     if(t.cd>0) t.cd--;
     else{
       const dx=PL.x-sx, dy=PL.y-ty, dd=Math.sqrt(dx*dx+dy*dy);
-      if(dd<420){
-        const sp=4.5;
+      if(dd<470){
+        const sp=5;
         eBullets.push({x:sx,y:ty,vx:dx/dd*sp,vy:dy/dd*sp});
         sfxEnemyShoot();
-        t.cd=140+Math.random()*60|0;
+        t.cd=95+Math.random()*45|0;
       }
     }
 
@@ -382,7 +442,7 @@ function update(){
       const b=bullets[j];
       if(Math.abs(b.x-sx)<14&&Math.abs(b.y-ty)<14){
         t.hp--; bullets.splice(j,1); spark(b.x,b.y);
-        if(t.hp<=0){ t.dead=true; score+=50; explode(sx,ty,false); sfxExplode(false); PL.hp=Math.min(PL.hp+3,PL.maxHp); }
+        if(t.hp<=0){ t.dead=true; score+=50; explode(sx,ty,false); sfxExplode(false); PL.hp=Math.min(PL.hp+(PL.maxHp-PL.hp)*0.05,PL.maxHp); }
         break;
       }
     }
@@ -409,10 +469,10 @@ function update(){
           explode(exhaustX,ey,true);
           setTimeout(()=>explode(exhaustX+30,ey-20,true),300);
           setTimeout(()=>explode(exhaustX-20,ey+30,true),600);
-          sfxExplode(true); sfxWin();
+          sfxExplode(true); sfxWin(); stopMusic();
           score+=1000;
           highScore=Math.max(highScore,score);
-          setTimeout(()=>{ if(isHighScore(score)) beginNameEntry('win'); else state='win'; },2500);
+          setTimeout(()=>startCinematic(), 800);
         }
         break;
       }
@@ -426,6 +486,47 @@ function update(){
     p.vx*=0.96; p.vy*=0.96; p.vy+=0.04;
     p.life-=p.dec;
     if(p.life<=0) parts.splice(i,1);
+  }
+
+  // Vader boss
+  if(!vaderSpawned && dist/TOTAL_DIST>=0.30 && !exhaustActive){
+    vaderSpawned=true;
+    vader={x:W+90, y:PL.y, vx:-1.3, vy:0, hp:8, cd:80, targetX:420};
+    shiftMusicVader();
+  }
+  // Scripted Han save — guaranteed at 85% regardless of HP
+  if(vaderSpawned && !falconSaved && dist/TOTAL_DIST>=0.85){
+    triggerHanSave();
+  }
+  if(vader){
+    if(vader.x>vader.targetX) vader.x+=vader.vx;
+    const vdDy=PL.y-vader.y; vader.vy+=vdDy*0.012; vader.vy*=0.90; vader.y+=vader.vy;
+    const vws=getTrench(vader.x);
+    if(vader.y<vws.top+32){ vader.y=vws.top+32; vader.vy=Math.abs(vader.vy); }
+    if(vader.y>vws.bot-32){ vader.y=vws.bot-32; vader.vy=-Math.abs(vader.vy); }
+    if(vader.cd>0) vader.cd--;
+    else{
+      const vdx=PL.x-vader.x, vdy=PL.y-vader.y, vdd=Math.sqrt(vdx*vdx+vdy*vdy);
+      if(vdd<700){
+        const sp=7;
+        eBullets.push({x:vader.x,y:vader.y,vx:vdx/vdd*sp,vy:vdy/vdd*sp,dmg:13});
+        sfxEnemyShoot();
+        vader.cd=32+Math.random()*20|0;
+      }
+    }
+    if(Math.abs(vader.x-PL.x)<40&&Math.abs(vader.y-PL.y)<24){
+      damage(20); // Vader is invincible — stays in pursuit
+    }
+    // Vader is invincible — bullets just deflect
+    if(vader){
+      for(let j=bullets.length-1;j>=0;j--){
+        const b=bullets[j];
+        if(Math.abs(b.x-vader.x)<32&&Math.abs(b.y-vader.y)<20){
+          bullets.splice(j,1); spark(b.x,b.y); spark(b.x+4,b.y-4);
+          break;
+        }
+      }
+    }
   }
 
   // Spawn enemies
@@ -452,69 +553,87 @@ function update(){
 function glow(color,blur){ ctx.shadowColor=color; ctx.shadowBlur=blur; }
 function noGlow(){ ctx.shadowBlur=0; }
 
-function drawXWing(x,y){
-  const flash=PL.inv>0&&PL.inv%4<2;
+function drawXWing(x,y,flash){
+  if(flash===undefined) flash=PL.inv>0&&PL.inv%4<2;
   if(flash){ ctx.globalAlpha=0.4; }
 
-  // Engine glow
-  const eg=ctx.createRadialGradient(x-24,y,0,x-24,y,16);
-  eg.addColorStop(0,'rgba(80,180,255,0.9)');
-  eg.addColorStop(1,'rgba(0,40,200,0)');
-  ctx.fillStyle=eg;
-  ctx.beginPath();
-  ctx.arc(x-24,y,13+Math.sin(frame*0.2)*2,0,Math.PI*2);
-  ctx.fill();
+  // Dual engine glows (two nacelles)
+  for(const oy of [-9,9]){
+    const eg=ctx.createRadialGradient(x-26,y+oy,0,x-26,y+oy,13);
+    eg.addColorStop(0,'rgba(100,200,255,0.95)');
+    eg.addColorStop(1,'rgba(0,40,200,0)');
+    ctx.fillStyle=eg;
+    ctx.beginPath(); ctx.arc(x-26,y+oy,11+Math.sin(frame*0.2)*1.5,0,Math.PI*2); ctx.fill();
+  }
 
-  // Body
-  ctx.fillStyle='#cccccc';
+  // === WINGS — draw behind fuselage ===
+  // Top-front wing
+  ctx.fillStyle='#b0b0b0';
   ctx.beginPath();
-  ctx.moveTo(x+28,y);
-  ctx.lineTo(x+12,y-6);
-  ctx.lineTo(x-24,y-5);
-  ctx.lineTo(x-24,y+5);
-  ctx.lineTo(x+12,y+6);
-  ctx.closePath();
-  ctx.fill();
-
-  // Cockpit
-  ctx.fillStyle='#7ab8f5';
-  ctx.beginPath();
-  ctx.ellipse(x+13,y-6,9,5,-0.25,0,Math.PI*2);
-  ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,0.3)';
-  ctx.beginPath();
-  ctx.ellipse(x+11,y-8,4,2,-0.25,0,Math.PI*2);
-  ctx.fill();
-
-  // Wings (4)
-  ctx.fillStyle='#aaaaaa';
-  // Top-front
-  ctx.beginPath();
-  ctx.moveTo(x+14,y-6);ctx.lineTo(x-4,y-24);ctx.lineTo(x-18,y-22);ctx.lineTo(x-6,y-6);
+  ctx.moveTo(x+10,y-4); ctx.lineTo(x-2,y-33); ctx.lineTo(x-18,y-31); ctx.lineTo(x-3,y-5);
   ctx.closePath(); ctx.fill();
-  // Bot-front
+  // Bot-front wing
   ctx.beginPath();
-  ctx.moveTo(x+14,y+6);ctx.lineTo(x-4,y+24);ctx.lineTo(x-18,y+22);ctx.lineTo(x-6,y+6);
+  ctx.moveTo(x+10,y+4); ctx.lineTo(x-2,y+33); ctx.lineTo(x-18,y+31); ctx.lineTo(x-3,y+5);
   ctx.closePath(); ctx.fill();
-  // Top-back
-  ctx.fillStyle='#999';
+  // Top-rear wing (darker)
+  ctx.fillStyle='#909090';
   ctx.beginPath();
-  ctx.moveTo(x-6,y-6);ctx.lineTo(x-18,y-22);ctx.lineTo(x-26,y-20);ctx.lineTo(x-24,y-5);
+  ctx.moveTo(x-3,y-5); ctx.lineTo(x-18,y-31); ctx.lineTo(x-32,y-28); ctx.lineTo(x-32,y-4);
   ctx.closePath(); ctx.fill();
-  // Bot-back
+  // Bot-rear wing
   ctx.beginPath();
-  ctx.moveTo(x-6,y+6);ctx.lineTo(x-18,y+22);ctx.lineTo(x-26,y+20);ctx.lineTo(x-24,y+5);
+  ctx.moveTo(x-3,y+5); ctx.lineTo(x-18,y+31); ctx.lineTo(x-32,y+28); ctx.lineTo(x-32,y+4);
   ctx.closePath(); ctx.fill();
 
-  // Red stripe
-  ctx.fillStyle='#cc4400';
-  ctx.fillRect(x-17,y-23,11,3);
-  ctx.fillRect(x-17,y+20,11,3);
+  // Red wing stripes
+  ctx.fillStyle='#cc3300';
+  ctx.fillRect(x-21,y-31,17,3);
+  ctx.fillRect(x-21,y+28,17,3);
 
-  // Cannons at nose
-  ctx.fillStyle='#888';
-  ctx.fillRect(x+22,y-3,10,2.5);
-  ctx.fillRect(x+22,y+0.5,10,2.5);
+  // Laser cannons — 4 tubes, one at each wingtip
+  ctx.fillStyle='#666';
+  ctx.fillRect(x-2,y-34,36,2.5);   // top-front tip → past nose
+  ctx.fillRect(x-2,y+32,36,2.5);   // bot-front tip → past nose
+  ctx.fillRect(x-32,y-30,26,2.5);  // top-rear tip
+  ctx.fillRect(x-32,y+28,26,2.5);  // bot-rear tip
+
+  // Engine nacelle blocks
+  ctx.fillStyle='#777';
+  ctx.fillRect(x-34,y-12,10,7);
+  ctx.fillRect(x-34,y+5,10,7);
+
+  // === FUSELAGE ===
+  ctx.fillStyle='#d2d2d2';
+  ctx.beginPath();
+  ctx.moveTo(x+36,y);        // nose tip
+  ctx.lineTo(x+22,y-4);
+  ctx.lineTo(x-2,y-4);
+  ctx.lineTo(x-22,y-5);
+  ctx.lineTo(x-32,y-3);
+  ctx.lineTo(x-32,y+3);
+  ctx.lineTo(x-22,y+5);
+  ctx.lineTo(x-2,y+4);
+  ctx.lineTo(x+22,y+4);
+  ctx.closePath(); ctx.fill();
+
+  // Fuselage darker top panel
+  ctx.fillStyle='#b8b8b8';
+  ctx.beginPath();
+  ctx.moveTo(x+34,y); ctx.lineTo(x+20,y-4); ctx.lineTo(x-20,y-4); ctx.lineTo(x-30,y-2);
+  ctx.lineTo(x-30,y); ctx.lineTo(x-20,y-1); ctx.lineTo(x+20,y-1); ctx.closePath(); ctx.fill();
+
+  // Cockpit canopy
+  ctx.fillStyle='#6aacdc';
+  ctx.beginPath(); ctx.ellipse(x+16,y-6,13,7,-0.18,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.28)';
+  ctx.beginPath(); ctx.ellipse(x+13,y-9,6,3,-0.18,0,Math.PI*2); ctx.fill();
+
+  // R2-D2 dome (behind cockpit)
+  ctx.fillStyle='#ccddf0';
+  ctx.beginPath(); ctx.arc(x+1,y-6,5,Math.PI,0); ctx.fill();
+  ctx.fillStyle='#2255aa';
+  ctx.beginPath(); ctx.arc(x+1,y-6,3,Math.PI,0); ctx.fill();
 
   ctx.globalAlpha=1;
 }
@@ -576,6 +695,78 @@ function drawTurret(x,y,side,dead){
     ctx.beginPath(); ctx.arc(x, down?y+6:y-6, 4, 0, Math.PI*2); ctx.fill();
     noGlow();
   }
+}
+
+function drawVader(x,y){
+  // TIE Advanced x1 — angular bent wings, red cockpit
+  ctx.fillStyle='#222'; ctx.strokeStyle='#445'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(x,y,13,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#1a0005';
+  ctx.beginPath(); ctx.arc(x+2,y,8,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#770011';
+  ctx.beginPath(); ctx.arc(x+2,y,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,60,60,0.5)';
+  ctx.beginPath(); ctx.arc(x+1,y-2,2,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#333';
+  ctx.fillRect(x-32,y-2.5,20,5); ctx.fillRect(x+12,y-2.5,20,5);
+  // Swept/bent wings
+  ctx.fillStyle='#2a2a3a'; ctx.strokeStyle='#556'; ctx.lineWidth=1.2;
+  ctx.beginPath();
+  ctx.moveTo(x-32,y-18); ctx.lineTo(x-55,y-8); ctx.lineTo(x-58,y+8);
+  ctx.lineTo(x-32,y+18); ctx.lineTo(x-22,y+10); ctx.lineTo(x-26,y);
+  ctx.lineTo(x-22,y-10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x+32,y-18); ctx.lineTo(x+55,y-8); ctx.lineTo(x+58,y+8);
+  ctx.lineTo(x+32,y+18); ctx.lineTo(x+22,y+10); ctx.lineTo(x+26,y);
+  ctx.lineTo(x+22,y-10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Wing panel lines
+  ctx.strokeStyle='#3a3a55'; ctx.lineWidth=0.8;
+  for(const ox of [-1,1]){
+    for(const dy of [-10,0,10]){
+      ctx.beginPath(); ctx.moveTo(x+ox*30,y+dy); ctx.lineTo(x+ox*50,y+dy*0.5); ctx.stroke();
+    }
+  }
+  // Red pulsing aura — strong so it's clearly visible
+  const pulse=0.4+0.4*Math.sin(frame*0.14);
+  glow('#ff0000',30);
+  ctx.strokeStyle=`rgba(255,0,0,${pulse})`;
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(x,y,18,0,Math.PI*2); ctx.stroke();
+  glow('#ff0000',12);
+  ctx.strokeStyle=`rgba(255,80,0,${pulse*0.6})`;
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(x,y,28,0,Math.PI*2); ctx.stroke();
+  noGlow();
+}
+
+function drawFalcon(x,y){
+  // Millennium Falcon flying LEFT — front faces left
+  const eg=ctx.createRadialGradient(x+36,y,0,x+36,y,22);
+  eg.addColorStop(0,'rgba(80,180,255,0.9)');
+  eg.addColorStop(1,'rgba(0,40,200,0)');
+  ctx.fillStyle=eg;
+  ctx.beginPath(); ctx.arc(x+36,y,18+Math.sin(frame*0.2)*2,0,Math.PI*2); ctx.fill();
+  // Main disc
+  ctx.fillStyle='#aaa';
+  ctx.beginPath(); ctx.ellipse(x,y,40,22,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#999';
+  ctx.beginPath(); ctx.ellipse(x-4,y,30,15,0,0,Math.PI*2); ctx.fill();
+  // Forward mandibles (pointing left)
+  ctx.fillStyle='#888';
+  ctx.beginPath();
+  ctx.moveTo(x-20,y-7); ctx.lineTo(x-46,y-3); ctx.lineTo(x-46,y-11); ctx.lineTo(x-22,y-14);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x-20,y+7); ctx.lineTo(x-46,y+3); ctx.lineTo(x-46,y+11); ctx.lineTo(x-22,y+14);
+  ctx.closePath(); ctx.fill();
+  // Cockpit (top)
+  ctx.fillStyle='#7ab8f5';
+  ctx.beginPath(); ctx.arc(x+8,y-14,8,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.3)';
+  ctx.beginPath(); ctx.arc(x+6,y-16,3,0,Math.PI*2); ctx.fill();
+  // Panel detail
+  ctx.strokeStyle='#777'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.ellipse(x-6,y,16,9,0.15,0,Math.PI*2); ctx.stroke();
 }
 
 function drawExhaustPort(x){
@@ -707,6 +898,9 @@ function render(){
     drawTIE(e.x,e.y);
   }
 
+  // Vader
+  if(vader) drawVader(vader.x,vader.y);
+
   // Player bullets
   glow('#00ff44',10);
   ctx.fillStyle='#44ff88';
@@ -783,6 +977,16 @@ function renderHUD(){
       ctx.textAlign='left';
       noGlow();
     }
+  }
+
+  // Vader warning
+  if(vader && Math.sin(frame*0.18)>0){
+    glow('#ff0000',18);
+    ctx.fillStyle='#ff2200'; ctx.font='bold 13px Courier New';
+    ctx.textAlign='center';
+    ctx.fillText('⚠  VADER ON YOUR TAIL  ⚠',W/2,H/2-70);
+    ctx.textAlign='left';
+    noGlow();
   }
 
   // Exhaust port incoming warning
@@ -946,17 +1150,318 @@ function renderLeaderboard(){
   ctx.textAlign='left';
 }
 
+// ── HAN SAVE CUTAWAY ──────────────────────────────────────────────────────
+function triggerHanSave(){
+  falconSaved=true;
+  stopMusic();
+  // Save Vader's last position for the cutaway
+  const vx=vader?vader.x:W*0.65, vy=vader?vader.y:H*0.5;
+  vader=null;
+  parts=[];
+  hanSave={
+    timer:0,
+    vaderX:Math.min(vx,W*0.72), vaderY:vy,
+    falcX:W+130, falcY:vy-20,
+  };
+  state='han_save';
+}
+
+function updateHanSave(){
+  if(!hanSave) return;
+  const t=hanSave.timer++;
+  // Stars drift
+  for(const s of stars){ s.x-=2; if(s.x<0){ s.x=W; s.y=Math.random()*H; } }
+  // Falcon sweeps across
+  hanSave.falcX-=5;
+  // Spawn debris when Vader explodes
+  if(t===130){ sfxExplode(true); explode(hanSave.vaderX,hanSave.vaderY,true); explode(hanSave.vaderX+20,hanSave.vaderY-15,true); }
+  if(t===150) sfxExplode(false);
+  // Update particles
+  for(let i=parts.length-1;i>=0;i--){
+    const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.vx*=0.97; p.vy*=0.97;
+    p.life-=p.dec; if(p.life<=0) parts.splice(i,1);
+  }
+  // Resume game after cutaway
+  if(t>=420){
+    hanSave=null;
+    state='playing';
+    PL.hp=Math.ceil(PL.maxHp*0.05); // 5% hp
+    PL.inv=200; // ~3.3s to get ready
+    // Jump dist to just before exhaust port (leaving ~600px of trench)
+    dist=TOTAL_DIST*0.885;
+    exhaustActive=false; exhaustX=0; exhaustDead=false;
+    vader=null; vaderSpawned=true; // don't re-spawn
+    enemies=[]; eBullets=[];
+    // Restart music in a tense mode
+    startMusic(); shiftMusicVader();
+  }
+}
+
+function renderHanSave(){
+  if(!hanSave) return;
+  const t=hanSave.timer;
+  ctx.fillStyle='#00010a'; ctx.fillRect(0,0,W,H);
+  // Stars
+  for(const s of stars){
+    ctx.globalAlpha=0.5+s.r*0.2; ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r*0.5,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // Vader (large, menacing) — visible until explosion
+  if(t<131){
+    ctx.save(); ctx.translate(hanSave.vaderX,hanSave.vaderY); ctx.scale(1.5,1.5);
+    drawVader(0,0); ctx.restore();
+  }
+  // Vader locked-on targeting reticle
+  if(t<110 && Math.sin(t*0.22)>0){
+    glow('#ff0000',15);
+    ctx.strokeStyle='#ff3300'; ctx.lineWidth=2;
+    const r=48+Math.sin(t*0.1)*4;
+    ctx.beginPath(); ctx.arc(hanSave.vaderX,hanSave.vaderY,r,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(hanSave.vaderX-r-10,hanSave.vaderY); ctx.lineTo(hanSave.vaderX-r+8,hanSave.vaderY);
+    ctx.moveTo(hanSave.vaderX+r-8,hanSave.vaderY); ctx.lineTo(hanSave.vaderX+r+10,hanSave.vaderY);
+    ctx.moveTo(hanSave.vaderX,hanSave.vaderY-r-10); ctx.lineTo(hanSave.vaderX,hanSave.vaderY-r+8);
+    ctx.moveTo(hanSave.vaderX,hanSave.vaderY+r-8); ctx.lineTo(hanSave.vaderX,hanSave.vaderY+r+10);
+    ctx.stroke(); noGlow();
+  }
+
+  // Damaged X-Wing at left — barely holding together
+  if(t<131){
+    const flicker=Math.sin(t*0.7)>-0.3;
+    if(flicker){ ctx.globalAlpha=0.5+0.5*Math.random(); drawXWing(160,H*0.52,false); ctx.globalAlpha=1; }
+    // Damage sparks
+    if(t%6===0) spark(160+(Math.random()-0.5)*20, H*0.52+(Math.random()-0.5)*20);
+  }
+
+  // Falcon sweeps in from right
+  if(t>45&&hanSave.falcX>-160){
+    ctx.save(); ctx.translate(hanSave.falcX,hanSave.falcY); ctx.scale(-1,1);
+    drawFalcon(0,0); ctx.restore();
+  }
+
+  // Vader explosion
+  if(t>=130&&t<240){
+    const et=t-130, r=Math.min(et*3.5,90), a=Math.max(0,1-et/100);
+    ctx.globalAlpha=a;
+    const mg=ctx.createRadialGradient(hanSave.vaderX,hanSave.vaderY,0,hanSave.vaderX,hanSave.vaderY,r);
+    mg.addColorStop(0,'#ffffff'); mg.addColorStop(0.25,'#ffffaa');
+    mg.addColorStop(0.55,'#ff8800'); mg.addColorStop(1,'rgba(255,30,0,0)');
+    ctx.fillStyle=mg; ctx.beginPath(); ctx.arc(hanSave.vaderX,hanSave.vaderY,r,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+  // Debris particles
+  for(const p of parts){
+    ctx.globalAlpha=p.life; ctx.fillStyle=p.col;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.sz*p.life,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // Text overlays
+  if(t>70&&t<131&&Math.sin(t*0.14)>0){
+    glow('#ff2200',12); ctx.fillStyle='#ff3300'; ctx.font='bold 15px Courier New';
+    ctx.textAlign='center'; ctx.fillText("VADER HAS YOU LOCKED IN...",W/2,H*0.18); ctx.textAlign='left'; noGlow();
+  }
+  if(t>100&&t<185&&Math.sin(t*0.18)>0){
+    glow('#ffcc00',18); ctx.fillStyle='#ffee00'; ctx.font='bold 21px Courier New';
+    ctx.textAlign='center'; ctx.fillText("YAHOO!  I'VE GOT HIM!",W/2,H*0.22); ctx.textAlign='left'; noGlow();
+  }
+  if(t>200){
+    const ta=Math.min(1,(t-200)/60); ctx.globalAlpha=ta;
+    glow('#00ff88',22); ctx.fillStyle='#00ff88'; ctx.font='bold 24px Courier New';
+    ctx.textAlign='center'; ctx.fillText("YOU'RE ALL CLEAR, KID!",W/2,H/2-16); noGlow();
+    ctx.fillStyle='#cccccc'; ctx.font='16px Courier New';
+    ctx.fillText("NOW BLOW THIS THING AND GO HOME!",W/2,H/2+18);
+    ctx.textAlign='left'; ctx.globalAlpha=1;
+  }
+  // Countdown bar at bottom
+  if(t>200){
+    const prog=Math.min(1,(t-200)/190);
+    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(W/2-150,H-50,300,14);
+    ctx.fillStyle='#00ff88'; ctx.fillRect(W/2-150,H-50,300*prog,14);
+  }
+}
+
+// ── CINEMATIC ─────────────────────────────────────────────────────────────
+function startCinematic(){
+  parts=[];
+  cine={
+    timer:0,
+    xwX:90,  xwY:H*0.58, xwVx:1.3, xwVy:-0.25,
+    falX:55, falY:H*0.40, falVx:1.5, falVy:-0.18,
+    dsX:W*0.27, dsY:H*0.47,
+  };
+  state='cinematic';
+}
+
+function updateCinematic(){
+  if(!cine) return;
+  const t=cine.timer++;
+
+  // Stars stream fast — dramatic escape
+  for(const s of stars){ s.x-=s.spd*2+5; if(s.x<0){ s.x=W; s.y=Math.random()*H; } }
+
+  // Ships fly right and slightly up
+  cine.xwX+=cine.xwVx; cine.xwY+=cine.xwVy;
+  cine.falX+=cine.falVx; cine.falY+=cine.falVy;
+
+  // Debris particles from Death Star
+  if(t>35&&t<320&&t%4===0){
+    const a=Math.random()*Math.PI*2, r=30+Math.random()*110;
+    explode(cine.dsX+Math.cos(a)*r, cine.dsY+Math.sin(a)*r, t>110);
+  }
+
+  // Explosion sound cues
+  if(t===55||t===110||t===160) sfxExplode(t>100);
+
+  // Update particles
+  for(let i=parts.length-1;i>=0;i--){
+    const p=parts[i];
+    p.x+=p.vx; p.y+=p.vy; p.vx*=0.97; p.vy*=0.97;
+    p.life-=p.dec; if(p.life<=0) parts.splice(i,1);
+  }
+
+  if(t>=500){ cine=null; if(isHighScore(score)) beginNameEntry('win'); else state='win'; }
+}
+
+function renderCinematic(){
+  if(!cine) return;
+  const t=cine.timer;
+  const dsX=cine.dsX, dsY=cine.dsY, dsR=155;
+
+  // Space background
+  ctx.fillStyle='#00010a'; ctx.fillRect(0,0,W,H);
+  for(const s of stars){
+    ctx.globalAlpha=0.5+s.r*0.25; ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r*0.5,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // ── DEATH STAR ──
+  const dsAlpha=t<240?1:Math.max(0,1-(t-240)/70);
+  if(dsAlpha>0){
+    ctx.globalAlpha=dsAlpha;
+    // Sphere gradient
+    const dg=ctx.createRadialGradient(dsX-50,dsY-50,20,dsX,dsY,dsR);
+    dg.addColorStop(0,'#898989'); dg.addColorStop(0.55,'#555'); dg.addColorStop(1,'#282828');
+    ctx.fillStyle=dg;
+    ctx.beginPath(); ctx.arc(dsX,dsY,dsR,0,Math.PI*2); ctx.fill();
+    // Panel grid (clipped to circle)
+    ctx.save();
+    ctx.beginPath(); ctx.arc(dsX,dsY,dsR,0,Math.PI*2); ctx.clip();
+    ctx.strokeStyle='#3e3e3e'; ctx.lineWidth=0.8;
+    for(let dy=-dsR;dy<=dsR;dy+=16){
+      ctx.beginPath(); ctx.moveTo(dsX-dsR,dsY+dy); ctx.lineTo(dsX+dsR,dsY+dy); ctx.stroke();
+    }
+    for(let dx=-dsR;dx<=dsR;dx+=16){
+      ctx.beginPath(); ctx.moveTo(dsX+dx,dsY-dsR); ctx.lineTo(dsX+dx,dsY+dsR); ctx.stroke();
+    }
+    // Equatorial trench
+    ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=7;
+    ctx.beginPath(); ctx.moveTo(dsX-dsR,dsY); ctx.lineTo(dsX+dsR,dsY); ctx.stroke();
+    ctx.restore();
+    // Superlaser dish
+    const dshX=dsX-55, dshY=dsY-62;
+    ctx.fillStyle='#353535';
+    ctx.beginPath(); ctx.arc(dshX,dshY,34,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#111';
+    ctx.beginPath(); ctx.arc(dshX,dshY,27,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#3a3a3a'; ctx.lineWidth=1.5;
+    for(const r of [8,15,22]){ ctx.beginPath(); ctx.arc(dshX,dshY,r,0,Math.PI*2); ctx.stroke(); }
+    ctx.fillStyle='#444'; ctx.beginPath(); ctx.arc(dshX,dshY,5,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // ── SURFACE EXPLOSIONS ──
+  const ePts=[
+    {ox:-40,oy:-70,d:35},{ox:50,oy:-25,d:70},{ox:-10,oy:60,d:55},
+    {ox:70,oy:35,d:95},{ox:-75,oy:25,d:80},{ox:25,oy:88,d:108},
+    {ox:-55,oy:-35,d:122},{ox:90,oy:-55,d:138}
+  ];
+  for(const ep of ePts){
+    const et=t-ep.d; if(et<=0) continue;
+    const r=Math.min(et*1.3,50); const a=Math.max(0,1-et/85);
+    ctx.globalAlpha=a;
+    ctx.fillStyle=`hsl(${22+Math.sin(et*0.1)*15},100%,55%)`;
+    ctx.beginPath(); ctx.arc(dsX+ep.ox,dsY+ep.oy,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(dsX+ep.ox,dsY+ep.oy,r*0.32,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // ── MAIN EXPLOSION BLOOM ──
+  if(t>140){
+    const mt=t-140, mr=Math.min(mt*2.6,220), ma=Math.max(0,1-mt/150);
+    ctx.globalAlpha=ma;
+    const mg=ctx.createRadialGradient(dsX,dsY,0,dsX,dsY,mr);
+    mg.addColorStop(0,'#ffffff'); mg.addColorStop(0.2,'#ffffaa');
+    mg.addColorStop(0.5,'#ff8800'); mg.addColorStop(0.8,'#ff3300');
+    mg.addColorStop(1,'rgba(255,30,0,0)');
+    ctx.fillStyle=mg;
+    ctx.beginPath(); ctx.arc(dsX,dsY,mr,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // ── DEBRIS PARTICLES ──
+  for(const p of parts){
+    ctx.globalAlpha=p.life; ctx.fillStyle=p.col;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.sz*p.life,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // ── SHIPS ESCAPING ──
+  // X-Wing faces right (normal draw)
+  drawXWing(cine.xwX, cine.xwY, false);
+  // Falcon mirrored to face right
+  ctx.save();
+  ctx.translate(cine.falX, cine.falY);
+  ctx.scale(-1,1);
+  drawFalcon(0,0);
+  ctx.restore();
+
+  // ── SCREEN FLASH ──
+  if(t>210&&t<290){
+    const fa=Math.sin((t-210)/80*Math.PI)*0.88;
+    ctx.fillStyle=`rgba(255,252,230,${fa})`; ctx.fillRect(0,0,W,H);
+  }
+
+  // ── WIN TEXT FADE IN ──
+  if(t>310){
+    const ta=Math.min(1,(t-310)/60);
+    ctx.globalAlpha=ta;
+    ctx.fillStyle='rgba(0,0,16,0.65)'; ctx.fillRect(0,0,W,H);
+    glow('#ffcc00',32);
+    ctx.fillStyle='#ffdd00'; ctx.font='bold 54px Courier New';
+    ctx.textAlign='center';
+    ctx.fillText('GREAT SHOT KID!',W/2,H/2-18);
+    noGlow();
+    ctx.fillStyle='#ffffff'; ctx.font='bold 20px Courier New';
+    ctx.fillText('DEATH STAR DESTROYED!',W/2,H/2+28);
+    ctx.textAlign='left';
+    ctx.globalAlpha=1;
+  }
+}
+
 // ── MAIN LOOP ─────────────────────────────────────────────────────────────
 function loop(){
   frame++;
-  update();
-  render();
-  switch(state){
-    case 'title': renderTitle(); break;
-    case 'dead': renderDead(); break;
-    case 'win': renderWin(); break;
-    case 'enter_name': renderNameEntry(); break;
-    case 'leaderboard': renderLeaderboard(); break;
+  if(state==='cinematic'){
+    updateCinematic();
+    renderCinematic();
+  } else if(state==='han_save'){
+    updateHanSave();
+    renderHanSave();
+  } else {
+    update();
+    render();
+    switch(state){
+      case 'title': renderTitle(); break;
+      case 'dead': renderDead(); break;
+      case 'win': renderWin(); break;
+      case 'enter_name': renderNameEntry(); break;
+      case 'leaderboard': renderLeaderboard(); break;
+    }
   }
   requestAnimationFrame(loop);
 }
