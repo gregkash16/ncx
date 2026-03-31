@@ -15,7 +15,8 @@ type TabKey =
   | "report"
   | "prefs"
   | "podcast"
-  | "prevseasons";
+  | "prevseasons"
+  | "arcade";
 
 const row1: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "home",      label: "Home",         href: "/" },
@@ -31,6 +32,7 @@ const row2Base: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "players",     label: "Players",       href: "/?tab=players" },
   { key: "podcast",     label: "Podcast",       href: "/?tab=podcast" },
   { key: "prevseasons", label: "Prev. Seasons", href: "/?tab=prevseasons" },
+  { key: "arcade",      label: "Trench Run",    href: "/arcade" },
 ];
 
 export default function DesktopNavTabs() {

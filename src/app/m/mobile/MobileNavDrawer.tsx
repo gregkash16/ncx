@@ -74,7 +74,7 @@ export default function MobileNavDrawer({ open, onClose }: Props) {
         { href: currentHref, label: "Current", icon: CalendarDays },
         { href: matchupsHref, label: "Matchups", icon: ListIcon },
         { href: "/m/standings", label: "Standings", icon: TrophyIcon },
-        { href: "/m/podcast", label: "Podcast", icon: Mic }, // ← ADD THIS
+        { href: "/m/podcast", label: "Podcast", icon: Mic },
         { href: "/m/report", label: "Report", icon: ClipboardEdit },
       ],
 
