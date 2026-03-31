@@ -240,62 +240,61 @@ export default async function CurrentWeekCard({
                 }}
               >
                 <div
-                  className="flex flex-col gap-2 rounded-xl px-6 py-4 transition-colors"
+                  className="grid items-center gap-x-4 rounded-xl px-6 py-4 transition-colors"
                   style={{
+                    gridTemplateColumns: "1fr auto auto auto 1fr",
+                    gridTemplateRows: "auto auto",
                     background: "rgb(0 0 0 / 0.25)",
                     border: "1px solid var(--ncx-border)",
                   }}
                 >
-                  {/* Match row */}
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                    {/* Away */}
-                    <div
-                      className="flex items-center gap-2"
-                      style={{ color: "var(--ncx-text-muted)" }}
-                    >
-                      <Logo name={m.awayTeam} side="left" />
-                      <span className="break-words">{m.awayTeam}</span>
-                      <div
-                        className="font-bold text-lg ml-auto"
-                        style={{ color: "var(--ncx-text-primary)" }}
-                      >
-                        {m.awayWins}
-                      </div>
-                    </div>
-
-                    {/* Center boxes */}
-                    <div className="flex items-center gap-2">
-                      <WinBoxes
-                        wins={m.awayWins}
-                        direction="left"
-                        color={getTeamPrimaryHex(m.awayTeam) ?? "#0f172a"}
-                      />
-                      <WinBoxes
-                        wins={m.homeWins}
-                        direction="right"
-                        color={getTeamPrimaryHex(m.homeTeam) ?? "#0f172a"}
-                      />
-                    </div>
-
-                    {/* Home */}
-                    <div
-                      className="flex items-center justify-end gap-2"
-                      style={{ color: "var(--ncx-text-muted)" }}
-                    >
-                      <div
-                        className="font-bold text-lg"
-                        style={{ color: "var(--ncx-text-primary)" }}
-                      >
-                        {m.homeWins}
-                      </div>
-                      <span className="break-words">{m.homeTeam}</span>
-                      <Logo name={m.homeTeam} side="right" />
-                    </div>
+                  {/* Away team */}
+                  <div
+                    className="flex items-center gap-2 col-start-1"
+                    style={{ color: "var(--ncx-text-muted)" }}
+                  >
+                    <Logo name={m.awayTeam} side="left" />
+                    <span className="break-words">{m.awayTeam}</span>
                   </div>
 
-                  {/* Games remaining */}
+                  {/* Away boxes */}
+                  <div className="flex justify-end col-start-2">
+                    <WinBoxes
+                      wins={m.awayWins}
+                      direction="left"
+                      color={getTeamPrimaryHex(m.awayTeam) ?? "#0f172a"}
+                    />
+                  </div>
+
+                  {/* Score */}
                   <div
-                    className="text-xs text-center"
+                    className="font-bold text-2xl text-center col-start-3 tabular-nums"
+                    style={{ color: "var(--ncx-text-primary)", minWidth: "4rem" }}
+                  >
+                    {m.awayWins} : {m.homeWins}
+                  </div>
+
+                  {/* Home boxes */}
+                  <div className="flex justify-start col-start-4">
+                    <WinBoxes
+                      wins={m.homeWins}
+                      direction="right"
+                      color={getTeamPrimaryHex(m.homeTeam) ?? "#0f172a"}
+                    />
+                  </div>
+
+                  {/* Home team */}
+                  <div
+                    className="flex items-center justify-end gap-2 col-start-5"
+                    style={{ color: "var(--ncx-text-muted)" }}
+                  >
+                    <span className="break-words">{m.homeTeam}</span>
+                    <Logo name={m.homeTeam} side="right" />
+                  </div>
+
+                  {/* Games remaining — spans full width */}
+                  <div
+                    className="text-xs text-center col-span-5 mt-1"
                     style={{ color: "var(--ncx-text-muted)" }}
                   >
                     {gamesLeft} game{gamesLeft === 1 ? "" : "s"} remaining
