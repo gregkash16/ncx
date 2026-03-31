@@ -1729,7 +1729,6 @@ export async function POST(req: NextRequest) {
 
     // ---- Lists sheet upsert (optional) ----
     let didListsUpdate = false;
-    let listsError: string | null = null;
     if (awayListStr || homeListStr) {
       try {
         const listsRange = "Lists!A2:D";
@@ -1792,9 +1791,7 @@ export async function POST(req: NextRequest) {
 
         didListsUpdate = true;
       } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.error("❌ Lists sheet update/append failed:", errMsg);
-        listsError = errMsg;
+        console.warn("⚠️ Lists sheet update/append failed:", e);
       }
     }
 
@@ -1921,7 +1918,7 @@ export async function POST(req: NextRequest) {
       // Don't fail the report if DB sync fails; Sheets is canonical.
     }
 
-    return NextResponse.json({ ok: true, pushed, listsError: listsError || undefined });
+    return NextResponse.json({ ok: true, pushed });
   } catch (e) {
     console.error("💥 Report POST error:", e);
     return NextResponse.json(
