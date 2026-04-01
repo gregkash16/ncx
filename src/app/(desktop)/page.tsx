@@ -21,6 +21,7 @@ import DesktopNavTabs from "../components/DesktopNavTabs";
 import HomeLanding from "../components/HomeLanding";
 import PlayoffsPanel from "../components/PlayoffsPanel";
 import PrevSeasonsPanel from "../components/PrevSeasonsPanel";
+import ArcadePanel from "../components/ArcadePanel";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -353,6 +354,7 @@ export default async function HomePage({
                 mode={prevMode}
               />
             }
+            arcadePanel={<ArcadePanel key="arcade" />}
           />
         </div>
       </section>

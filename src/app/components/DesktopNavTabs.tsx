@@ -32,7 +32,7 @@ const row2Base: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "players",     label: "Players",       href: "/?tab=players" },
   { key: "podcast",     label: "Podcast",       href: "/?tab=podcast" },
   { key: "prevseasons", label: "Prev. Seasons", href: "/?tab=prevseasons" },
-  { key: "arcade",      label: "Trench Run",    href: "/arcade" },
+  { key: "arcade",      label: "Arcade",         href: "/?tab=arcade" },
 ];
 
 export default function DesktopNavTabs() {

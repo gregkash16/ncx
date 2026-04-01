@@ -2,6 +2,7 @@
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  serverExternalPackages: ["node-apn"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "cdn.discordapp.com", pathname: "/avatars/**" },

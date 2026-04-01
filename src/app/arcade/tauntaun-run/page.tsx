@@ -1,13 +1,14 @@
+// src/app/arcade/tauntaun-run/page.tsx
 "use client";
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-export default function ArcadePage() {
+export default function TauntaunRunPage() {
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", display: "flex", flexDirection: "column" }}>
       <Link
-        href="/m"
+        href="/?tab=arcade"
         style={{
           position: "absolute", top: 10, left: 10, zIndex: 10,
           display: "flex", alignItems: "center", gap: 5,
@@ -16,12 +17,12 @@ export default function ArcadePage() {
           borderRadius: 6, border: "1px solid #444", textDecoration: "none",
         }}
       >
-        <ArrowLeft size={13} /> BACK
+        <ArrowLeft size={13} /> BACK TO ARCADE
       </Link>
       <iframe
-        src="/trench-run/"
+        src="/tauntaun-run/index.html"
         style={{ flex: 1, border: "none", width: "100%", height: "100%" }}
-        title="Trench Run"
+        title="TaunTaun Run"
         allowFullScreen
       />
     </div>
