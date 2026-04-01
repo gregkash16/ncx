@@ -67,6 +67,7 @@ export async function GET(req: Request) {
           games: Number(r.games ?? 0),
           winPct: Number(r.win_pct ?? 0),
           ppg: Number(r.ppg ?? 0),
+          adj_ppg: (r.adj_ppg ?? "").toString().trim(),
 
           seasons: [
             r.s1 || null,

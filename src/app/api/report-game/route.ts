@@ -1048,7 +1048,7 @@ async function syncAllTimeStats(
 ) {
   const rowsRes = await sheets.spreadsheets.values.get({
     spreadsheetId: statsSheetId,
-    range: "ALL TIME STATS!A2:U500",
+    range: "ALL TIME STATS!A2:V500",
     valueRenderOption: "FORMATTED_VALUE",
   });
   const rows = (rowsRes.data.values ?? []) as string[][];
@@ -1068,6 +1068,7 @@ async function syncAllTimeStats(
       games,
       win_pct,
       ppg,
+      adj_ppg,
       s1,
       s2,
       s3,
@@ -1076,8 +1077,9 @@ async function syncAllTimeStats(
       s6,
       s7,
       s8,
+      s9,
       championships
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `;
 
   for (const r0 of rows) {
@@ -1103,7 +1105,7 @@ async function syncAllTimeStats(
       "",
       "",
       "",
-    ].slice(0, 20);
+    ].slice(0, 22);
 
     const [
       ncxid,
@@ -1117,6 +1119,7 @@ async function syncAllTimeStats(
       games,
       win_pct,
       ppg,
+      adj_ppg,
       s1,
       s2,
       s3,
@@ -1125,6 +1128,7 @@ async function syncAllTimeStats(
       s6,
       s7,
       s8,
+      s9,
       championships,
     ] = r.map(norm);
 
@@ -1142,6 +1146,7 @@ async function syncAllTimeStats(
       games,
       toDecimalOrNone(win_pct),
       toDecimalOrNone(ppg),
+      toDecimalOrNone(adj_ppg),
       s1,
       s2,
       s3,
@@ -1150,6 +1155,7 @@ async function syncAllTimeStats(
       s6,
       s7,
       s8,
+      s9,
       toIntOrNone(championships),
     ]);
   }

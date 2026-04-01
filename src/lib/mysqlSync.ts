@@ -511,7 +511,7 @@ export async function syncAllTimeStats(
 ) {
   const rowsRes = await sheets.spreadsheets.values.get({
     spreadsheetId: statsSheetId,
-    range: "ALL TIME STATS!A2:U500",
+    range: "ALL TIME STATS!A2:V500",
     valueRenderOption: "FORMATTED_VALUE",
   });
   const rows = (rowsRes.data.values ?? []) as string[][];
