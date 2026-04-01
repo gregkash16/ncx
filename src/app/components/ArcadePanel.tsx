@@ -16,17 +16,23 @@ const games = [
     description: "Race across Hoth on your TaunTaun. Dodge ice, rocks, and AT-ATs to survive.",
     image: "/tauntaun-run/tauntaun-run-thumb.png",
   },
+  {
+    slug: "pod-racer",
+    title: "Pod Racer",
+    description: "Top-down Boonta Eve racing. Pick your pod, dodge hazards, and set the fastest time.",
+    image: "/pod-racer/pod-racer-thumb.png",
+  },
 ];
 
 export default function ArcadePanel() {
   return (
     <div className="mx-auto max-w-5xl py-6">
       <h2
-        className="mb-2 text-center text-3xl font-extrabold tracking-wide"
+        className="mb-2 text-center text-4xl font-extrabold tracking-widest"
         style={{
-          background: "linear-gradient(to right, var(--ncx-hero-from), var(--ncx-hero-via), var(--ncx-hero-to))",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
+          color: "#FFD700",
+          textShadow: "0 0 12px rgba(255,215,0,0.4), 0 2px 4px rgba(0,0,0,0.5)",
+          letterSpacing: "0.15em",
         }}
       >
         ARCADE
