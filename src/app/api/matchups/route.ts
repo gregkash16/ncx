@@ -13,24 +13,28 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const week = searchParams.get("week") || currentWeek;
 
-    // Fetch matchups for the requested week
+    // Fetch matchups with faction data from individual_stats
     const [rows] = await pool.query<any[]>(
       `
         SELECT
-          week_label,
-          game,
-          awayId,
-          awayName,
-          awayTeam,
-          awayPts,
-          homeId,
-          homeName,
-          homeTeam,
-          homePts,
-          scenario
-        FROM S9.weekly_matchups
-        WHERE week_label = ?
-        ORDER BY game ASC
+          m.week_label,
+          m.game,
+          m.awayId,
+          m.awayName,
+          m.awayTeam,
+          m.awayPts,
+          m.homeId,
+          m.homeName,
+          m.homeTeam,
+          m.homePts,
+          m.scenario,
+          sa.faction AS awayFaction,
+          sh.faction AS homeFaction
+        FROM S9.weekly_matchups m
+        LEFT JOIN S9.individual_stats sa ON sa.ncxid = m.awayId
+        LEFT JOIN S9.individual_stats sh ON sh.ncxid = m.homeId
+        WHERE m.week_label = ?
+        ORDER BY m.game ASC
       `,
       [week]
     );
@@ -41,10 +45,12 @@ export async function GET(request: Request) {
       away_id: r.awayId != null ? String(r.awayId) : null,
       away_name: r.awayName != null ? String(r.awayName) : null,
       away_team: r.awayTeam != null ? String(r.awayTeam).trim() : null,
+      away_faction: r.awayFaction != null ? String(r.awayFaction).trim() : null,
       away_pts: r.awayPts != null ? Number(r.awayPts) : null,
       home_id: r.homeId != null ? String(r.homeId) : null,
       home_name: r.homeName != null ? String(r.homeName) : null,
       home_team: r.homeTeam != null ? String(r.homeTeam).trim() : null,
+      home_faction: r.homeFaction != null ? String(r.homeFaction).trim() : null,
       home_pts: r.homePts != null ? Number(r.homePts) : null,
       scenario: r.scenario != null ? String(r.scenario) : null,
     }));
