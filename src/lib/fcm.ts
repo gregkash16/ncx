@@ -5,41 +5,59 @@
  * Requires env vars: FCM_PROJECT_ID, FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY
  */
 
-import { google } from 'googleapis';
-
 const FCM_PROJECT_ID = process.env.FCM_PROJECT_ID || '';
 const FCM_CLIENT_EMAIL = process.env.FCM_CLIENT_EMAIL || '';
 
 function getFcmPrivateKey(): string {
   const raw = process.env.FCM_PRIVATE_KEY || '';
-  // Handle various ways the key might be stored in env vars
-  let key = raw.replace(/\\n/g, '\n');
-  // If it was JSON-stringified with quotes
-  if (key.startsWith('"') && key.endsWith('"')) {
-    key = JSON.parse(key);
-  }
-  return key;
+  return raw.replace(/\\n/g, '\n');
 }
 
+/**
+ * Get an OAuth2 access token using a service account JWT.
+ * Manually constructs and signs the JWT instead of relying on googleapis library.
+ */
 async function getAccessToken(): Promise<string> {
   const privateKey = getFcmPrivateKey();
 
-  console.log(`FCM auth: project=${FCM_PROJECT_ID}, email=${FCM_CLIENT_EMAIL}, keyLength=${privateKey.length}, keyStart=${privateKey.slice(0, 30)}`);
-
   if (!privateKey || !FCM_CLIENT_EMAIL) {
-    throw new Error(`FCM not configured: email=${!!FCM_CLIENT_EMAIL}, key=${!!privateKey}`);
+    throw new Error(`FCM not configured: email=${!!FCM_CLIENT_EMAIL}, keyLen=${privateKey.length}`);
   }
 
-  const auth = new google.auth.JWT(
-    FCM_CLIENT_EMAIL,
-    undefined,
-    privateKey,
-    ['https://www.googleapis.com/auth/firebase.messaging']
-  );
+  // Import jose for JWT signing (available in Node 18+ / Edge runtime)
+  const { SignJWT, importPKCS8 } = await import('jose');
 
-  const { token } = await auth.getAccessToken();
-  if (!token) throw new Error('Failed to get FCM access token');
-  return token;
+  const now = Math.floor(Date.now() / 1000);
+  const key = await importPKCS8(privateKey, 'RS256');
+
+  const jwt = await new SignJWT({
+    iss: FCM_CLIENT_EMAIL,
+    sub: FCM_CLIENT_EMAIL,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+  })
+    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
+    .sign(key);
+
+  // Exchange JWT for access token
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`OAuth token exchange failed: ${res.status} ${errText}`);
+  }
+
+  const data = await res.json();
+  return data.access_token;
 }
 
 export async function sendFCMToDevices(
@@ -91,6 +109,7 @@ export async function sendFCMToDevices(
 
         if (res.ok) {
           sent++;
+          console.log(`FCM: sent to ${token.slice(0, 20)}...`);
         } else {
           const errBody = await res.text();
           console.error(`FCM send failed for token ${token.slice(0, 20)}...: ${errBody}`);
