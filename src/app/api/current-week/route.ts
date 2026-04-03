@@ -28,10 +28,10 @@ export async function GET(req: NextRequest) {
     // Fetch all matchups for the week
     const [rows] = await pool.query<any[]>(
       `SELECT
-        awayTeam AS away_team,
-        homeTeam AS home_team,
-        away_pts,
-        home_pts
+        awayTeam,
+        homeTeam,
+        awayPts,
+        homePts
       FROM S9.weekly_matchups
       WHERE week_label = ?
       ORDER BY game ASC`,
@@ -47,8 +47,8 @@ export async function GET(req: NextRequest) {
     }>();
 
     for (const r of rows ?? []) {
-      const away = (r.away_team ?? '').trim();
-      const home = (r.home_team ?? '').trim();
+      const away = (r.awayTeam ?? '').trim();
+      const home = (r.homeTeam ?? '').trim();
       if (!away || !home) continue;
 
       const key = `${away}|${home}`;
@@ -57,8 +57,8 @@ export async function GET(req: NextRequest) {
       }
 
       const series = seriesMap.get(key)!;
-      const aPts = Number(r.away_pts ?? 0);
-      const hPts = Number(r.home_pts ?? 0);
+      const aPts = Number(r.awayPts ?? 0);
+      const hPts = Number(r.homePts ?? 0);
 
       // Only count if game has been played (both have points or at least one > 0)
       if (aPts > 0 || hPts > 0) {
