@@ -1274,16 +1274,19 @@ async function syncLists(
 /* --------------------------- GET /report-game ------------------------- */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getIOSServerSession();
-    if (!session?.user) {
+    // Native app auth: accept x-discord-id header as fallback
+    const nativeDiscordId = request.headers.get("x-discord-id");
+    const session = nativeDiscordId ? null : await getIOSServerSession();
+
+    if (!session?.user && !nativeDiscordId) {
       return NextResponse.json<LookupResult>({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
     // Check if this is Apple auth on iOS
     const appPlatform = request.headers.get("x-app-platform");
-    const isAppleAuth = (session.user as any).provider === "apple" && appPlatform === "ios";
+    const isAppleAuth = !nativeDiscordId && (session?.user as any)?.provider === "apple" && appPlatform === "ios";
 
-    const raw = (session.user as any).discordId ?? (session.user as any).id;
+    const raw = nativeDiscordId ?? (session?.user as any)?.discordId ?? (session?.user as any)?.id;
     const discordId = normalizeDiscordId(raw);
     if (!discordId && !isAppleAuth) {
       return NextResponse.json<LookupResult>(
@@ -1487,14 +1490,17 @@ export async function GET(request: NextRequest) {
 /* --------------------------- POST /report-game ------------------------ */
 export async function POST(req: NextRequest) {
   try {
-    const session = await getIOSServerSession();
-    if (!session?.user) {
+    // Native app auth: accept x-discord-id header as fallback
+    const nativeDiscordId = req.headers.get("x-discord-id");
+    const session = nativeDiscordId ? null : await getIOSServerSession();
+
+    if (!session?.user && !nativeDiscordId) {
       return NextResponse.json({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
     // Check if this is Apple auth on iOS
     const appPlatform = req.headers.get("x-app-platform");
-    const isAppleAuth = (session.user as any).provider === "apple" && appPlatform === "ios";
+    const isAppleAuth = !nativeDiscordId && (session?.user as any)?.provider === "apple" && appPlatform === "ios";
 
     const body = await req.json().catch(() => ({}));
     const {
@@ -1562,7 +1568,7 @@ export async function POST(req: NextRequest) {
     const statsSheetId = process.env.NCX_STATS_SHEET_ID || spreadsheetId;
     const sheets = getSheets();
 
-    const raw = (session.user as any).discordId ?? (session.user as any).id;
+    const raw = nativeDiscordId ?? (session?.user as any)?.discordId ?? (session?.user as any)?.id;
     const discordId = normalizeDiscordId(raw);
 
     const [who, captainTeams] = await Promise.all([
