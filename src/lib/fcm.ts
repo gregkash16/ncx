@@ -46,7 +46,7 @@ export async function sendFCMToDevices(
   deviceTokens: string[],
   payload: { title: string; body: string; url?: string }
 ) {
-  if (!FCM_PROJECT_ID || !FCM_CLIENT_EMAIL || !FCM_PRIVATE_KEY) {
+  if (!FCM_PROJECT_ID || !FCM_CLIENT_EMAIL || !getFcmPrivateKey()) {
     console.warn('FCM not configured — skipping Android push notifications');
     return { sent: 0, failed: 0 };
   }
