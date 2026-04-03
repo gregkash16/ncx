@@ -228,7 +228,34 @@ async function sendPushForTeams(
     }
   }
 
-  return subs.length + deviceTokens.length;
+  // Get FCM device tokens (Android)
+  let fcmCount = 0;
+  try {
+    const { rows: fcmRows } = await sql`
+      SELECT device_token
+      FROM fcm_subscriptions
+      WHERE
+        all_teams = TRUE
+        OR EXISTS (
+          SELECT 1
+          FROM json_array_elements_text(${teamsJson}::json) j
+          WHERE j = ANY(fcm_subscriptions.teams)
+        )
+    `;
+
+    if (fcmRows.length > 0) {
+      const { sendFCMToDevices } = await import("@/lib/fcm");
+      await sendFCMToDevices(
+        fcmRows.map((r) => r.device_token),
+        payload
+      );
+      fcmCount = fcmRows.length;
+    }
+  } catch (e) {
+    console.error("Failed to send FCM notifications:", e);
+  }
+
+  return subs.length + deviceTokens.length + fcmCount;
 }
 
 /* ------------------------- Role helpers ------------------------- */
