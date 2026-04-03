@@ -1239,7 +1239,7 @@ function renderLeaderboard(){
 // ── GAME LOOP (fixed 60fps timestep) ──────────────────────────────────────
 initSnow();
 
-const _TICK=1000/60;
+const _TICK=1000/90;
 let _lastTime=0, _accum=0;
 function loop(now){
   if(!_lastTime){ _lastTime=now; requestAnimationFrame(loop); return; }

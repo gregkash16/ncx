@@ -1443,8 +1443,8 @@ function renderCinematic(){
   }
 }
 
-// ── MAIN LOOP (fixed 60fps timestep) ──────────────────────────────────────
-const _TICK=1000/60;
+// ── MAIN LOOP (fixed 75fps timestep) ──────────────────────────────────────
+const _TICK=1000/90;
 let _lastTime=0, _accum=0;
 function loop(now){
   if(!_lastTime){ _lastTime=now; requestAnimationFrame(loop); return; }

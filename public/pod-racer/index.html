@@ -1054,9 +1054,9 @@ function handleInput(){
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// MAIN LOOP (fixed 60fps timestep)
+// MAIN LOOP (fixed 75fps timestep)
 // ═══════════════════════════════════════════════════════════════════════
-var _TICK=1000/60, _lastTime=0, _accum=0;
+var _TICK=1000/90, _lastTime=0, _accum=0;
 function loop(now){
   if(!_lastTime){ _lastTime=now; requestAnimationFrame(loop); return; }
   _accum+=now-_lastTime;
