@@ -17,16 +17,16 @@ export async function GET(request: Request) {
     const [rows] = await pool.query<any[]>(
       `
         SELECT
-          week_label  AS week,
+          week_label,
           game,
-          away_id,
-          away_name,
-          awayTeam    AS away_team,
-          away_pts,
-          home_id,
-          home_name,
-          homeTeam    AS home_team,
-          home_pts,
+          awayId,
+          awayName,
+          awayTeam,
+          awayPts,
+          homeId,
+          homeName,
+          homeTeam,
+          homePts,
           scenario
         FROM S9.weekly_matchups
         WHERE week_label = ?
@@ -36,16 +36,16 @@ export async function GET(request: Request) {
     );
 
     const matchups = (rows ?? []).map((r: any) => ({
-      week: String(r.week ?? ""),
+      week: String(r.week_label ?? ""),
       game: r.game != null ? String(r.game) : null,
-      away_id: r.away_id != null ? String(r.away_id) : null,
-      away_name: r.away_name != null ? String(r.away_name) : null,
-      away_team: r.away_team != null ? String(r.away_team).trim() : null,
-      away_pts: r.away_pts != null ? Number(r.away_pts) : null,
-      home_id: r.home_id != null ? String(r.home_id) : null,
-      home_name: r.home_name != null ? String(r.home_name) : null,
-      home_team: r.home_team != null ? String(r.home_team).trim() : null,
-      home_pts: r.home_pts != null ? Number(r.home_pts) : null,
+      away_id: r.awayId != null ? String(r.awayId) : null,
+      away_name: r.awayName != null ? String(r.awayName) : null,
+      away_team: r.awayTeam != null ? String(r.awayTeam).trim() : null,
+      away_pts: r.awayPts != null ? Number(r.awayPts) : null,
+      home_id: r.homeId != null ? String(r.homeId) : null,
+      home_name: r.homeName != null ? String(r.homeName) : null,
+      home_team: r.homeTeam != null ? String(r.homeTeam).trim() : null,
+      home_pts: r.homePts != null ? Number(r.homePts) : null,
       scenario: r.scenario != null ? String(r.scenario) : null,
     }));
 
