@@ -231,6 +231,15 @@ async function sendPushForTeams(
   // Get FCM device tokens (Android)
   let fcmCount = 0;
   try {
+    // Ensure table exists (may not have been created yet)
+    await sql`
+      CREATE TABLE IF NOT EXISTS fcm_subscriptions (
+        device_token TEXT PRIMARY KEY,
+        all_teams BOOLEAN DEFAULT TRUE,
+        teams TEXT[] DEFAULT '{}'
+      )
+    `;
+
     const { rows: fcmRows } = await sql`
       SELECT device_token
       FROM fcm_subscriptions
@@ -243,12 +252,15 @@ async function sendPushForTeams(
         )
     `;
 
+    console.log(`FCM: found ${fcmRows.length} matching subscriptions`);
+
     if (fcmRows.length > 0) {
       const { sendFCMToDevices } = await import("@/lib/fcm");
-      await sendFCMToDevices(
+      const result = await sendFCMToDevices(
         fcmRows.map((r) => r.device_token),
         payload
       );
+      console.log(`FCM: sent=${result.sent}, failed=${result.failed}`);
       fcmCount = fcmRows.length;
     }
   } catch (e) {
