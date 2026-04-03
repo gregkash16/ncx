@@ -9,13 +9,31 @@ import { google } from 'googleapis';
 
 const FCM_PROJECT_ID = process.env.FCM_PROJECT_ID || '';
 const FCM_CLIENT_EMAIL = process.env.FCM_CLIENT_EMAIL || '';
-const FCM_PRIVATE_KEY = (process.env.FCM_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+
+function getFcmPrivateKey(): string {
+  const raw = process.env.FCM_PRIVATE_KEY || '';
+  // Handle various ways the key might be stored in env vars
+  let key = raw.replace(/\\n/g, '\n');
+  // If it was JSON-stringified with quotes
+  if (key.startsWith('"') && key.endsWith('"')) {
+    key = JSON.parse(key);
+  }
+  return key;
+}
 
 async function getAccessToken(): Promise<string> {
+  const privateKey = getFcmPrivateKey();
+
+  console.log(`FCM auth: project=${FCM_PROJECT_ID}, email=${FCM_CLIENT_EMAIL}, keyLength=${privateKey.length}, keyStart=${privateKey.slice(0, 30)}`);
+
+  if (!privateKey || !FCM_CLIENT_EMAIL) {
+    throw new Error(`FCM not configured: email=${!!FCM_CLIENT_EMAIL}, key=${!!privateKey}`);
+  }
+
   const auth = new google.auth.JWT(
     FCM_CLIENT_EMAIL,
     undefined,
-    FCM_PRIVATE_KEY,
+    privateKey,
     ['https://www.googleapis.com/auth/firebase.messaging']
   );
 
