@@ -1054,29 +1054,37 @@ function handleInput(){
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// MAIN LOOP
+// MAIN LOOP (fixed 60fps timestep)
 // ═══════════════════════════════════════════════════════════════════════
-function loop(){
-  frame++;
-  handleInput();
-  tickMusic();
-
+var _TICK=1000/60, _lastTime=0, _accum=0;
+function loop(now){
+  if(!_lastTime){ _lastTime=now; requestAnimationFrame(loop); return; }
+  _accum+=now-_lastTime;
+  _lastTime=now;
+  if(_accum>_TICK*5) _accum=_TICK*5;
+  while(_accum>=_TICK){
+    frame++;
+    handleInput();
+    tickMusic();
+    if(state==='countdown') tickCountdown();
+    else if(state==='race') updateRace();
+    clearTaps();
+    _accum-=_TICK;
+  }
   switch(state){
     case 'title': drawTitle(); break;
     case 'select': drawSelect(); break;
-    case 'countdown': tickCountdown(); drawCountdown(); break;
+    case 'countdown': drawCountdown(); break;
     case 'race':
-      updateRace();
       drawBG();drawTrack();drawHaz();drawPU();drawTusk();drawRacers();drawParts();drawHUD();
       break;
     case 'results': drawResults(); break;
     case 'enter_name': drawNameEntry(); break;
     case 'leaderboard': case 'leaderboard_view': drawLB(); break;
   }
-  clearTaps();
   requestAnimationFrame(loop);
 }
-loop();
+requestAnimationFrame(loop);
 
 })();
 </script>

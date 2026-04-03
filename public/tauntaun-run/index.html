@@ -1236,31 +1236,37 @@ function renderLeaderboard(){
   ctx.textAlign='left';
 }
 
-// ── GAME LOOP ─────────────────────────────────────────────────────────────
+// ── GAME LOOP (fixed 60fps timestep) ──────────────────────────────────────
 initSnow();
 
-function loop(){
-  frame++;
-  if(state==='playing'){
-    update();
-    render();
-  } else if(state==='title'){
-    for(const s of snowflakes){
-      s.y+=s.sy*0.4; s.x+=s.sx;
-      if(s.y>H){ s.y=0; s.x=Math.random()*W; }
-      if(s.x<0) s.x=W; if(s.x>W) s.x=0;
+const _TICK=1000/60;
+let _lastTime=0, _accum=0;
+function loop(now){
+  if(!_lastTime){ _lastTime=now; requestAnimationFrame(loop); return; }
+  _accum+=now-_lastTime;
+  _lastTime=now;
+  if(_accum>_TICK*5) _accum=_TICK*5;
+  while(_accum>=_TICK){
+    frame++;
+    if(state==='playing'){
+      update();
+    } else if(state==='title'){
+      for(const s of snowflakes){
+        s.y+=s.sy*0.4; s.x+=s.sx;
+        if(s.y>H){ s.y=0; s.x=Math.random()*W; }
+        if(s.x<0) s.x=W; if(s.x>W) s.x=0;
+      }
     }
-    renderTitle();
-  } else if(state==='dead'){
-    renderDead();
-  } else if(state==='enter_name'){
-    renderNameEntry();
-  } else if(state==='leaderboard'){
-    renderLeaderboard();
+    _accum-=_TICK;
   }
+  if(state==='playing') render();
+  else if(state==='title') renderTitle();
+  else if(state==='dead') renderDead();
+  else if(state==='enter_name') renderNameEntry();
+  else if(state==='leaderboard') renderLeaderboard();
   requestAnimationFrame(loop);
 }
-loop();
+requestAnimationFrame(loop);
 
 })();
 </script>

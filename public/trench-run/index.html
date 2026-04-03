@@ -1443,17 +1443,24 @@ function renderCinematic(){
   }
 }
 
-// ── MAIN LOOP ─────────────────────────────────────────────────────────────
-function loop(){
-  frame++;
-  if(state==='cinematic'){
-    updateCinematic();
-    renderCinematic();
-  } else if(state==='han_save'){
-    updateHanSave();
-    renderHanSave();
-  } else {
-    update();
+// ── MAIN LOOP (fixed 60fps timestep) ──────────────────────────────────────
+const _TICK=1000/60;
+let _lastTime=0, _accum=0;
+function loop(now){
+  if(!_lastTime){ _lastTime=now; requestAnimationFrame(loop); return; }
+  _accum+=now-_lastTime;
+  _lastTime=now;
+  if(_accum>_TICK*5) _accum=_TICK*5;
+  while(_accum>=_TICK){
+    frame++;
+    if(state==='cinematic') updateCinematic();
+    else if(state==='han_save') updateHanSave();
+    else update();
+    _accum-=_TICK;
+  }
+  if(state==='cinematic') renderCinematic();
+  else if(state==='han_save') renderHanSave();
+  else {
     render();
     switch(state){
       case 'title': renderTitle(); break;
@@ -1468,7 +1475,7 @@ function loop(){
 
 // Start
 initStars();
-loop();
+requestAnimationFrame(loop);
 
 })();
 </script>
