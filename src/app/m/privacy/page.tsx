@@ -21,7 +21,7 @@ export default function PrivacyPage() {
       <div className="max-w-2xl space-y-6 px-4 py-6 text-sm">
         <div>
           <h1 className="text-2xl font-bold mb-4">Privacy Policy</h1>
-          <p className="text-[var(--ncx-text-muted)] text-xs mb-4">Last updated: March 2026</p>
+          <p className="text-[var(--ncx-text-muted)] text-xs mb-4">Last updated: April 2026</p>
         </div>
 
         <section>
@@ -90,11 +90,23 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">5. Information Sharing</h2>
+          <h2 className="text-lg font-semibold mb-3">5. Information Sharing & Third-Party Services</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
-            We do not sell your personal information. We do not use third-party services to process
-            your data. Information is only shared with Discord for authentication purposes and when
-            required by law or regulation.
+            We do not sell your personal information. We use the following third-party services
+            to operate the App:
+          </p>
+          <ul className="space-y-2 text-[var(--ncx-text-primary)]/80 leading-relaxed mt-3">
+            <li>• <strong>Discord</strong> — Authentication (OAuth2 login)</li>
+            <li>• <strong>Vercel</strong> — Application hosting and serverless functions</li>
+            <li>• <strong>Neon</strong> — Database hosting for league data</li>
+            <li>• <strong>Railway</strong> — Database hosting for league data</li>
+            <li>• <strong>Apple Push Notification Service (APNs)</strong> — Push notification delivery for iOS</li>
+            <li>• <strong>Firebase Cloud Messaging (FCM)</strong> — Push notification delivery for Android</li>
+          </ul>
+          <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed mt-3">
+            These services may process your data as described in their respective privacy policies.
+            We only share the minimum information necessary for each service to function. Your information
+            may also be disclosed when required by law or regulation.
           </p>
         </section>
 
@@ -107,11 +119,18 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">7. Data Retention</h2>
+          <h2 className="text-lg font-semibold mb-3">7. Data Retention & Account Deletion</h2>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed">
             We retain your personal information indefinitely for the purpose of maintaining league
-            statistics and player records. You may request deletion of your account and associated data
-            by contacting us at the email address provided in the Contact Us section.
+            statistics and player records.
+          </p>
+          <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed mt-3">
+            You may request deletion of your account and all associated personal data at any time by
+            emailing <span className="font-semibold text-[var(--ncx-primary)]">gregkash@gmail.com</span> with
+            the subject line "Account Deletion Request." We will process your request within 30 days and
+            confirm deletion via email. Upon deletion, your Discord authentication data, push notification
+            tokens, and device information will be permanently removed. Anonymized league statistics
+            (win/loss records, game scores) may be retained for historical league integrity.
           </p>
         </section>
 
