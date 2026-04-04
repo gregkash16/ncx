@@ -2001,6 +2001,48 @@ export async function POST(req: NextRequest) {
       // Don't fail the report if DB sync fails; Sheets is canonical.
     }
 
+    // ---- Series clinch push notification ----
+    if (hasScoreInputs && a !== undefined && h !== undefined && Number(a) > 0 && Number(h) > 0) {
+      try {
+        const conn = await getMySqlConn();
+        try {
+          const [seriesRows] = await conn.execute<any[]>(
+            `SELECT awayPts, homePts FROM S9.weekly_matchups
+             WHERE week_label = ? AND awayTeam = ? AND homeTeam = ?
+             AND awayPts > 0 AND homePts > 0`,
+            [canonicalWeekLabel, awayTeam, homeTeam]
+          );
+
+          let awayWins = 0;
+          let homeWins = 0;
+          for (const row of seriesRows ?? []) {
+            if (Number(row.awayPts) > Number(row.homePts)) awayWins++;
+            else if (Number(row.homePts) > Number(row.awayPts)) homeWins++;
+          }
+
+          if (awayWins === 4 || homeWins === 4) {
+            const winner = awayWins === 4 ? awayTeam : homeTeam;
+            const loser = awayWins === 4 ? homeTeam : awayTeam;
+            const weekNum = canonicalWeekLabel.replace(/^WEEK\s*/i, "");
+
+            try {
+              await sendPushForTeams([awayTeam, homeTeam], {
+                title: "Series Complete",
+                body: `${winner} has defeated ${loser} in WEEK ${weekNum}`,
+                url: "/m/current",
+              });
+            } catch (clinchPushErr) {
+              console.warn("⚠️ Series clinch push failed:", clinchPushErr);
+            }
+          }
+        } finally {
+          await conn.end();
+        }
+      } catch (clinchErr) {
+        console.warn("⚠️ Series clinch check failed:", clinchErr);
+      }
+    }
+
     return NextResponse.json({ ok: true, pushed });
   } catch (e) {
     console.error("💥 Report POST error:", e);
