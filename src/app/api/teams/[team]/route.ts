@@ -4,10 +4,11 @@ import { pool } from "@/lib/db";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { team: string } }
+  { params }: { params: Promise<{ team: string }> }
 ) {
   try {
-    const teamSlug = decodeURIComponent(params.team).trim();
+    const { team } = await params;
+    const teamSlug = decodeURIComponent(team).trim();
 
     // 1. Standings row for this team
     const [standRows] = await pool.query<any[]>(
