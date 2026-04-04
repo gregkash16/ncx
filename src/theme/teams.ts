@@ -6,25 +6,25 @@ export const TEAM_COLOR_MAP: Record<string, string> = {
   FIREBIRDS: "#ea580c",
   FOXES: "#a855f7",
   GAMBLERS: "#d4af37", // gold
-  HAVOC: "#eab308",
+  HAVOC: "#7b1f2b", // maroon
   "TRASH PANDAS": "#FFFFFF",
-  "HOTSHOTS": "#facc99",
-  "JAGGED AXE": "#f97316",
+  "HOTSHOTS": "#4a6d8c", // steel blue
+  "JAGGED AXE": "#b5543e", // rust/copper
   KDB: "#14b8a6",
   "KING'S GAMBIT": "#9b111e", // ruby red
   MEATBAGS: "#dc2626",
-  "MEGA MILK UNION": "#38bdf8",
+  "MEGA MILK UNION": "#a8d4e8", // baby blue
   MISFITS: "#ea580c",
-  "NEBULA BORN": "#8b5a2b",
-  "NERF HERDERS": "#16a34a",
-  "ORDER 66": "#2563eb",
+  "NEBULA BORN": "#e040a0", // hot pink/magenta
+  "NERF HERDERS": "#1a6b3c", // forest green
+  "ORDER 66": "#1c3d6e", // navy
   "OUTER RIM HEROES": "#2563eb",
-  PILLAGERS: "#4b1d6b", // deep purple
-  "PUDDLE JUMPERS": "#22c55e",
-  SANDBLASTERS: "#8b5a2b",
-  "RAVE CRAB CHAMPIONS": "#fb923c",
+  PILLAGERS: "#5b2d8b", // purple
+  "PUDDLE JUMPERS": "#6b8c42", // olive green
+  SANDBLASTERS: "#c8902a", // golden amber
+  "RAVE CRAB CHAMPIONS": "#cc2244", // red/magenta
   STARKILLERS: "#d97706",
-  "VOODOO KREWE": "#1d4ed8",
+  "VOODOO KREWE": "#1e2d5a", // dark navy
   WOLFPACK: "#ec4899",
 };
 
