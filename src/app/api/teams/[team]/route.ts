@@ -31,20 +31,20 @@ export async function GET(
     // 2. Roster — players on this team from individual_stats
     const [rosterRows] = await pool.query<any[]>(
       `SELECT
-         \`rank\`, ncxid, first, last, pick, team, faction,
+         \`rank\`, ncxid, first_name, last_name, pick_no, team, faction,
          wins, losses, points, plms, games,
-         winPct, ppg, efficiency, war, h2h, potato, sos
+         winper, ppg, efficiency, war, h2h, potato, sos
        FROM S9.individual_stats
        WHERE team = ?
-       ORDER BY pick ASC, first ASC`,
+       ORDER BY pick_no ASC, first_name ASC`,
       [teamSlug]
     );
     const roster = (rosterRows ?? []).map((r: any) => ({
       rank: Number(r.rank ?? 0),
       ncxid: String(r.ncxid ?? ""),
-      first: String(r.first ?? ""),
-      last: String(r.last ?? ""),
-      pick: Number(r.pick ?? 0),
+      first: String(r.first_name ?? ""),
+      last: String(r.last_name ?? ""),
+      pick: Number(r.pick_no ?? 0),
       team: String(r.team ?? ""),
       faction: String(r.faction ?? ""),
       wins: Number(r.wins ?? 0),
@@ -52,7 +52,7 @@ export async function GET(
       points: Number(r.points ?? 0),
       plms: Number(r.plms ?? 0),
       games: Number(r.games ?? 0),
-      winPct: Number(r.winPct ?? 0),
+      winPct: Number(r.winper ?? 0),
       ppg: Number(r.ppg ?? 0),
       efficiency: Number(r.efficiency ?? 0),
       war: Number(r.war ?? 0),
