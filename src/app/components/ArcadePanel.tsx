@@ -22,6 +22,12 @@ const games = [
     description: "Top-down Boonta Eve racing. Pick your pod, dodge hazards, and set the fastest time.",
     image: "/pod-racer/pod-racer-thumb.png",
   },
+  {
+    slug: "last-stand",
+    title: "Last Stand",
+    description: "First-person blaster defense. Mow down stormtroopers before they overwhelm you.",
+    image: "/last-stand/last-stand-thumb.png",
+  },
 ];
 
 export default function ArcadePanel() {

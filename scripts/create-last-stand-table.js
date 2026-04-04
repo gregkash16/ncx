@@ -14,10 +14,14 @@ const password = match ? match[1].trim() : '';
     password,
     database: 'S9'
   });
-  await conn.query('TRUNCATE TABLE railway.trench_run_leaderboard');
-  await conn.query('TRUNCATE TABLE railway.tauntaun_run_leaderboard');
-  await conn.query('TRUNCATE TABLE railway.pod_racer_leaderboard');
-  await conn.query('TRUNCATE TABLE railway.last_stand_leaderboard');
-  console.log('All 4 leaderboards cleared.');
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS railway.last_stand_leaderboard (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(3) NOT NULL,
+      score INT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  console.log('last_stand_leaderboard table created.');
   await conn.end();
 })();

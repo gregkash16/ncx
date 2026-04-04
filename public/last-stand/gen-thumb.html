@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html><head><title>Last Stand Thumbnail Generator</title></head>
+<body style="background:#000;display:flex;flex-direction:column;align-items:center;padding:20px;">
+<canvas id="c" width="640" height="360"></canvas>
+<br>
+<button onclick="download()" style="padding:10px 20px;font-size:16px;">Download PNG</button>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const W=640,H=360;
+
+// Corridor
+const VPX=W/2,VPY=H*0.38;
+const bw=90,bh=60;
+const cx=VPX,cy=VPY;
+
+// Back wall
+ctx.fillStyle='#1a1a1e';
+ctx.fillRect(0,0,W,H);
+ctx.fillRect(cx-bw/2,cy-bh/2,bw,bh);
+
+// Ceiling
+ctx.fillStyle='#222228';
+ctx.beginPath();ctx.moveTo(cx-bw/2,cy-bh/2);ctx.lineTo(0,0);ctx.lineTo(W,0);ctx.lineTo(cx+bw/2,cy-bh/2);ctx.closePath();ctx.fill();
+// Floor
+ctx.fillStyle='#2e2e34';
+ctx.beginPath();ctx.moveTo(cx-bw/2,cy+bh/2);ctx.lineTo(0,H);ctx.lineTo(W,H);ctx.lineTo(cx+bw/2,cy+bh/2);ctx.closePath();ctx.fill();
+// Walls
+ctx.fillStyle='#252530';
+ctx.beginPath();ctx.moveTo(cx-bw/2,cy-bh/2);ctx.lineTo(0,0);ctx.lineTo(0,H);ctx.lineTo(cx-bw/2,cy+bh/2);ctx.closePath();ctx.fill();
+ctx.beginPath();ctx.moveTo(cx+bw/2,cy-bh/2);ctx.lineTo(W,0);ctx.lineTo(W,H);ctx.lineTo(cx+bw/2,cy+bh/2);ctx.closePath();ctx.fill();
+
+// Wall lines
+ctx.strokeStyle='#3a3a44';ctx.lineWidth=1;
+for(let i=1;i<=5;i++){
+  const t=i/6;
+  const lx=cx-bw/2+(0-(cx-bw/2))*t;
+  const rx=cx+bw/2+(W-(cx+bw/2))*t;
+  const ly1=cy-bh/2+(0-(cy-bh/2))*t;
+  const ly2=cy+bh/2+(H-(cy+bh/2))*t;
+  ctx.beginPath();ctx.moveTo(lx,ly1);ctx.lineTo(lx,ly2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(rx,ly1);ctx.lineTo(rx,ly2);ctx.stroke();
+}
+
+// Floor grid
+ctx.strokeStyle='#36363e';
+for(let i=1;i<=8;i++){
+  const t=i/9;
+  const y=cy+bh/2+(H-(cy+bh/2))*t;
+  const xs=(bw/2)+((W/2)-(bw/2))*t;
+  ctx.beginPath();ctx.moveTo(cx-xs,y);ctx.lineTo(cx+xs,y);ctx.stroke();
+}
+
+// Ceiling lights
+for(let i=1;i<=6;i++){
+  const t=i/7;
+  const lw=4+t*18,lh=2+t*3;
+  const ly=cy-bh/2*0.7+(H*0.05-(cy-bh/2*0.7))*(1-t);
+  const b=Math.floor(80+t*80);
+  ctx.fillStyle=`rgb(${b},${b},${b+30})`;
+  ctx.fillRect(cx-lw/2,ly-lh/2,lw,lh);
+}
+
+// Draw a few stormtroopers at different depths
+function drawMiniTrooper(laneX,z){
+  const sc=Math.max(0.05,1-z);
+  const bx=VPX+laneX*(1-z)*(W*0.55);
+  const fy=VPY+(H*0.62-VPY)*(1-z);
+  const h=sc*80,w=sc*30;
+  ctx.save();ctx.translate(bx,fy);
+  // Legs
+  ctx.fillStyle='#ddd';
+  ctx.fillRect(-w*0.2,-h*0.35,w*0.18,h*0.35);
+  ctx.fillRect(w*0.02,-h*0.35,w*0.18,h*0.35);
+  // Body
+  ctx.fillStyle='#e8e8e8';
+  ctx.fillRect(-w*0.25,-h*0.35-h*0.3,w*0.5,h*0.3);
+  // Head
+  ctx.fillStyle='#f0f0f0';
+  ctx.beginPath();ctx.arc(0,-h*0.72,w*0.18,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#111';
+  ctx.fillRect(-w*0.08,-h*0.74,w*0.16,h*0.04);
+  ctx.restore();
+}
+
+drawMiniTrooper(-0.3, 0.5);
+drawMiniTrooper(0.15, 0.55);
+drawMiniTrooper(0.4, 0.65);
+drawMiniTrooper(-0.1, 0.7);
+drawMiniTrooper(-0.5, 0.6);
+drawMiniTrooper(0.05, 0.4);
+drawMiniTrooper(0.3, 0.45);
+
+// Crosshair
+ctx.strokeStyle='#f44';ctx.lineWidth=2;
+ctx.shadowColor='#f44';ctx.shadowBlur=8;
+const mx=W*0.48,my=H*0.42,sz=14;
+ctx.beginPath();
+ctx.moveTo(mx-sz,my);ctx.lineTo(mx-sz*0.4,my);
+ctx.moveTo(mx+sz*0.4,my);ctx.lineTo(mx+sz,my);
+ctx.moveTo(mx,my-sz);ctx.lineTo(mx,my-sz*0.4);
+ctx.moveTo(mx,my+sz*0.4);ctx.lineTo(mx,my+sz);
+ctx.stroke();
+ctx.beginPath();ctx.arc(mx,my,sz*0.7,0,Math.PI*2);ctx.stroke();
+ctx.shadowBlur=0;
+
+// Blaster bolt line from bottom
+ctx.save();ctx.globalAlpha=0.7;
+ctx.strokeStyle='#f44';ctx.lineWidth=3;ctx.shadowColor='#f44';ctx.shadowBlur=12;
+ctx.beginPath();ctx.moveTo(W/2,H-10);ctx.lineTo(mx,my);ctx.stroke();
+ctx.shadowBlur=0;ctx.restore();
+
+// Red flash at crosshair
+ctx.save();ctx.globalAlpha=0.5;
+ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(mx,my,6,0,Math.PI*2);ctx.fill();
+ctx.restore();
+
+// Title
+ctx.fillStyle='#FFD700';ctx.font='bold 38px monospace';ctx.textAlign='center';
+ctx.shadowColor='rgba(255,215,0,0.5)';ctx.shadowBlur=15;
+ctx.fillText('LAST STAND',W/2,H*0.88);
+ctx.shadowBlur=0;
+
+function download(){
+  const a=document.createElement('a');
+  a.download='last-stand-thumb.png';
+  a.href=canvas.toDataURL('image/png');
+  a.click();
+}
+</script>
+</body>
+</html>

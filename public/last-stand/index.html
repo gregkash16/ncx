@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LAST STAND</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; display:flex; justify-content:center; align-items:center; height:100vh; overflow:hidden; cursor:none; }
+canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+(function(){
+'use strict';
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = 900;
+canvas.height = 600;
+const W = canvas.width, H = canvas.height;
+
+// ── FIXED TIMESTEP ────────────────────────────────────────────────────────
+const _TICK = 1000/90;
+
+// ── AUDIO ─────────────────────────────────────────────────────────────────
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+function resumeAC(){ if(AC.state==='suspended') AC.resume(); }
+
+function playTone(freq0, freq1, dur, type='square', vol=0.25){
+  const o=AC.createOscillator(), g=AC.createGain();
+  o.type=type; o.connect(g); g.connect(AC.destination);
+  o.frequency.setValueAtTime(freq0, AC.currentTime);
+  o.frequency.exponentialRampToValueAtTime(freq1, AC.currentTime+dur);
+  g.gain.setValueAtTime(vol, AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+dur);
+  o.start(AC.currentTime); o.stop(AC.currentTime+dur);
+}
+
+function playNoise(dur=0.25, vol=0.4){
+  const buf=AC.createBuffer(1,AC.sampleRate*dur,AC.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.5);
+  const s=AC.createBufferSource(), g=AC.createGain();
+  s.buffer=buf; s.connect(g); g.connect(AC.destination);
+  g.gain.setValueAtTime(vol, AC.currentTime);
+  s.start();
+}
+
+function sfxShoot(){ playTone(1200,300,0.08,'square',0.15); playNoise(0.06,0.12); }
+function sfxDryFire(){ playTone(200,100,0.05,'square',0.08); }
+function sfxReload(){ playTone(400,800,0.3,'sine',0.12); }
+function sfxHit(){ playNoise(0.15,0.3); playTone(250,80,0.12,'sawtooth',0.15); }
+function sfxPlayerHit(){ playTone(120,40,0.2,'sawtooth',0.35); playNoise(0.15,0.25); }
+function sfxEnemyShoot(){ playTone(600,200,0.12,'sawtooth',0.1); }
+function sfxWaveClear(){ [523,659,784].forEach((f,i)=>setTimeout(()=>playTone(f,f,0.25,'sine',0.3),i*150)); }
+
+// Vader SFX
+function sfxSaberIgnite(){ playTone(80,800,0.6,'sawtooth',0.3); playNoise(0.5,0.2); }
+function sfxSaberHum(){
+  const o=AC.createOscillator(), g=AC.createGain();
+  o.type='sawtooth'; o.frequency.value=92; o.connect(g); g.connect(AC.destination);
+  g.gain.value=0.06;
+  o.start();
+  return {stop:()=>{try{g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+0.5);o.stop(AC.currentTime+0.5);}catch(e){}}};
+}
+function sfxDeflect(){ playTone(2000,400,0.15,'square',0.2); playTone(800,2400,0.08,'sine',0.15); }
+function sfxBreathing(){
+  // Vader breathing — inhale/exhale with filtered noise
+  const dur=1.2;
+  const buf=AC.createBuffer(1,AC.sampleRate*dur,AC.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++){
+    const t=i/AC.sampleRate;
+    const env = t<0.5 ? Math.sin(t/0.5*Math.PI) : Math.sin((t-0.5)/0.7*Math.PI);
+    d[i]=(Math.random()*2-1)*0.3*Math.max(0,env);
+  }
+  const s=AC.createBufferSource(), g=AC.createGain(), f=AC.createBiquadFilter();
+  s.buffer=buf; f.type='lowpass'; f.frequency.value=400;
+  s.connect(f); f.connect(g); g.connect(AC.destination);
+  g.gain.value=0.4;
+  s.start();
+}
+function sfxVaderKill(){
+  playTone(200,50,0.5,'sawtooth',0.4);
+  playNoise(0.4,0.35);
+  playTone(100,30,0.8,'square',0.2);
+}
+
+// ── MUSIC ─────────────────────────────────────────────────────────────────
+let _musicOn=false, _musicTense=false, _musicNext=0, _musicIdx=0;
+let _droneA=null,_droneB=null,_droneGA=null,_droneGB=null;
+const MUS_CALM={notes:[110,131,165,196,165,131,110,147],tempo:0.8,vol:0.022,type:'sine'};
+const MUS_TENSE={notes:[82.4,98,110,82.4,73.4,98,110,131],tempo:0.35,vol:0.03,type:'triangle'};
+
+function startMusic(){
+  if(_musicOn) return; _musicOn=true; _musicTense=false; _musicIdx=0; _musicNext=AC.currentTime+0.4;
+  _droneGA=AC.createGain(); _droneGA.gain.value=0.04;
+  _droneA=AC.createOscillator(); _droneA.type='sine'; _droneA.frequency.value=55;
+  _droneA.connect(_droneGA); _droneGA.connect(AC.destination); _droneA.start();
+  _droneGB=AC.createGain(); _droneGB.gain.value=0.025;
+  _droneB=AC.createOscillator(); _droneB.type='sine'; _droneB.frequency.value=82.4;
+  _droneB.connect(_droneGB); _droneGB.connect(AC.destination); _droneB.start();
+}
+
+function stopMusic(){
+  if(!_musicOn) return; _musicOn=false; _musicTense=false;
+  try{_droneA.stop();}catch(e){} try{_droneB.stop();}catch(e){}
+  _droneA=_droneB=_droneGA=_droneGB=null;
+}
+
+function shiftMusicTense(){
+  if(_musicTense) return; _musicTense=true; _musicIdx=0; _musicNext=AC.currentTime+0.05;
+  if(_droneA) _droneA.frequency.setTargetAtTime(36.7,AC.currentTime,2);
+  if(_droneB) _droneB.frequency.setTargetAtTime(55,AC.currentTime,2);
+  if(_droneGA) _droneGA.gain.setTargetAtTime(0.06,AC.currentTime,0.7);
+  if(_droneGB) _droneGB.gain.setTargetAtTime(0.045,AC.currentTime,0.7);
+}
+
+function shiftMusicCalm(){
+  if(!_musicTense) return; _musicTense=false; _musicIdx=0;
+  if(_droneA) _droneA.frequency.setTargetAtTime(55,AC.currentTime,2);
+  if(_droneB) _droneB.frequency.setTargetAtTime(82.4,AC.currentTime,2);
+  if(_droneGA) _droneGA.gain.setTargetAtTime(0.04,AC.currentTime,0.7);
+  if(_droneGB) _droneGB.gain.setTargetAtTime(0.025,AC.currentTime,0.7);
+}
+
+function updateMusic(){
+  if(!_musicOn||AC.state==='suspended'||AC.currentTime<_musicNext) return;
+  const m=_musicTense?MUS_TENSE:MUS_CALM;
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type=m.type; o.frequency.value=m.notes[_musicIdx%m.notes.length];
+  o.connect(g); g.connect(AC.destination);
+  g.gain.setValueAtTime(m.vol,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+m.tempo*0.88);
+  o.start(AC.currentTime); o.stop(AC.currentTime+m.tempo);
+  _musicNext=AC.currentTime+m.tempo; _musicIdx++;
+}
+
+// ── PERSPECTIVE ───────────────────────────────────────────────────────────
+const VPX = W/2, VPY = H*0.38;
+const FLOOR_Y = H*0.62;
+const CEIL_Y = H*0.15;
+const BW = 120; // back wall width
+
+function perspX(laneX, z){
+  return VPX + laneX * (1-z) * (W*0.55);
+}
+function perspY(baseY, z){
+  return VPY + baseY * (1-z);
+}
+function perspScale(z){
+  return Math.max(0.05, 1-z);
+}
+
+// Max lane magnitude at depth z so troopers stay inside corridor walls
+function maxLaneAtZ(z){
+  const corridorHW = BW/2 + (W/2 - BW/2)*(1-z);
+  const denom = (1-z)*W*0.55;
+  if(denom<1) return 5;
+  return Math.max(0.1, (corridorHW-20)/denom);
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let state='title'; // title|playing|wave_clear|dead|enter_name|leaderboard|vader_cine
+let frame=0, score=0, wave=0, kills=0;
+let waveTimer=0;
+let highScore=0;
+let screenShake=0;
+let damageFlash=0;
+
+// ── PLAYER ────────────────────────────────────────────────────────────────
+const PL = {
+  hp:100, maxHp:100,
+  ammo:8, maxAmmo:8,
+  reloading:false, reloadTimer:0, reloadTime:72,
+};
+
+// ── VADER ─────────────────────────────────────────────────────────────────
+let vaderActive=false;
+let vaderTriggered=false; // has vader been triggered this game
+let vader=null; // {z, speed, deflectTimer, saberHum}
+let vaderCine=null; // {phase, timer, totalFrames}
+const VADER_PHASES=['fadeout','breathing','darkness','ignite','reveal','resume'];
+const VADER_DURATIONS=[90,100,45,55,110,50]; // frames per phase
+
+// ── MOUSE ─────────────────────────────────────────────────────────────────
+let mx=W/2, my=H/2, mDown=false, mClicked=false;
+const RELOAD_MARGIN = 40;
+
+canvas.addEventListener('mousemove', e=>{
+  const r=canvas.getBoundingClientRect();
+  mx = (e.clientX-r.left)*(W/r.width);
+  my = (e.clientY-r.top)*(H/r.height);
+});
+canvas.addEventListener('mousedown', e=>{
+  e.preventDefault();
+  resumeAC();
+  mDown=true; mClicked=true;
+});
+canvas.addEventListener('mouseup', ()=>{ mDown=false; });
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+
+document.addEventListener('mousedown', e=>{
+  resumeAC();
+  if(e.target!==canvas && state==='playing') tryReload();
+});
+
+// ── KEYBOARD ──────────────────────────────────────────────────────────────
+const K={};
+document.addEventListener('keydown', e=>{
+  resumeAC();
+  K[e.key]=true;
+  if(e.key===' ') e.preventDefault();
+
+  if(state==='enter_name'){
+    const ci = CHARS.indexOf(nameEntry.chars[nameEntry.pos]);
+    if(e.key==='ArrowUp'||e.key==='w'||e.key==='W'){
+      nameEntry.chars[nameEntry.pos] = CHARS[(ci+1)%CHARS.length];
+    } else if(e.key==='ArrowDown'||e.key==='s'||e.key==='S'){
+      nameEntry.chars[nameEntry.pos] = CHARS[(ci-1+CHARS.length)%CHARS.length];
+    } else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D'){
+      nameEntry.pos = Math.min(2, nameEntry.pos+1);
+    } else if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'){
+      nameEntry.pos = Math.max(0, nameEntry.pos-1);
+    } else if(e.key==='Enter'||e.key===' '){
+      if(nameEntry.pos<2) nameEntry.pos++;
+      else confirmName();
+    }
+    return;
+  }
+
+  if(state==='leaderboard'){
+    if(e.key==='Enter'||e.key===' ') state='title';
+    return;
+  }
+
+  if(e.key==='r'||e.key==='R'){
+    if(state==='playing') tryReload();
+  }
+  if(e.key==='l'||e.key==='L'){
+    if(state==='title') state='leaderboard';
+  }
+});
+document.addEventListener('keyup', e=>{ K[e.key]=false; });
+
+// ── LEADERBOARD ───────────────────────────────────────────────────────────
+let leaderboard = [];
+let lbLoaded = false;
+let nameEntry = { chars:['A','A','A'], pos:0 };
+const CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+function fetchLeaderboard(){
+  fetch('/api/last-stand').then(r=>r.json()).then(rows=>{
+    leaderboard = rows;
+    if(rows.length) highScore = rows[0].score;
+    lbLoaded = true;
+  }).catch(()=>{ lbLoaded = true; });
+}
+fetchLeaderboard();
+
+function isHighScore(s){ return leaderboard.length<5 || s>leaderboard[leaderboard.length-1].score; }
+function isTopScore(s){ return leaderboard.length>0 && s>leaderboard[0].score; }
+
+function beginNameEntry(){
+  nameEntry = { chars:['A','A','A'], pos:0 };
+  state='enter_name';
+}
+
+function confirmName(){
+  const name = nameEntry.chars.join('').trim()||'???';
+  state='leaderboard';
+  fetch('/api/last-stand', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, score})
+  }).then(r=>r.json()).then(rows=>{
+    leaderboard = rows;
+    if(rows.length) highScore = rows[0].score;
+  }).catch(()=>{});
+}
+
+// ── OBJECTS ───────────────────────────────────────────────────────────────
+let troopers = [];
+let incomingBolts = [];
+let blasterEffects = [];
+let deflectEffects = []; // vader deflection sparks
+let particles = [];
+let waveEnemies = 0;
+let waveSpawned = 0;
+let waveAlive = 0;
+let spawnTimer = 0;
+let spawnInterval = 90;
+
+// ── TROOPER ───────────────────────────────────────────────────────────────
+function spawnTrooper(){
+  const maxL = maxLaneAtZ(0.96);
+  const lane = (Math.random()-0.5)*2*Math.min(0.8, maxL*0.85);
+  const speed = 0.0015 + wave*0.00015 + Math.random()*0.0008;
+  troopers.push({
+    lane: lane,
+    z: 0.95 + Math.random()*0.04,
+    speed: speed,
+    hp: 1,
+    shootCD: Math.floor(180 + Math.random()*200 - wave*8),
+    sway: Math.random()*Math.PI*2,
+    swayAmp: 0.015 + Math.random()*0.02,
+    swaySpd: 0.02 + Math.random()*0.015,
+    hitFlash: 0,
+    dying: false,
+    deathTimer: 0,
+    deathVy: 0,
+  });
+  waveSpawned++;
+  waveAlive++;
+}
+
+function getClampedLane(t){
+  const raw = t.lane + Math.sin(t.sway)*t.swayAmp;
+  const ml = maxLaneAtZ(t.z);
+  return Math.max(-ml, Math.min(ml, raw));
+}
+
+function tryReload(){
+  if(PL.reloading || PL.ammo===PL.maxAmmo) return;
+  PL.reloading=true;
+  PL.reloadTimer=PL.reloadTime;
+  sfxReload();
+}
+
+// ── WAVE SETUP ────────────────────────────────────────────────────────────
+function startWave(){
+  wave++;
+  waveEnemies = 4 + wave*3 + Math.floor(wave*wave*0.3);
+  if(waveEnemies>50) waveEnemies=50;
+  waveSpawned=0;
+  waveAlive=0;
+  spawnTimer=0;
+  spawnInterval = Math.max(25, 90 - wave*5);
+  state='playing';
+
+  if(wave>=5) shiftMusicTense();
+  else shiftMusicCalm();
+}
+
+// ── VADER CINEMATIC ───────────────────────────────────────────────────────
+function triggerVader(){
+  vaderTriggered=true;
+  stopMusic();
+  // Clear all troopers and bolts
+  troopers=[]; incomingBolts=[]; blasterEffects=[];
+  state='vader_cine';
+  vaderCine={phase:0, timer:0};
+  screenShake=0; damageFlash=0;
+}
+
+function spawnVaderGameplay(){
+  vaderActive=true;
+  vader={z:0.92, speed:0.0008, deflectTimer:0};
+  vader.saberHum=sfxSaberHum();
+  state='playing';
+  // No more trooper spawning — waveSpawned/waveEnemies set so nothing spawns
+  waveEnemies=0; waveSpawned=0; waveAlive=0;
+}
+
+// ── PARTICLES ─────────────────────────────────────────────────────────────
+function explode(x,y,count,colors){
+  for(let i=0;i<count;i++){
+    const a=Math.random()*Math.PI*2, s=Math.random()*4+1;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,
+      life:1,dec:0.02+Math.random()*0.03,
+      sz:Math.random()*3+1,
+      col:colors[Math.floor(Math.random()*colors.length)]});
+  }
+}
+
+// ── START GAME ────────────────────────────────────────────────────────────
+function startGame(){
+  frame=0; score=0; wave=0; kills=0;
+  PL.hp=PL.maxHp; PL.ammo=PL.maxAmmo;
+  PL.reloading=false; PL.reloadTimer=0;
+  troopers=[]; incomingBolts=[]; blasterEffects=[]; deflectEffects=[]; particles=[];
+  screenShake=0; damageFlash=0;
+  vaderActive=false; vaderTriggered=false; vader=null; vaderCine=null;
+  stopMusic(); startMusic();
+  startWave();
+}
+
+// ── DIE ───────────────────────────────────────────────────────────────────
+function doDeath(){
+  PL.hp=0;
+  screenShake=0; damageFlash=0;
+  stopMusic();
+  if(vader && vader.saberHum){ vader.saberHum.stop(); }
+  setTimeout(()=>{
+    if(isHighScore(score)) beginNameEntry();
+    else state='dead';
+  }, 1500);
+  state='dead';
+}
+
+// ── UPDATE ────────────────────────────────────────────────────────────────
+function update(){
+  frame++;
+  updateMusic();
+
+  // ── VADER CINEMATIC UPDATE ──────────────────────────────────────────────
+  if(state==='vader_cine'){
+    vaderCine.timer++;
+    const phaseName = VADER_PHASES[vaderCine.phase];
+    const phaseDur = VADER_DURATIONS[vaderCine.phase];
+
+    // Phase-specific triggers
+    if(phaseName==='breathing' && vaderCine.timer===1){
+      sfxBreathing();
+    }
+    if(phaseName==='breathing' && vaderCine.timer===55){
+      sfxBreathing();
+    }
+    if(phaseName==='ignite' && vaderCine.timer===1){
+      sfxSaberIgnite();
+    }
+
+    if(vaderCine.timer >= phaseDur){
+      vaderCine.phase++;
+      vaderCine.timer=0;
+      if(vaderCine.phase >= VADER_PHASES.length){
+        spawnVaderGameplay();
+      }
+    }
+    return;
+  }
+
+  if(state==='wave_clear'){
+    waveTimer--;
+    if(waveTimer<=0) startWave();
+    return;
+  }
+
+  if(state!=='playing') return;
+
+  // Screen shake decay
+  if(screenShake>0) screenShake*=0.9;
+  if(screenShake<0.3) screenShake=0;
+  if(damageFlash>0) damageFlash--;
+
+  // Reload
+  if(PL.reloading){
+    PL.reloadTimer--;
+    if(PL.reloadTimer<=0){
+      PL.reloading=false;
+      PL.ammo=PL.maxAmmo;
+    }
+  }
+
+  // Handle click
+  if(mClicked){
+    if(PL.reloading){
+      // do nothing while reloading
+    } else if(mx<RELOAD_MARGIN || mx>W-RELOAD_MARGIN || my<RELOAD_MARGIN || my>H-RELOAD_MARGIN){
+      tryReload();
+    } else if(PL.ammo>0){
+      PL.ammo--;
+      sfxShoot();
+      screenShake=3;
+      blasterEffects.push({x:mx, y:my, life:8});
+
+      // Check if shooting Vader
+      if(vaderActive && vader){
+        const sc = perspScale(vader.z);
+        const vx = perspX(0, vader.z);
+        const vy = perspY(FLOOR_Y-VPY, vader.z) - sc*65;
+        const vhw = sc*30, vhh = sc*70;
+        if(mx>vx-vhw && mx<vx+vhw && my>vy-vhh && my<vy+vhh){
+          // Deflect!
+          sfxDeflect();
+          vader.deflectTimer=12;
+          deflectEffects.push({x:vx, y:vy-sc*20, life:15});
+          // Reflected bolt damages player slightly
+          PL.hp -= 3;
+          damageFlash=5;
+          if(PL.hp<=0){ doDeath(); mClicked=false; return; }
+          mClicked=false;
+          // Don't check troopers
+        } else {
+          // Miss — sparks
+          explode(mx, my, 4, ['#ff8800','#ffcc00','#666']);
+        }
+        mClicked=false;
+      } else {
+        // Normal hit detection — front to back
+        const sorted = troopers.filter(t=>!t.dying).sort((a,b)=>a.z-b.z);
+        let hit=false;
+        for(const t of sorted){
+          const sc = perspScale(t.z);
+          const effectiveLane = getClampedLane(t);
+          const tx = perspX(effectiveLane, t.z);
+          const ty = perspY(FLOOR_Y-VPY, t.z) - sc*55;
+          const hw = sc*22, hh = sc*55;
+          if(mx>tx-hw && mx<tx+hw && my>ty-hh && my<ty+hh){
+            t.hp--;
+            t.hitFlash=6;
+            if(t.hp<=0){
+              t.dying=true;
+              t.deathTimer=30;
+              t.deathVy=-2*sc;
+              waveAlive--;
+              kills++;
+              const distBonus = Math.floor(t.z*150);
+              score += 100 + distBonus;
+              // HP regen: 3% of missing HP per kill
+              const missing = PL.maxHp - PL.hp;
+              PL.hp = Math.min(PL.maxHp, PL.hp + Math.ceil(missing*0.03));
+              sfxHit();
+              explode(tx, ty, 12, ['#fff','#ff4400','#ff8800','#aaa','#ffcc00']);
+
+              // Check Vader trigger: beat #1 score, wave>=3, leaderboard exists
+              if(!vaderTriggered && wave>=3 && isTopScore(score)){
+                triggerVader();
+                mClicked=false;
+                return;
+              }
+            }
+            hit=true;
+            break;
+          }
+        }
+        if(!hit){
+          explode(mx, my, 4, ['#ff8800','#ffcc00','#666']);
+        }
+        mClicked=false;
+      }
+    } else {
+      sfxDryFire();
+      mClicked=false;
+    }
+    mClicked=false;
+  }
+  mClicked=false;
+
+  // ── VADER GAMEPLAY UPDATE ───────────────────────────────────────────────
+  if(vaderActive && vader){
+    vader.z -= vader.speed;
+    if(vader.deflectTimer>0) vader.deflectTimer--;
+
+    // Vader reached player
+    if(vader.z<=0.08){
+      sfxVaderKill();
+      screenShake=12;
+      damageFlash=20;
+      doDeath();
+      return;
+    }
+  }
+
+  // Spawn enemies (not during Vader)
+  if(!vaderActive && waveSpawned < waveEnemies){
+    spawnTimer--;
+    if(spawnTimer<=0){
+      spawnTrooper();
+      spawnTimer = spawnInterval + Math.floor(Math.random()*20);
+    }
+  }
+
+  // Update troopers
+  for(let i=troopers.length-1; i>=0; i--){
+    const t=troopers[i];
+
+    if(t.dying){
+      t.deathTimer--;
+      t.deathVy+=0.1;
+      if(t.deathTimer<=0) troopers.splice(i,1);
+      continue;
+    }
+
+    t.z -= t.speed;
+    t.sway += t.swaySpd;
+    if(t.hitFlash>0) t.hitFlash--;
+
+    // Clamp lane to stay inside corridor
+    const ml = maxLaneAtZ(t.z);
+    if(Math.abs(t.lane)>ml*0.9) t.lane = Math.sign(t.lane)*ml*0.9;
+
+    if(t.z <= 0.05){
+      PL.hp -= 15;
+      damageFlash=12;
+      screenShake=8;
+      sfxPlayerHit();
+      t.dying=true; t.deathTimer=15; waveAlive--;
+      explode(perspX(getClampedLane(t),0.05), H*0.7, 8, ['#fff','#aaa']);
+      if(PL.hp<=0){ doDeath(); return; }
+      continue;
+    }
+
+    // Enemy shoots
+    t.shootCD--;
+    if(t.shootCD<=0 && t.z<0.8 && t.z>0.1){
+      t.shootCD = Math.floor(150 + Math.random()*180 - wave*5);
+      if(t.shootCD<60) t.shootCD=60;
+      const effectiveLane = getClampedLane(t);
+      const tx = perspX(effectiveLane, t.z);
+      const ty = perspY(FLOOR_Y-VPY, t.z) - perspScale(t.z)*35;
+      incomingBolts.push({
+        x:tx, y:ty,
+        vx:(W/2-tx+((Math.random()-0.5)*120))*0.025,
+        vy:(H-ty)*0.025,
+        life:45
+      });
+      sfxEnemyShoot();
+    }
+  }
+
+  // Update incoming bolts
+  for(let i=incomingBolts.length-1; i>=0; i--){
+    const b=incomingBolts[i];
+    b.x+=b.vx; b.y+=b.vy; b.life--;
+    if(b.life<=0 || b.y>H+20){
+      if(b.y>=H-60 && b.x>100 && b.x<W-100){
+        PL.hp -= 5 + Math.floor(wave*0.5);
+        damageFlash=8;
+        screenShake=4;
+        sfxPlayerHit();
+        if(PL.hp<=0){ doDeath(); return; }
+      }
+      incomingBolts.splice(i,1);
+    }
+  }
+
+  // Update effects
+  for(let i=blasterEffects.length-1;i>=0;i--){
+    blasterEffects[i].life--;
+    if(blasterEffects[i].life<=0) blasterEffects.splice(i,1);
+  }
+  for(let i=deflectEffects.length-1;i>=0;i--){
+    deflectEffects[i].life--;
+    if(deflectEffects[i].life<=0) deflectEffects.splice(i,1);
+  }
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.08; p.life-=p.dec;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  // Check wave complete (not during Vader)
+  if(!vaderActive && waveSpawned>=waveEnemies && waveAlive<=0 && troopers.length===0){
+    score += wave*50;
+    sfxWaveClear();
+    state='wave_clear';
+    waveTimer=120;
+  }
+}
+
+// ── DRAW ──────────────────────────────────────────────────────────────────
+
+function drawCorridor(darken){
+  ctx.fillStyle='#2a2a2e';
+  ctx.fillRect(0,0,W,H);
+
+  const cx=VPX, cy=VPY;
+  const bw=BW, bh=80;
+
+  // Back wall
+  ctx.fillStyle='#1a1a1e';
+  ctx.fillRect(cx-bw/2, cy-bh/2, bw, bh);
+
+  // Ceiling
+  ctx.fillStyle='#222228';
+  ctx.beginPath();
+  ctx.moveTo(cx-bw/2, cy-bh/2); ctx.lineTo(0, 0); ctx.lineTo(W, 0); ctx.lineTo(cx+bw/2, cy-bh/2);
+  ctx.closePath(); ctx.fill();
+
+  // Floor
+  ctx.fillStyle='#2e2e34';
+  ctx.beginPath();
+  ctx.moveTo(cx-bw/2, cy+bh/2); ctx.lineTo(0, H); ctx.lineTo(W, H); ctx.lineTo(cx+bw/2, cy+bh/2);
+  ctx.closePath(); ctx.fill();
+
+  // Left wall
+  ctx.fillStyle='#252530';
+  ctx.beginPath();
+  ctx.moveTo(cx-bw/2, cy-bh/2); ctx.lineTo(0, 0); ctx.lineTo(0, H); ctx.lineTo(cx-bw/2, cy+bh/2);
+  ctx.closePath(); ctx.fill();
+
+  // Right wall
+  ctx.fillStyle='#252530';
+  ctx.beginPath();
+  ctx.moveTo(cx+bw/2, cy-bh/2); ctx.lineTo(W, 0); ctx.lineTo(W, H); ctx.lineTo(cx+bw/2, cy+bh/2);
+  ctx.closePath(); ctx.fill();
+
+  // Wall detail lines
+  ctx.strokeStyle='#3a3a44'; ctx.lineWidth=1;
+  for(let i=1;i<=6;i++){
+    const t=i/7;
+    const ly1=cy-bh/2+(0-(cy-bh/2))*t;
+    const ly2=cy+bh/2+(H-(cy+bh/2))*t;
+    const lx=cx-bw/2+(0-(cx-bw/2))*t;
+    ctx.beginPath(); ctx.moveTo(lx,ly1); ctx.lineTo(lx,ly2); ctx.stroke();
+    const rx=cx+bw/2+(W-(cx+bw/2))*t;
+    ctx.beginPath(); ctx.moveTo(rx,ly1); ctx.lineTo(rx,ly2); ctx.stroke();
+  }
+
+  // Floor grid
+  ctx.strokeStyle='#36363e'; ctx.lineWidth=1;
+  for(let i=1;i<=10;i++){
+    const t=i/11;
+    const y=cy+bh/2+(H-(cy+bh/2))*t;
+    const xSpread=(bw/2)+((W/2)-(bw/2))*t;
+    ctx.beginPath(); ctx.moveTo(cx-xSpread,y); ctx.lineTo(cx+xSpread,y); ctx.stroke();
+  }
+
+  // Ceiling lights
+  if(!darken){
+    for(let i=1;i<=8;i++){
+      const t=i/9;
+      const lx=cx;
+      const ly=cy-bh/2*0.7+(CEIL_Y*0.3-(cy-bh/2*0.7))*(1-t);
+      const lw=6+t*25, lh=2+t*4;
+      const brightness=Math.floor(80+t*80);
+      ctx.fillStyle=`rgb(${brightness},${brightness},${brightness+30})`;
+      ctx.fillRect(lx-lw/2,ly-lh/2,lw,lh);
+      ctx.fillStyle=`rgba(180,190,220,${0.03+t*0.04})`;
+      ctx.fillRect(lx-lw,ly-lh*2,lw*2,lh*4);
+    }
+  }
+
+  // Wall panels
+  ctx.strokeStyle='#44444e'; ctx.lineWidth=1;
+  for(let i=1;i<=5;i++){
+    const t=i/6, sc=t;
+    const pw=8+sc*50, ph=12+sc*35;
+    const lpx=cx-bw/2+(0-(cx-bw/2))*t-pw*0.3;
+    const lpy=cy-ph*0.3;
+    ctx.strokeRect(lpx,lpy,pw,ph);
+    const rpx=cx+bw/2+(W-(cx+bw/2))*t-pw*0.7;
+    ctx.strokeRect(rpx,lpy,pw,ph);
+  }
+}
+
+function drawTrooper(t){
+  const sc = perspScale(t.z);
+  const effectiveLane = getClampedLane(t);
+  const baseX = perspX(effectiveLane, t.z);
+  const feetY = perspY(FLOOR_Y-VPY, t.z);
+  const h = sc*110;
+
+  ctx.save();
+  ctx.translate(baseX, feetY);
+
+  if(t.dying){
+    ctx.translate(0, t.deathVy*t.deathTimer*0.5);
+    ctx.globalAlpha = t.deathTimer/30;
+  }
+  if(t.hitFlash>0) ctx.globalAlpha = 0.5+Math.sin(t.hitFlash*2)*0.5;
+
+  const w = sc*40;
+  const legH=h*0.38, legW=w*0.3;
+  ctx.fillStyle='#ddd';
+  ctx.fillRect(-legW*1.1,-legH,legW,legH);
+  ctx.fillRect(legW*0.1,-legH,legW,legH);
+  ctx.fillStyle='#222';
+  ctx.fillRect(-legW*1.1,-legH*0.15,legW,legH*0.15);
+  ctx.fillRect(legW*0.1,-legH*0.15,legW,legH*0.15);
+
+  const bodyH=h*0.32, bodyW=w*0.7, bodyY=-legH;
+  ctx.fillStyle='#e8e8e8';
+  ctx.fillRect(-bodyW/2,bodyY-bodyH,bodyW,bodyH);
+  ctx.fillStyle='#bbb';
+  ctx.fillRect(-bodyW*0.2,bodyY-bodyH*0.8,bodyW*0.4,bodyH*0.3);
+  ctx.fillStyle='#333';
+  ctx.fillRect(-bodyW*0.08,bodyY-bodyH*0.4,bodyW*0.16,bodyH*0.15);
+
+  const armW=w*0.2;
+  ctx.fillStyle='#ddd';
+  ctx.fillRect(-bodyW/2-armW,bodyY-bodyH*0.9,armW,bodyH*0.8);
+  ctx.fillRect(bodyW/2,bodyY-bodyH*0.9,armW,bodyH*0.8);
+  ctx.fillStyle='#444';
+  ctx.fillRect(-bodyW/2-armW,bodyY-bodyH*0.92,armW+2,bodyH*0.12);
+  ctx.fillRect(bodyW/2-2,bodyY-bodyH*0.92,armW+2,bodyH*0.12);
+
+  const headH=h*0.22, headW=w*0.52, headY=bodyY-bodyH;
+  ctx.fillStyle='#f0f0f0';
+  ctx.beginPath();
+  ctx.ellipse(0,headY-headH*0.5,headW/2,headH*0.55,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle='#111';
+  const eyeW=headW*0.18, eyeH=headH*0.16, eyeY=headY-headH*0.55;
+  ctx.fillRect(-headW*0.22,eyeY,eyeW,eyeH);
+  ctx.fillRect(headW*0.04,eyeY,eyeW,eyeH);
+  ctx.fillRect(-headW*0.06,eyeY,headW*0.12,eyeH);
+  ctx.fillRect(-headW*0.04,eyeY+eyeH,headW*0.08,headH*0.22);
+  ctx.fillStyle='#333';
+  ctx.fillRect(-headW*0.15,eyeY+eyeH+headH*0.18,headW*0.3,headH*0.1);
+
+  ctx.fillStyle='#333';
+  const gunLen=sc*28, gunX=bodyW/2+armW*0.3, gunY=bodyY-bodyH*0.5;
+  ctx.fillRect(gunX,gunY,gunLen,sc*3);
+  ctx.fillRect(gunX+gunLen*0.6,gunY-sc*2,sc*4,sc*4);
+
+  ctx.restore();
+}
+
+// ── VADER DRAWING ─────────────────────────────────────────────────────────
+function drawVader(z){
+  const sc = perspScale(z);
+  const baseX = perspX(0, z);
+  const feetY = perspY(FLOOR_Y-VPY, z);
+  const h = sc*130; // taller than troopers
+
+  ctx.save();
+  ctx.translate(baseX, feetY);
+
+  const w = sc*50;
+
+  // Cape (wide dark shape behind body)
+  ctx.fillStyle='#0a0a0a';
+  ctx.beginPath();
+  ctx.moveTo(-w*0.7, -h*0.25);
+  ctx.quadraticCurveTo(-w*0.8, -h*0.7, -w*0.15, -h*0.95);
+  ctx.lineTo(w*0.15, -h*0.95);
+  ctx.quadraticCurveTo(w*0.8, -h*0.7, w*0.7, -h*0.25);
+  ctx.lineTo(w*0.5, 0);
+  ctx.lineTo(-w*0.5, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Legs
+  const legH=h*0.35, legW=w*0.25;
+  ctx.fillStyle='#111';
+  ctx.fillRect(-legW*1.05,-legH,legW,legH);
+  ctx.fillRect(legW*0.05,-legH,legW,legH);
+
+  // Body
+  const bodyH=h*0.32, bodyW=w*0.65, bodyY=-legH;
+  ctx.fillStyle='#151515';
+  ctx.fillRect(-bodyW/2,bodyY-bodyH,bodyW,bodyH);
+
+  // Chest plate / control panel
+  ctx.fillStyle='#333';
+  ctx.fillRect(-bodyW*0.15,bodyY-bodyH*0.65,bodyW*0.3,bodyH*0.25);
+  // Colored lights on chest
+  ctx.fillStyle='#f00';
+  ctx.fillRect(-bodyW*0.08,bodyY-bodyH*0.58,sc*3,sc*3);
+  ctx.fillStyle='#0af';
+  ctx.fillRect(bodyW*0.02,bodyY-bodyH*0.58,sc*3,sc*3);
+  ctx.fillStyle='#0f0';
+  ctx.fillRect(-bodyW*0.03,bodyY-bodyH*0.50,sc*3,sc*2);
+
+  // Arms
+  const armW2=w*0.22;
+  ctx.fillStyle='#111';
+  ctx.fillRect(-bodyW/2-armW2,bodyY-bodyH*0.9,armW2,bodyH*0.85);
+  ctx.fillRect(bodyW/2,bodyY-bodyH*0.9,armW2,bodyH*0.85);
+
+  // Helmet
+  const headH=h*0.24, headW=w*0.55, headY=bodyY-bodyH;
+  ctx.fillStyle='#0e0e0e';
+  ctx.beginPath();
+  ctx.ellipse(0,headY-headH*0.45,headW/2,headH*0.55,0,0,Math.PI*2);
+  ctx.fill();
+
+  // Helmet details — angular visor shape
+  ctx.fillStyle='#222';
+  // Eye lenses (triangular)
+  ctx.beginPath();
+  ctx.moveTo(-headW*0.25,headY-headH*0.52);
+  ctx.lineTo(-headW*0.05,headY-headH*0.52);
+  ctx.lineTo(-headW*0.15,headY-headH*0.38);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(headW*0.05,headY-headH*0.52);
+  ctx.lineTo(headW*0.25,headY-headH*0.52);
+  ctx.lineTo(headW*0.15,headY-headH*0.38);
+  ctx.closePath();
+  ctx.fill();
+
+  // Mouth grill
+  ctx.fillStyle='#1a1a1a';
+  const mouthY=headY-headH*0.28;
+  for(let i=0;i<3;i++){
+    ctx.fillRect(-headW*0.12, mouthY+i*sc*2.5, headW*0.24, sc*1.5);
+  }
+
+  // Lightsaber — held extended forward
+  const saberX = bodyW/2+armW2*0.5;
+  const saberHandY = bodyY-bodyH*0.45;
+  // Hilt
+  ctx.fillStyle='#666';
+  ctx.fillRect(saberX-sc*1.5, saberHandY, sc*3, sc*14);
+  ctx.fillStyle='#888';
+  ctx.fillRect(saberX-sc*2, saberHandY+sc*2, sc*4, sc*3);
+
+  // Blade (red glow)
+  const bladeLen = sc*55;
+  ctx.save();
+  ctx.shadowColor='#f00';
+  ctx.shadowBlur=15*sc;
+  ctx.fillStyle='#ff2020';
+  ctx.fillRect(saberX-sc*0.8, saberHandY-bladeLen, sc*1.6, bladeLen);
+  ctx.shadowBlur=0;
+  // Inner bright core
+  ctx.fillStyle='#fff';
+  ctx.globalAlpha=0.7;
+  ctx.fillRect(saberX-sc*0.3, saberHandY-bladeLen+sc*2, sc*0.6, bladeLen-sc*4);
+  ctx.globalAlpha=1;
+  ctx.restore();
+
+  // Deflect flash
+  if(vader && vader.deflectTimer>0){
+    const flashAlpha = vader.deflectTimer/12;
+    ctx.fillStyle=`rgba(255,100,100,${flashAlpha*0.6})`;
+    ctx.beginPath();
+    ctx.arc(saberX, saberHandY-bladeLen*0.5, sc*20*flashAlpha, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawVaderCinematic(){
+  const phase = VADER_PHASES[vaderCine.phase];
+  const t = vaderCine.timer;
+  const dur = VADER_DURATIONS[vaderCine.phase];
+  const pct = t/dur;
+
+  if(phase==='fadeout'){
+    // Corridor fades to black
+    drawCorridor(false);
+    ctx.fillStyle=`rgba(0,0,0,${pct})`;
+    ctx.fillRect(0,0,W,H);
+  }
+  else if(phase==='breathing' || phase==='darkness'){
+    // Pure black with subtle breathing text
+    ctx.fillStyle='#000';
+    ctx.fillRect(0,0,W,H);
+    if(phase==='breathing'){
+      // Subtle red pulse
+      const breathPulse = Math.sin(t*0.07)*0.03;
+      ctx.fillStyle=`rgba(255,0,0,${Math.max(0,breathPulse)})`;
+      ctx.fillRect(0,0,W,H);
+    }
+  }
+  else if(phase==='ignite'){
+    // Dark corridor, lightsaber ignites at the end of the hallway
+    ctx.fillStyle='#000';
+    ctx.fillRect(0,0,W,H);
+    drawCorridor(true); // no ceiling lights
+    // Heavy darkness over corridor
+    ctx.fillStyle='rgba(0,0,0,0.88)';
+    ctx.fillRect(0,0,W,H);
+
+    // Saber ignite — red line extends from center
+    const ignitePct = Math.min(1, pct*1.5);
+    const saberLen = ignitePct * 35;
+    const sx = VPX+15, sy = VPY-10;
+    ctx.save();
+    ctx.shadowColor='#f00';
+    ctx.shadowBlur=20;
+    ctx.strokeStyle='#ff2020';
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx, sy-saberLen);
+    ctx.stroke();
+    // Bright core
+    ctx.strokeStyle='#fff';
+    ctx.lineWidth=1;
+    ctx.globalAlpha=0.8;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx, sy-saberLen);
+    ctx.stroke();
+    ctx.globalAlpha=1;
+    ctx.shadowBlur=0;
+    ctx.restore();
+
+    // Red ambient glow around saber
+    const glowR = ignitePct*80;
+    const grd = ctx.createRadialGradient(sx,sy-saberLen/2,0,sx,sy-saberLen/2,glowR);
+    grd.addColorStop(0,'rgba(255,0,0,0.15)');
+    grd.addColorStop(1,'rgba(255,0,0,0)');
+    ctx.fillStyle=grd;
+    ctx.fillRect(sx-glowR,sy-saberLen-glowR,glowR*2,glowR*2+saberLen);
+  }
+  else if(phase==='reveal'){
+    // Dark corridor with Vader silhouette lit by red saber glow
+    ctx.fillStyle='#000';
+    ctx.fillRect(0,0,W,H);
+    drawCorridor(true);
+    ctx.fillStyle='rgba(0,0,0,0.82)';
+    ctx.fillRect(0,0,W,H);
+
+    // Draw Vader at back of corridor
+    const vz = 0.88;
+    // Red glow illumination
+    const glowR = 120;
+    const gx = perspX(0, vz);
+    const gy = perspY(FLOOR_Y-VPY, vz) - perspScale(vz)*60;
+    const grd = ctx.createRadialGradient(gx,gy,0,gx,gy,glowR);
+    grd.addColorStop(0,'rgba(255,20,20,0.2)');
+    grd.addColorStop(0.5,'rgba(255,0,0,0.08)');
+    grd.addColorStop(1,'rgba(255,0,0,0)');
+    ctx.fillStyle=grd;
+    ctx.fillRect(gx-glowR,gy-glowR,glowR*2,glowR*2);
+
+    drawVader(vz);
+
+    // Text
+    if(pct>0.4){
+      const textAlpha = Math.min(1,(pct-0.4)/0.3);
+      ctx.globalAlpha=textAlpha;
+      ctx.fillStyle='#f00';
+      ctx.font='bold 20px monospace';
+      ctx.textAlign='center';
+      ctx.fillText('YOU HAVE BROKEN THE RECORD', W/2, H*0.18);
+      ctx.fillStyle='#888';
+      ctx.font='14px monospace';
+      ctx.fillText('BUT THE DARK SIDE DOES NOT FORGET', W/2, H*0.24);
+      ctx.globalAlpha=1;
+    }
+  }
+  else if(phase==='resume'){
+    // Corridor lights flicker back on
+    const flickerOn = pct > 0.5 || (Math.random()<pct);
+    drawCorridor(!flickerOn);
+    if(!flickerOn){
+      ctx.fillStyle='rgba(0,0,0,0.6)';
+      ctx.fillRect(0,0,W,H);
+    }
+    drawVader(0.88);
+    drawHUD();
+  }
+}
+
+function drawHUD(){
+  // HP bar
+  const barW=200, barH=16, barX=20, barY=H-35;
+  ctx.fillStyle='rgba(0,0,0,0.6)';
+  ctx.fillRect(barX-2,barY-2,barW+4,barH+4);
+  const hpPct=PL.hp/PL.maxHp;
+  ctx.fillStyle=hpPct>0.5?'#4a4':'#a44';
+  ctx.fillRect(barX,barY,barW*Math.max(0,hpPct),barH);
+  ctx.strokeStyle='#888'; ctx.lineWidth=1;
+  ctx.strokeRect(barX,barY,barW,barH);
+  ctx.fillStyle='#fff'; ctx.font='bold 11px monospace'; ctx.textAlign='left';
+  ctx.fillText('HP',barX,barY-4);
+
+  // Ammo
+  const ammoX=W-220, ammoY=H-35;
+  ctx.fillStyle='#fff'; ctx.font='bold 12px monospace'; ctx.textAlign='right';
+  ctx.fillText('AMMO',W-25,ammoY-4);
+  for(let i=0;i<PL.maxAmmo;i++){
+    const bx=ammoX+i*23;
+    if(i<PL.ammo){
+      ctx.fillStyle='#f44'; ctx.shadowColor='#f44'; ctx.shadowBlur=6;
+      ctx.fillRect(bx,ammoY+2,16,12);
+      ctx.shadowBlur=0;
+    } else {
+      ctx.fillStyle='#333';
+      ctx.fillRect(bx,ammoY+2,16,12);
+    }
+    ctx.strokeStyle='#555'; ctx.strokeRect(bx,ammoY+2,16,12);
+  }
+
+  // Reload indicator
+  if(PL.reloading){
+    const pct=1-PL.reloadTimer/PL.reloadTime;
+    ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.fillRect(W/2-80,H/2+40,160,20);
+    ctx.fillStyle='#f80';
+    ctx.fillRect(W/2-78,H/2+42,156*pct,16);
+    ctx.fillStyle='#fff'; ctx.font='bold 14px monospace'; ctx.textAlign='center';
+    ctx.fillText('RELOADING...',W/2,H/2+38);
+  } else if(PL.ammo===0){
+    if(frame%40<25){
+      ctx.fillStyle='#f44'; ctx.font='bold 18px monospace'; ctx.textAlign='center';
+      ctx.fillText('SHOOT EDGE TO RELOAD',W/2,H/2+40);
+    }
+  }
+
+  // Score
+  ctx.fillStyle='#FFD700'; ctx.font='bold 16px monospace'; ctx.textAlign='left';
+  ctx.fillText('SCORE: '+score,20,28);
+
+  // Wave
+  ctx.fillStyle='#aaa'; ctx.font='bold 14px monospace'; ctx.textAlign='right';
+  ctx.fillText(vaderActive?'VADER':'WAVE '+wave,W-20,28);
+
+  // Kills
+  ctx.fillStyle='#aaa'; ctx.font='12px monospace'; ctx.textAlign='right';
+  ctx.fillText('KILLS: '+kills,W-20,46);
+
+  // Remaining
+  if(!vaderActive){
+    const remaining=waveEnemies-(waveSpawned-waveAlive);
+    if(state==='playing'){
+      ctx.fillStyle='#888'; ctx.font='11px monospace'; ctx.textAlign='center';
+      ctx.fillText('HOSTILES: '+remaining,W/2,22);
+    }
+  } else {
+    if(frame%60<40){
+      ctx.fillStyle='#f44'; ctx.font='bold 13px monospace'; ctx.textAlign='center';
+      ctx.fillText('VADER APPROACHES',W/2,22);
+    }
+  }
+}
+
+function drawCrosshair(){
+  ctx.save();
+  ctx.strokeStyle=PL.ammo>0?'#f44':'#888';
+  ctx.lineWidth=2;
+  ctx.shadowColor=PL.ammo>0?'#f44':'#444';
+  ctx.shadowBlur=PL.ammo>0?8:0;
+  const sz=16;
+  ctx.beginPath();
+  ctx.moveTo(mx-sz,my); ctx.lineTo(mx-sz*0.4,my);
+  ctx.moveTo(mx+sz*0.4,my); ctx.lineTo(mx+sz,my);
+  ctx.moveTo(mx,my-sz); ctx.lineTo(mx,my-sz*0.4);
+  ctx.moveTo(mx,my+sz*0.4); ctx.lineTo(mx,my+sz);
+  ctx.stroke();
+  ctx.beginPath(); ctx.arc(mx,my,sz*0.7,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle=PL.ammo>0?'#f44':'#888';
+  ctx.beginPath(); ctx.arc(mx,my,2,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.restore();
+}
+
+function drawBlasterEffects(){
+  for(const e of blasterEffects){
+    const alpha=e.life/8;
+    ctx.save(); ctx.globalAlpha=alpha;
+    ctx.strokeStyle='#f44'; ctx.lineWidth=3;
+    ctx.shadowColor='#f44'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.moveTo(W/2,H-20); ctx.lineTo(e.x,e.y); ctx.stroke();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(e.x,e.y,8*alpha,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0; ctx.restore();
+  }
+}
+
+function drawDeflectEffects(){
+  for(const d of deflectEffects){
+    const alpha=d.life/15;
+    ctx.save(); ctx.globalAlpha=alpha;
+    // Sparks radiating out
+    for(let i=0;i<6;i++){
+      const a=i/6*Math.PI*2 + d.life*0.3;
+      const r=20*(1-alpha);
+      ctx.fillStyle='#f44';
+      ctx.beginPath();
+      ctx.arc(d.x+Math.cos(a)*r, d.y+Math.sin(a)*r, 3*alpha, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function drawIncomingBolts(){
+  for(const b of incomingBolts){
+    ctx.save();
+    ctx.fillStyle='#4f4'; ctx.shadowColor='#4f4'; ctx.shadowBlur=10;
+    const sz=3+(1-b.life/45)*4;
+    ctx.beginPath(); ctx.arc(b.x,b.y,sz,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(80,255,80,0.4)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x-b.vx*3,b.y-b.vy*3); ctx.stroke();
+    ctx.shadowBlur=0; ctx.restore();
+  }
+}
+
+function drawParticles(){
+  for(const p of particles){
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.col;
+    ctx.fillRect(p.x-p.sz/2,p.y-p.sz/2,p.sz,p.sz);
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawReloadZone(){
+  if(PL.ammo<PL.maxAmmo && !PL.reloading && PL.ammo<=2){
+    const alpha=0.15+Math.sin(frame*0.08)*0.1;
+    ctx.fillStyle=`rgba(255,136,0,${alpha})`;
+    ctx.fillRect(0,H-RELOAD_MARGIN,W,RELOAD_MARGIN);
+    ctx.fillRect(0,0,W,RELOAD_MARGIN);
+    ctx.fillRect(0,0,RELOAD_MARGIN,H);
+    ctx.fillRect(W-RELOAD_MARGIN,0,RELOAD_MARGIN,H);
+  }
+}
+
+function drawTitle(){
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+  drawCorridor(false);
+  ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle='#FFD700'; ctx.font='bold 64px monospace'; ctx.textAlign='center';
+  ctx.shadowColor='rgba(255,215,0,0.5)'; ctx.shadowBlur=20;
+  ctx.fillText('LAST STAND',W/2,H*0.32);
+  ctx.shadowBlur=0;
+
+  ctx.fillStyle='#aaa'; ctx.font='16px monospace';
+  ctx.fillText('Defend the corridor. Hold as long as you can.',W/2,H*0.44);
+  ctx.fillStyle='#888'; ctx.font='13px monospace';
+  ctx.fillText('MOUSE to aim  •  CLICK to fire  •  SHOOT EDGES to reload',W/2,H*0.54);
+  ctx.fillText('R to reload  •  L for leaderboard',W/2,H*0.59);
+
+  ctx.fillStyle='#fff'; ctx.font='bold 18px monospace';
+  if(frame%80<55) ctx.fillText('CLICK TO START',W/2,H*0.72);
+
+  if(highScore>0){
+    ctx.fillStyle='#FFD700'; ctx.font='14px monospace';
+    ctx.fillText('HIGH SCORE: '+highScore,W/2,H*0.82);
+  }
+}
+
+function drawDead(){
+  ctx.fillStyle='rgba(80,0,0,0.7)'; ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle='#f44'; ctx.font='bold 48px monospace'; ctx.textAlign='center';
+  ctx.fillText(vaderTriggered?'VADER WINS':'OVERWHELMED',W/2,H*0.35);
+
+  ctx.fillStyle='#fff'; ctx.font='20px monospace';
+  ctx.fillText('SCORE: '+score,W/2,H*0.48);
+  ctx.fillText('WAVE: '+wave,W/2,H*0.54);
+  ctx.fillText('KILLS: '+kills,W/2,H*0.60);
+
+  ctx.fillStyle='#aaa'; ctx.font='14px monospace';
+  if(frame%80<55) ctx.fillText('CLICK TO CONTINUE',W/2,H*0.75);
+}
+
+function drawWaveClear(){
+  drawCorridor(false);
+  drawHUD();
+  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle='#FFD700'; ctx.font='bold 36px monospace'; ctx.textAlign='center';
+  ctx.shadowColor='rgba(255,215,0,0.5)'; ctx.shadowBlur=15;
+  ctx.fillText('WAVE '+wave+' CLEAR',W/2,H*0.42);
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#fff'; ctx.font='16px monospace';
+  ctx.fillText('BONUS: +'+(wave*50),W/2,H*0.52);
+  ctx.fillStyle='#aaa'; ctx.font='14px monospace';
+  ctx.fillText('NEXT WAVE IN '+Math.ceil(waveTimer/90)+'...',W/2,H*0.62);
+}
+
+function drawNameEntry(){
+  ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle='#FFD700'; ctx.font='bold 28px monospace'; ctx.textAlign='center';
+  ctx.fillText('NEW HIGH SCORE!',W/2,H*0.25);
+  ctx.fillStyle='#fff'; ctx.font='22px monospace';
+  ctx.fillText('SCORE: '+score,W/2,H*0.34);
+  ctx.fillStyle='#aaa'; ctx.font='14px monospace';
+  ctx.fillText('ENTER YOUR NAME',W/2,H*0.44);
+  ctx.fillText('W/S = change letter   A/D = move   ENTER = confirm',W/2,H*0.72);
+
+  for(let i=0;i<3;i++){
+    const x=W/2+(i-1)*50, y=H*0.56;
+    const active=i===nameEntry.pos;
+    ctx.fillStyle=active?'#FFD700':'#888';
+    ctx.font='bold 36px monospace';
+    ctx.fillText(nameEntry.chars[i],x,y);
+    if(active && frame%40<25) ctx.fillRect(x-14,y+5,28,3);
+  }
+}
+
+function drawLeaderboard(){
+  ctx.fillStyle='rgba(0,0,0,0.9)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#FFD700'; ctx.font='bold 32px monospace'; ctx.textAlign='center';
+  ctx.fillText('HIGH SCORES',W/2,H*0.18);
+
+  if(!leaderboard.length){
+    ctx.fillStyle='#666'; ctx.font='16px monospace';
+    ctx.fillText('No scores yet',W/2,H*0.45);
+  } else {
+    for(let i=0;i<leaderboard.length;i++){
+      const y=H*0.30+i*42, e=leaderboard[i];
+      ctx.fillStyle=i===0?'#FFD700':i===1?'#ccc':i===2?'#a67c52':'#888';
+      ctx.font='bold 22px monospace';
+      ctx.textAlign='left';
+      ctx.fillText((i+1)+'.',W/2-100,y);
+      ctx.fillText(e.name,W/2-60,y);
+      ctx.textAlign='right';
+      ctx.fillText(String(e.score),W/2+120,y);
+    }
+  }
+  ctx.fillStyle='#aaa'; ctx.font='14px monospace'; ctx.textAlign='center';
+  if(frame%80<55) ctx.fillText('PRESS ENTER TO RETURN',W/2,H*0.85);
+}
+
+// ── MAIN DRAW ─────────────────────────────────────────────────────────────
+function draw(){
+  ctx.save();
+
+  // Only apply screen shake during gameplay
+  if(state==='playing' && screenShake>0.5){
+    ctx.translate((Math.random()-0.5)*screenShake*2,(Math.random()-0.5)*screenShake*2);
+  }
+
+  if(state==='title'){ drawTitle(); drawCrosshair(); ctx.restore(); return; }
+  if(state==='dead'){ drawCorridor(false); drawDead(); ctx.restore(); return; }
+  if(state==='enter_name'){ drawNameEntry(); ctx.restore(); return; }
+  if(state==='leaderboard'){ drawLeaderboard(); ctx.restore(); return; }
+  if(state==='wave_clear'){ drawWaveClear(); drawCrosshair(); ctx.restore(); return; }
+  if(state==='vader_cine'){ drawVaderCinematic(); ctx.restore(); return; }
+
+  // Playing state
+  drawCorridor(false);
+  drawReloadZone();
+
+  // Draw troopers sorted by z (farthest first)
+  const sorted=[...troopers].sort((a,b)=>b.z-a.z);
+  for(const t of sorted) drawTrooper(t);
+
+  // Draw Vader if active
+  if(vaderActive && vader) drawVader(vader.z);
+
+  drawIncomingBolts();
+  drawBlasterEffects();
+  drawDeflectEffects();
+  drawParticles();
+  drawHUD();
+
+  if(damageFlash>0){
+    ctx.fillStyle=`rgba(255,0,0,${damageFlash*0.04})`;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  drawCrosshair();
+  ctx.restore();
+}
+
+// ── INPUT HANDLING ────────────────────────────────────────────────────────
+canvas.addEventListener('click', ()=>{
+  resumeAC();
+  if(state==='title') startGame();
+  else if(state==='dead') state='title';
+  else if(state==='leaderboard') state='title';
+});
+
+// ── GAME LOOP ─────────────────────────────────────────────────────────────
+let _lastTime=0, _accumulator=0;
+
+function loop(timestamp){
+  if(!_lastTime) _lastTime=timestamp;
+  let dt=timestamp-_lastTime;
+  _lastTime=timestamp;
+  if(dt>200) dt=200;
+
+  _accumulator+=dt;
+  let ticks=0;
+  while(_accumulator>=_TICK && ticks<5){
+    update();
+    _accumulator-=_TICK;
+    ticks++;
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
