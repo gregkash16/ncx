@@ -302,12 +302,10 @@ function StreakPill({
   const base =
     "inline-flex items-center justify-end gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border";
 
-  // Token-based styling:
-  // - "up" uses ncx primary (cyan)
-  // - "down" uses shadcn destructive token (global)
   const upCls =
-    "border-[rgb(var(--ncx-primary-rgb)/0.60)] bg-[rgb(var(--ncx-primary-rgb)/0.10)] text-[rgb(var(--ncx-primary-rgb))]";
-  const downCls = "border-destructive/50 bg-destructive/10 text-destructive";
+    "border-[rgb(var(--ncx-success-rgb)/0.60)] bg-[rgb(var(--ncx-success-rgb)/0.10)] text-[rgb(var(--ncx-success-rgb))]";
+  const downCls =
+    "border-[rgb(var(--ncx-danger-rgb)/0.45)] bg-[rgb(var(--ncx-danger-rgb)/0.10)] text-[rgb(var(--ncx-danger-rgb))]";
 
   const cls = dir === "up" ? upCls : downCls;
   const arrow = dir === "up" ? "↑" : "↓";

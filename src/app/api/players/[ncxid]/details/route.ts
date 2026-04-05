@@ -209,6 +209,10 @@ export async function GET(
       const opponentId = isAway ? norm(m.homeId) : norm(m.awayId);
       const playerPts = Number(isAway ? m.awayPts : m.homePts) || 0;
       const opponentPts = Number(!isAway ? m.awayPts : m.homePts) || 0;
+
+      // Skip unplayed matches (both sides 0 points)
+      if (playerPts === 0 && opponentPts === 0) continue;
+
       const outcome: "W" | "L" = playerPts > opponentPts ? "W" : "L";
 
       matchResults.push(outcome);
