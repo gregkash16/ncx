@@ -133,31 +133,48 @@ export async function GET(request: NextRequest) {
       [week]
     );
 
-    // Build a lookup: ncxid -> matchup game number
+    // Build lookups: ncxid -> matchup game number, and ncxid -> { awayId, homeId }
     const ncxidToGame: Record<string, string> = {};
+    const ncxidToMatchup: Record<string, { awayId: string; homeId: string }> = {};
     for (const m of matchups ?? []) {
       const g = String(m.game);
-      if (m.awayId) ncxidToGame[String(m.awayId)] = g;
-      if (m.homeId) ncxidToGame[String(m.homeId)] = g;
+      const away = String(m.awayId);
+      const home = String(m.homeId);
+      if (away) { ncxidToGame[away] = g; ncxidToMatchup[away] = { awayId: away, homeId: home }; }
+      if (home) { ncxidToGame[home] = g; ncxidToMatchup[home] = { awayId: away, homeId: home }; }
     }
 
     return NextResponse.json({
       currentWeek,
       week,
-      signups: (signups ?? []).map((s: any) => ({
-        id: s.id,
-        weekLabel: s.week_label,
-        slotDay: s.slot_day,
-        slotGame: s.slot_game,
-        ncxid: String(s.ncxid),
-        opponentNcxid: s.opponent_ncxid ? String(s.opponent_ncxid) : null,
-        createdAt: s.created_at,
-        matchupGame: ncxidToGame[String(s.ncxid)] || null,
-        player: playerMap[String(s.ncxid)] || null,
-        opponent: s.opponent_ncxid
-          ? playerMap[String(s.opponent_ncxid)] || null
-          : null,
-      })),
+      signups: (signups ?? []).map((s: any) => {
+        const signerNcxid = String(s.ncxid);
+        const oppNcxid = s.opponent_ncxid ? String(s.opponent_ncxid) : null;
+        // Always resolve away (left) and home (right) from the matchup data
+        const matchInfo = ncxidToMatchup[signerNcxid];
+        let awayNcxid: string;
+        let homeNcxid: string | null;
+        if (matchInfo) {
+          awayNcxid = matchInfo.awayId;
+          homeNcxid = matchInfo.homeId;
+        } else {
+          // Fallback: keep original order
+          awayNcxid = signerNcxid;
+          homeNcxid = oppNcxid;
+        }
+        return {
+          id: s.id,
+          weekLabel: s.week_label,
+          slotDay: s.slot_day,
+          slotGame: s.slot_game,
+          ncxid: awayNcxid,
+          opponentNcxid: homeNcxid,
+          createdAt: s.created_at,
+          matchupGame: ncxidToGame[signerNcxid] || null,
+          player: playerMap[awayNcxid] || null,
+          opponent: homeNcxid ? playerMap[homeNcxid] || null : null,
+        };
+      }),
       callerNcxid,
       callerSignup: callerSignup
         ? {

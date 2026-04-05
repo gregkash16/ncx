@@ -459,7 +459,10 @@ export default function StreamPanel() {
         <div className="px-5 pb-5 pt-2">
           {signup ? (
             <div className="flex items-stretch gap-3">
-              <PlayerCard info={signup.player} />
+              <div className="flex-1 flex flex-col">
+                <span className="mb-1 text-center text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--ncx-text-muted)" }}>Away</span>
+                <PlayerCard info={signup.player} />
+              </div>
               {/* VS divider */}
               <div className="flex flex-col items-center justify-center px-2">
                 <div className="h-8 w-px" style={{ background: "var(--ncx-border)" }} />
@@ -471,7 +474,10 @@ export default function StreamPanel() {
                 </span>
                 <div className="h-8 w-px" style={{ background: "var(--ncx-border)" }} />
               </div>
-              <PlayerCard info={signup.opponent} />
+              <div className="flex-1 flex flex-col">
+                <span className="mb-1 text-center text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--ncx-text-muted)" }}>Home</span>
+                <PlayerCard info={signup.opponent} />
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4 py-6">
