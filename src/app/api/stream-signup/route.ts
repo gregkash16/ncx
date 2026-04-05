@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
@@ -42,7 +42,7 @@ async function getSetupWeek(): Promise<string> {
 }
 
 /* ─── GET: fetch signups for current (or specified) week ─── */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
@@ -95,10 +95,14 @@ export async function GET(request: Request) {
     }
 
     // Check caller identity for admin flag
-    const session = await getServerSession(authOptions);
-    const discordId = normalizeDiscordId(
-      (session?.user as any)?.discordId ?? (session?.user as any)?.id
-    );
+    // Native app auth: accept x-discord-id header as fallback
+    const nativeDiscordId = request.headers.get("x-discord-id");
+    const session = nativeDiscordId ? null : await getServerSession(authOptions);
+    const discordId = nativeDiscordId
+      ? normalizeDiscordId(nativeDiscordId)
+      : normalizeDiscordId(
+          (session?.user as any)?.discordId ?? (session?.user as any)?.id
+        );
     const admin = discordId ? isAdmin(discordId) : false;
 
     // Resolve caller's NCXID
@@ -183,16 +187,21 @@ export async function GET(request: Request) {
 }
 
 /* ─── POST: sign up for a slot ─── */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    // Native app auth: accept x-discord-id header as fallback
+    const nativeDiscordId = request.headers.get("x-discord-id");
+    const session = nativeDiscordId ? null : await getServerSession(authOptions);
+
+    if (!session?.user && !nativeDiscordId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const discordId = normalizeDiscordId(
-      (session.user as any).discordId ?? (session.user as any).id
-    );
+    const discordId = nativeDiscordId
+      ? normalizeDiscordId(nativeDiscordId)
+      : normalizeDiscordId(
+          (session!.user as any).discordId ?? (session!.user as any).id
+        );
     if (!discordId) {
       return NextResponse.json(
         { error: "No Discord ID found" },
@@ -279,16 +288,21 @@ export async function POST(request: Request) {
 }
 
 /* ─── PUT: admin assign a matchup to a slot ─── */
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    // Native app auth: accept x-discord-id header as fallback
+    const nativeDiscordId = request.headers.get("x-discord-id");
+    const session = nativeDiscordId ? null : await getServerSession(authOptions);
+
+    if (!session?.user && !nativeDiscordId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const discordId = normalizeDiscordId(
-      (session.user as any).discordId ?? (session.user as any).id
-    );
+    const discordId = nativeDiscordId
+      ? normalizeDiscordId(nativeDiscordId)
+      : normalizeDiscordId(
+          (session!.user as any).discordId ?? (session!.user as any).id
+        );
     if (!isAdmin(discordId)) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
@@ -354,16 +368,21 @@ export async function PUT(request: Request) {
 }
 
 /* ─── DELETE: admin remove a signup ─── */
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    // Native app auth: accept x-discord-id header as fallback
+    const nativeDiscordId = request.headers.get("x-discord-id");
+    const session = nativeDiscordId ? null : await getServerSession(authOptions);
+
+    if (!session?.user && !nativeDiscordId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const discordId = normalizeDiscordId(
-      (session.user as any).discordId ?? (session.user as any).id
-    );
+    const discordId = nativeDiscordId
+      ? normalizeDiscordId(nativeDiscordId)
+      : normalizeDiscordId(
+          (session!.user as any).discordId ?? (session!.user as any).id
+        );
     if (!isAdmin(discordId)) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }

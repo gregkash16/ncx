@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
@@ -102,16 +102,21 @@ async function postMessage(content: string) {
   }
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    // Native app auth: accept x-discord-id header as fallback
+    const nativeDiscordId = request.headers.get("x-discord-id");
+    const session = nativeDiscordId ? null : await getServerSession(authOptions);
+
+    if (!session?.user && !nativeDiscordId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const discordId = normalizeDiscordId(
-      (session.user as any).discordId ?? (session.user as any).id
-    );
+    const discordId = nativeDiscordId
+      ? normalizeDiscordId(nativeDiscordId)
+      : normalizeDiscordId(
+          (session!.user as any).discordId ?? (session!.user as any).id
+        );
     if (!isAdmin(discordId)) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }

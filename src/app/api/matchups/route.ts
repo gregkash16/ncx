@@ -13,6 +13,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const week = searchParams.get("week") || currentWeek;
 
+    // Get all weeks for the week selector
+    const [allWeeks] = await pool.query<any[]>(
+      `SELECT DISTINCT week_label FROM S9.weekly_matchups ORDER BY CAST(SUBSTRING_INDEX(week_label, ' ', -1) AS UNSIGNED) ASC`
+    );
+    const weeks = (allWeeks ?? []).map((r: any) => r.week_label);
+
     // Fetch matchups with faction data from individual_stats
     const [rows] = await pool.query<any[]>(
       `
@@ -55,7 +61,7 @@ export async function GET(request: Request) {
       scenario: r.scenario != null ? String(r.scenario) : null,
     }));
 
-    return NextResponse.json({ currentWeek, matchups });
+    return NextResponse.json({ currentWeek, showWeek: week, weeks, matchups });
   } catch (err: any) {
     console.error("GET /api/matchups error:", err);
     return NextResponse.json(
