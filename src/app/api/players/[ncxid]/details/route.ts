@@ -326,6 +326,10 @@ export async function GET(
       const isAway = norm(m.awayId) === ncxid;
       const playerPts = Number(isAway ? m.awayPts : m.homePts) || 0;
       const opponentPts = Number(!isAway ? m.awayPts : m.homePts) || 0;
+
+      // Skip unplayed matches
+      if (playerPts === 0 && opponentPts === 0) continue;
+
       const isWin = playerPts > opponentPts;
 
       // Determine season
@@ -370,6 +374,10 @@ export async function GET(
       const opponentId = isAway ? norm(m.homeId) : norm(m.awayId);
       const playerPts = Number(isAway ? m.awayPts : m.homePts) || 0;
       const opponentPts = Number(!isAway ? m.awayPts : m.homePts) || 0;
+
+      // Skip unplayed matches
+      if (playerPts === 0 && opponentPts === 0) continue;
+
       const isWin = playerPts > opponentPts;
 
       const current = opponentRecords.get(opponentId) || { wins: 0, losses: 0 };
