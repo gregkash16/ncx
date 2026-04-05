@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         LEFT JOIN S9.individual_stats sa ON sa.ncxid = m.awayId
         LEFT JOIN S9.individual_stats sh ON sh.ncxid = m.homeId
         WHERE m.week_label = ?
-        ORDER BY m.game ASC
+        ORDER BY CAST(m.game AS UNSIGNED) ASC
       `,
       [week]
     );
