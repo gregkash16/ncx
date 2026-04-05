@@ -6,11 +6,11 @@
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:#000; display:flex; justify-content:center; align-items:center; height:100vh; overflow:hidden; cursor:none; }
-canvas { display:block; }
+canvas { display:block; outline:none; }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
+<canvas id="c" tabindex="0"></canvas>
 <script>
 (function(){
 'use strict';
@@ -187,6 +187,7 @@ const VADER_DURATIONS=[90,100,45,55,110,50]; // frames per phase
 
 // ── MOUSE ─────────────────────────────────────────────────────────────────
 let mx=W/2, my=H/2, mDown=false, mClicked=false;
+let canvasActive=false; // true after first click (focus gate for iframe embed)
 const RELOAD_MARGIN = 40;
 
 canvas.addEventListener('mousemove', e=>{
@@ -194,9 +195,12 @@ canvas.addEventListener('mousemove', e=>{
   mx = (e.clientX-r.left)*(W/r.width);
   my = (e.clientY-r.top)*(H/r.height);
 });
+let _skipNextClick=false;
 canvas.addEventListener('mousedown', e=>{
   e.preventDefault();
+  canvas.focus();
   resumeAC();
+  if(!canvasActive){ canvasActive=true; _skipNextClick=true; return; }
   mDown=true; mClicked=true;
 });
 canvas.addEventListener('mouseup', ()=>{ mDown=false; });
@@ -204,6 +208,7 @@ canvas.addEventListener('contextmenu', e=>e.preventDefault());
 
 document.addEventListener('mousedown', e=>{
   resumeAC();
+  canvas.focus();
   if(e.target!==canvas && state==='playing') tryReload();
 });
 
@@ -211,6 +216,7 @@ document.addEventListener('mousedown', e=>{
 const K={};
 document.addEventListener('keydown', e=>{
   resumeAC();
+  canvasActive=true;
   K[e.key]=true;
   if(e.key===' ') e.preventDefault();
 
@@ -1206,7 +1212,7 @@ function drawTitle(){
   ctx.fillText('R to reload  •  L for leaderboard',W/2,H*0.59);
 
   ctx.fillStyle='#fff'; ctx.font='bold 18px monospace';
-  if(frame%80<55) ctx.fillText('CLICK TO START',W/2,H*0.72);
+  if(frame%80<55) ctx.fillText(canvasActive?'CLICK TO START':'CLICK TO ACTIVATE',W/2,H*0.72);
 
   if(highScore>0){
     ctx.fillStyle='#FFD700'; ctx.font='14px monospace';
@@ -1253,16 +1259,26 @@ function drawNameEntry(){
   ctx.fillText('SCORE: '+score,W/2,H*0.34);
   ctx.fillStyle='#aaa'; ctx.font='14px monospace';
   ctx.fillText('ENTER YOUR NAME',W/2,H*0.44);
-  ctx.fillText('W/S = change letter   A/D = move   ENTER = confirm',W/2,H*0.72);
+  ctx.fillText('W/S or CLICK \u25B2\u25BC = change   A/D = move   ENTER = confirm',W/2,H*0.72);
 
   for(let i=0;i<3;i++){
     const x=W/2+(i-1)*50, y=H*0.56;
     const active=i===nameEntry.pos;
+    // Up/down arrows
+    ctx.fillStyle=active?'#FFD700':'#555';
+    ctx.font='18px monospace';
+    ctx.fillText('\u25B2',x,y-32);
+    ctx.fillText('\u25BC',x,y+22);
+    // Letter
     ctx.fillStyle=active?'#FFD700':'#888';
     ctx.font='bold 36px monospace';
     ctx.fillText(nameEntry.chars[i],x,y);
     if(active && frame%40<25) ctx.fillRect(x-14,y+5,28,3);
   }
+
+  // Confirm button
+  ctx.fillStyle='#FFD700'; ctx.font='bold 16px monospace';
+  ctx.fillText('[ CONFIRM ]',W/2,H*0.82);
 }
 
 function drawLeaderboard(){
@@ -1334,9 +1350,39 @@ function draw(){
 // ── INPUT HANDLING ────────────────────────────────────────────────────────
 canvas.addEventListener('click', ()=>{
   resumeAC();
+  if(_skipNextClick){ _skipNextClick=false; return; }
   if(state==='title') startGame();
   else if(state==='dead') state='title';
   else if(state==='leaderboard') state='title';
+  else if(state==='enter_name'){
+    // Mouse-based name entry: click on character positions or arrows
+    for(let i=0;i<3;i++){
+      const cx=W/2+(i-1)*50, cy=H*0.56;
+      if(mx>cx-20&&mx<cx+20){
+        if(my>cy-40&&my<cy+10){
+          // Clicked on a character — select that position
+          nameEntry.pos=i;
+          return;
+        }
+        if(my>cy-70&&my<cy-40){
+          // Clicked above character — scroll up
+          nameEntry.pos=i;
+          const ci=CHARS.indexOf(nameEntry.chars[i]);
+          nameEntry.chars[i]=CHARS[(ci+1)%CHARS.length];
+          return;
+        }
+        if(my>cy+10&&my<cy+40){
+          // Clicked below character — scroll down
+          nameEntry.pos=i;
+          const ci=CHARS.indexOf(nameEntry.chars[i]);
+          nameEntry.chars[i]=CHARS[(ci-1+CHARS.length)%CHARS.length];
+          return;
+        }
+      }
+    }
+    // Click on confirm area (bottom)
+    if(my>H*0.75) confirmName();
+  }
 });
 
 // ── GAME LOOP ─────────────────────────────────────────────────────────────
