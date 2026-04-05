@@ -16,14 +16,16 @@ type TabKey =
   | "prefs"
   | "podcast"
   | "prevseasons"
-  | "arcade";
+  | "arcade"
+  | "stream";
 
 const row1: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "home",      label: "Home",         href: "/" },
   { key: "current",   label: "Current Week", href: "/?tab=current" },
   { key: "matchups",  label: "Matchups",     href: "/?tab=matchups" },
   { key: "standings", label: "Standings",    href: "/?tab=standings" },
-  { key: "report",      label: "Report a Game", href: "/?tab=report" },
+  { key: "report",    label: "Report a Game", href: "/?tab=report" },
+  { key: "stream",    label: "Stream",        href: "/?tab=stream" },
 ];
 
 const row2Base: Array<{ key: TabKey; label: string; href: string }> = [

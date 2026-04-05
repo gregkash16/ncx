@@ -22,6 +22,7 @@ import HomeLanding from "../components/HomeLanding";
 import PlayoffsPanel from "../components/PlayoffsPanel";
 import PrevSeasonsPanel from "../components/PrevSeasonsPanel";
 import ArcadePanel from "../components/ArcadePanel";
+import StreamPanel from "../components/StreamPanel";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -355,6 +356,7 @@ export default async function HomePage({
               />
             }
             arcadePanel={<ArcadePanel key="arcade" />}
+            streamPanel={<StreamPanel key="stream" />}
           />
         </div>
       </section>

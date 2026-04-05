@@ -18,7 +18,8 @@ export type TabKey =
   | "team"
   | "playoffs"
   | "prevseasons"
-  | "arcade";
+  | "arcade"
+  | "stream";
 
 const MATCHUPS: TabKey = "matchups";
 function isMatchups(k: TabKey): k is "matchups" {
@@ -44,6 +45,7 @@ type HomeTabsProps = {
   playoffsPanel?: React.ReactNode;
   prevSeasonsPanel?: React.ReactNode;
   arcadePanel?: React.ReactNode;
+  streamPanel?: React.ReactNode;
   hideButtons?: boolean;
   preSeasonEnabled?: boolean;
 };
@@ -63,6 +65,7 @@ export default function HomeTabs({
   playoffsPanel,
   prevSeasonsPanel,
   arcadePanel,
+  streamPanel,
   hideButtons = false,
   preSeasonEnabled = false,
 }: HomeTabsProps) {
@@ -175,7 +178,7 @@ export default function HomeTabs({
 
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
-          active === "indstats" || active === "advstats" || active === "prevseasons"
+          active === "indstats" || active === "advstats" || active === "prevseasons" || active === "stream"
             ? "w-full max-w-[115rem]"
             : "max-w-6xl"
         }`}
@@ -194,6 +197,7 @@ export default function HomeTabs({
         {active === "playoffs" && hasPlayoffs && playoffsPanel}
         {active === "prevseasons" && hasPrevSeasons && prevSeasonsPanel}
         {active === "arcade" && arcadePanel}
+        {active === "stream" && streamPanel}
       </div>
     </div>
   );
