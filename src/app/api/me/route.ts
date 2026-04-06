@@ -18,6 +18,24 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Apple auth in demo mode: return mock admin stats
+  if (discordId.startsWith('apple-') && process.env.DEMO_MODE === 'true') {
+    return NextResponse.json({
+      found: true,
+      ncxid: 'DEMO',
+      name: 'Demo User',
+      stats: {
+        team: 'Demo Team',
+        faction: 'Rebel',
+        rank: '1',
+        wins: '5',
+        losses: '2',
+        points: '15',
+        ppg: '107.5',
+      },
+    });
+  }
+
   try {
     // Look up NCXID from Discord ID
     const discordMap = await getDiscordMapCached();

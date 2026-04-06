@@ -308,8 +308,8 @@ function resolveRole(
   captainTeams: string[],
   isAppleAuth?: boolean
 ): Role | null {
-  // Apple auth users are admins if enabled via env var (iOS app only)
-  if (isAppleAuth && process.env.APPLE_AUTH_GRANT_ADMIN === "true") {
+  // Apple auth users get admin access when demo mode is on (for App Store review)
+  if (isAppleAuth && process.env.DEMO_MODE === "true") {
     return "admin";
   }
   if (ADMIN_DISCORD_IDS.includes(discordId)) return "admin";
@@ -1297,12 +1297,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json<LookupResult>({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
-    // Check if this is Apple auth on iOS
+    // Check if this is Apple auth — either from native app (apple- prefix) or web session
+    const isNativeAppleAuth = nativeDiscordId?.startsWith("apple-") ?? false;
     const appPlatform = request.headers.get("x-app-platform");
-    const isAppleAuth = !nativeDiscordId && (session?.user as any)?.provider === "apple" && appPlatform === "ios";
+    const isWebAppleAuth = !nativeDiscordId && (session?.user as any)?.provider === "apple" && appPlatform === "ios";
+    const isAppleAuth = isNativeAppleAuth || isWebAppleAuth;
 
     const raw = nativeDiscordId ?? (session?.user as any)?.discordId ?? (session?.user as any)?.id;
-    const discordId = normalizeDiscordId(raw);
+    const discordId = isNativeAppleAuth ? "" : normalizeDiscordId(raw);
     if (!discordId && !isAppleAuth) {
       return NextResponse.json<LookupResult>(
         { ok: false, reason: "NO_DISCORD_ID" },
@@ -1513,9 +1515,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
     }
 
-    // Check if this is Apple auth on iOS
+    // Check if this is Apple auth — either from native app (apple- prefix) or web session
+    const isNativeAppleAuthPost = nativeDiscordId?.startsWith("apple-") ?? false;
     const appPlatform = req.headers.get("x-app-platform");
-    const isAppleAuth = !nativeDiscordId && (session?.user as any)?.provider === "apple" && appPlatform === "ios";
+    const isWebAppleAuthPost = !nativeDiscordId && (session?.user as any)?.provider === "apple" && appPlatform === "ios";
+    const isAppleAuth = isNativeAppleAuthPost || isWebAppleAuthPost;
 
     const body = await req.json().catch(() => ({}));
     const {
@@ -1584,7 +1588,7 @@ export async function POST(req: NextRequest) {
     const sheets = getSheets();
 
     const raw = nativeDiscordId ?? (session?.user as any)?.discordId ?? (session?.user as any)?.id;
-    const discordId = normalizeDiscordId(raw);
+    const discordId = isNativeAppleAuthPost ? "" : normalizeDiscordId(raw);
 
     const [who, captainTeams] = await Promise.all([
       getNcxIdForDiscord(sheets, spreadsheetId, discordId || ""),
