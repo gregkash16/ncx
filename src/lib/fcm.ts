@@ -103,6 +103,14 @@ export async function sendFCMToDevices(
                   channelId: 'ncx_game_updates',
                 },
               },
+              apns: {
+                payload: {
+                  aps: {
+                    sound: 'default',
+                    badge: 1,
+                  },
+                },
+              },
             },
           }),
         });
