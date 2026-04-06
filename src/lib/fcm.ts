@@ -107,7 +107,6 @@ export async function sendFCMToDevices(
                 payload: {
                   aps: {
                     sound: 'default',
-                    badge: 1,
                   },
                 },
               },
