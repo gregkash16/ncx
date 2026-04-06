@@ -5,8 +5,6 @@ import MobileBottomNav from "./mobile/MobileBottomNav";
 import MobileNavButton from "./mobile/MobileNavButton";
 import AuthStatus from "./components/AuthStatus";
 import MobileHeaderTitle from "./components/MobileHeaderTitle";
-import { AuthSetup } from "./layout-auth-setup";
-
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDiscordMapCached } from "@/lib/googleSheets";
@@ -63,10 +61,7 @@ export default async function MobileLayout({
       {/* Service Worker for PWA push notifications */}
       <ServiceWorkerBoot />
 
-      {/* Auth setup for iOS deeplinks */}
-      <AuthSetup />
-
-      {/* Top Bar - Fixed */}
+{/* Top Bar - Fixed */}
       <header className="fixed inset-x-0 top-0 z-20 border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">
         {/* Status-bar fill */}
         <div

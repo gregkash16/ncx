@@ -100,7 +100,6 @@ export default function PrivacyPage() {
             <li>• <strong>Vercel</strong> — Application hosting and serverless functions</li>
             <li>• <strong>Neon</strong> — Database hosting for league data</li>
             <li>• <strong>Railway</strong> — Database hosting for league data</li>
-            <li>• <strong>Apple Push Notification Service (APNs)</strong> — Push notification delivery for iOS</li>
             <li>• <strong>Firebase Cloud Messaging (FCM)</strong> — Push notification delivery for Android</li>
           </ul>
           <p className="text-[var(--ncx-text-primary)]/80 leading-relaxed mt-3">

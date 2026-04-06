@@ -67,7 +67,6 @@ export const authOptions: NextAuthOptions = {
             allowDangerousEmailAccountLinking: true,
             authorization: {
               params: {
-                // Disable PKCE for Capacitor (cookies don't transfer to/from external Safari)
                 response_mode: "form_post",
               },
             },

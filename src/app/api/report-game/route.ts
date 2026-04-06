@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getIOSServerSession } from "@/lib/getIOSServerSession";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { getSheets } from "@/lib/googleSheets";
 import { sql } from "@vercel/postgres";
 import webpush from "web-push";
 import mysql from "mysql2/promise";
-import { sendAPNsToDevices } from "@/lib/apns";
 
 /* ------------------------- Shared helpers ------------------------- */
 
@@ -204,31 +204,7 @@ async function sendPushForTeams(
     })
   );
 
-  // Get APNs device tokens
-  const { rows: apnsRows } = await sql`
-    SELECT device_token
-    FROM apns_subscriptions
-    WHERE
-      all_teams = TRUE
-      OR EXISTS (
-        SELECT 1
-        FROM json_array_elements_text(${teamsJson}::json) j
-        WHERE j = ANY(apns_subscriptions.teams)
-      )
-  `;
-
-  const deviceTokens = apnsRows.map((r) => r.device_token);
-
-  // Send APNs notifications
-  if (deviceTokens.length > 0) {
-    try {
-      await sendAPNsToDevices(deviceTokens, payload);
-    } catch (e) {
-      console.error("Failed to send APNs notifications:", e);
-    }
-  }
-
-  // Get FCM device tokens (Android)
+// Get FCM device tokens (Android)
   let fcmCount = 0;
   try {
     // Ensure table exists (may not have been created yet)
@@ -267,7 +243,7 @@ async function sendPushForTeams(
     console.error("Failed to send FCM notifications:", e);
   }
 
-  return subs.length + deviceTokens.length + fcmCount;
+  return subs.length + fcmCount;
 }
 
 /* ------------------------- Role helpers ------------------------- */
@@ -1315,7 +1291,7 @@ export async function GET(request: NextRequest) {
   try {
     // Native app auth: accept x-discord-id header as fallback
     const nativeDiscordId = request.headers.get("x-discord-id");
-    const session = nativeDiscordId ? null : await getIOSServerSession();
+    const session = nativeDiscordId ? null : await getServerSession(authOptions);
 
     if (!session?.user && !nativeDiscordId) {
       return NextResponse.json<LookupResult>({ ok: false, reason: "NOT_AUTH" }, { status: 401 });
@@ -1531,7 +1507,7 @@ export async function POST(req: NextRequest) {
   try {
     // Native app auth: accept x-discord-id header as fallback
     const nativeDiscordId = req.headers.get("x-discord-id");
-    const session = nativeDiscordId ? null : await getIOSServerSession();
+    const session = nativeDiscordId ? null : await getServerSession(authOptions);
 
     if (!session?.user && !nativeDiscordId) {
       return NextResponse.json({ ok: false, reason: "NOT_AUTH" }, { status: 401 });

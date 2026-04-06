@@ -9,7 +9,6 @@ import {
   SheetTrigger,
 } from "../../components/ui/sheet";
 import { Check, Bell, BellOff } from "lucide-react";
-import { isCapacitor } from "@/lib/capacitor";
 
 type Props = {
   /** Button that opens the drawer */
@@ -44,40 +43,7 @@ async function saveSubAndPrefs(sub: PushSubscription, prefs: PushPrefs) {
   if (!res.ok) throw new Error("Failed to save subscription/prefs");
 }
 
-async function saveAPNsTokenAndPrefs(deviceToken: string, prefs: PushPrefs) {
-  const body = JSON.stringify({ deviceToken, prefs });
-  const res = await fetch("/api/push/apns-save", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  });
-  if (!res.ok) throw new Error("Failed to save APNs token/prefs");
-}
-
-async function loadAPNsPrefs(deviceToken: string): Promise<PushPrefs> {
-  try {
-    const res = await fetch(`/api/push/apns-save?token=${encodeURIComponent(deviceToken)}`);
-    if (res.ok) {
-      const data = await res.json();
-      return data?.prefs || { allTeams: true, teams: [] };
-    }
-  } catch (e) {
-    console.warn("Failed to load APNs prefs", e);
-  }
-  return { allTeams: true, teams: [] };
-}
-
-async function deleteAPNsToken(deviceToken: string) {
-  const body = JSON.stringify({ deviceToken });
-  const res = await fetch("/api/push/apns-save", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body,
-  });
-  if (!res.ok) throw new Error("Failed to delete APNs token");
-}
-
-// Capability guards (fixes “Can’t find variable: Notification”)
+// Capability guards (fixes "Can't find variable: Notification")
 const hasNotifications = () =>
   typeof window !== "undefined" && typeof Notification !== "undefined";
 
@@ -101,30 +67,11 @@ export default function NotificationsDrawer({
   const [subscribed, setSubscribed] = useState(false);
   const [prefs, setPrefs] = useState<PushPrefs>({ allTeams: true, teams: [] });
   const [teams, setTeams] = useState<string[]>([]);
-  const [isCapacitorApp, setIsCapacitorApp] = useState(false);
-  const [apnsToken, setApnsToken] = useState<string | null>(null);
 
-  // Prefer env; if missing, we’ll fetch from the endpoint
+  // Prefer env; if missing, we'll fetch from the endpoint
   const [vapidKey, setVapidKey] = useState(
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""
   );
-
-  // Detect if running in Capacitor on mount
-  useEffect(() => {
-    const inCapacitor = isCapacitor();
-    setIsCapacitorApp(inCapacitor);
-  }, []);
-
-  // Check for APNs token when drawer opens
-  useEffect(() => {
-    if (!open || !isCapacitorApp) return;
-    const token = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_token") : null;
-    const subscribed = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_subscribed") === "true" : false;
-    setApnsToken(token);
-    if (token || subscribed) {
-      setSubscribed(subscribed || !!token);
-    }
-  }, [open, isCapacitorApp]);
 
   // Load team list via /api/teams
   useEffect(() => {
@@ -154,50 +101,32 @@ export default function NotificationsDrawer({
 
   // Initial capability check (guard Notification access)
   useEffect(() => {
-    if (isCapacitorApp) {
-      // APNs on Capacitor is always "supported" if we have a token
-      setSupported(!!apnsToken);
-      setPermission("granted");
-    } else {
-      setSupported(hasPush() && hasNotifications());
-      setPermission(
-        hasNotifications() ? (Notification.permission as NotificationPermission) : "default"
-      );
-    }
-  }, [isCapacitorApp, apnsToken]);
+    setSupported(hasPush() && hasNotifications());
+    setPermission(
+      hasNotifications() ? (Notification.permission as NotificationPermission) : "default"
+    );
+  }, []);
 
   // Load prefs when drawer opens
   useEffect(() => {
     if (!open) return;
     (async () => {
       try {
-        if (isCapacitorApp) {
-          // Check both localStorage flag and if token exists
-          const savedSubscribed = typeof window !== "undefined" ? localStorage.getItem("ncx_apns_subscribed") === "true" : false;
-          if (apnsToken || savedSubscribed) {
-            setSubscribed(true);
-            if (apnsToken) {
-              const loadedPrefs = await loadAPNsPrefs(apnsToken);
-              setPrefs(loadedPrefs);
-            }
-          }
-        } else {
-          const reg = await navigator.serviceWorker?.ready;
-          const sub = await reg?.pushManager.getSubscription();
-          setSubscribed(!!sub);
-          if (sub) {
-            const res = await fetch("/api/push/save", { method: "GET" });
-            if (res.ok) {
-              const data = await res.json();
-              if (data?.prefs) setPrefs(data.prefs);
-            }
+        const reg = await navigator.serviceWorker?.ready;
+        const sub = await reg?.pushManager.getSubscription();
+        setSubscribed(!!sub);
+        if (sub) {
+          const res = await fetch("/api/push/save", { method: "GET" });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.prefs) setPrefs(data.prefs);
           }
         }
       } catch (e) {
         console.warn("Failed to load push prefs", e);
       }
     })();
-  }, [open, isCapacitorApp, apnsToken]);
+  }, [open]);
 
   const selectedSet = useMemo(() => new Set(prefs.teams), [prefs.teams]);
 
@@ -212,50 +141,32 @@ export default function NotificationsDrawer({
     try {
       setLoading(true);
 
-      if (isCapacitorApp && apnsToken) {
-        // APNs path: just toggle the subscription flag
-        if (!subscribed) {
-          await saveAPNsTokenAndPrefs(apnsToken, prefs);
-          setSubscribed(true);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("ncx_apns_subscribed", "true");
-          }
-        } else {
-          await deleteAPNsToken(apnsToken);
-          setSubscribed(false);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("ncx_apns_subscribed", "false");
-          }
-        }
-      } else {
-        // Web Push path
-        if (!vapidKey) throw new Error("Missing VAPID public key");
+      if (!vapidKey) throw new Error("Missing VAPID public key");
 
-        if (!subscribed) {
-          if (!hasNotifications()) {
-            throw new Error("Notifications are not supported on this device/browser.");
-          }
-          if (permission !== "granted") {
-            const p = await Notification.requestPermission();
-            setPermission(p);
-            if (p !== "granted") return;
-          }
-          const reg = await navigator.serviceWorker?.ready;
-          if (!reg) throw new Error("No active service worker");
-          const key = urlBase64ToUint8Array(vapidKey);
-          const sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: key as unknown as BufferSource,
-          });
-          await saveSubAndPrefs(sub, prefs);
-          setSubscribed(true);
-        } else {
-          const reg = await navigator.serviceWorker?.ready;
-          const sub = await reg?.pushManager.getSubscription();
-          await fetch("/api/push/save", { method: "DELETE" });
-          await sub?.unsubscribe();
-          setSubscribed(false);
+      if (!subscribed) {
+        if (!hasNotifications()) {
+          throw new Error("Notifications are not supported on this device/browser.");
         }
+        if (permission !== "granted") {
+          const p = await Notification.requestPermission();
+          setPermission(p);
+          if (p !== "granted") return;
+        }
+        const reg = await navigator.serviceWorker?.ready;
+        if (!reg) throw new Error("No active service worker");
+        const key = urlBase64ToUint8Array(vapidKey);
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: key as unknown as BufferSource,
+        });
+        await saveSubAndPrefs(sub, prefs);
+        setSubscribed(true);
+      } else {
+        const reg = await navigator.serviceWorker?.ready;
+        const sub = await reg?.pushManager.getSubscription();
+        await fetch("/api/push/save", { method: "DELETE" });
+        await sub?.unsubscribe();
+        setSubscribed(false);
       }
     } catch (e) {
       alert((e as Error).message || "Subscription error");
@@ -280,13 +191,9 @@ export default function NotificationsDrawer({
 
   async function maybePersist(next: PushPrefs) {
     try {
-      if (isCapacitorApp && apnsToken && subscribed) {
-        await saveAPNsTokenAndPrefs(apnsToken, next);
-      } else if (!isCapacitorApp) {
-        const reg = await navigator.serviceWorker?.ready;
-        const sub = await reg?.pushManager.getSubscription();
-        if (sub) await saveSubAndPrefs(sub, next);
-      }
+      const reg = await navigator.serviceWorker?.ready;
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub) await saveSubAndPrefs(sub, next);
     } catch (e) {
       console.warn("Prefs save skipped:", e);
     }
@@ -333,11 +240,7 @@ export default function NotificationsDrawer({
                 <div>
                   <div className="text-sm font-semibold">Push notifications</div>
                   <div className="text-xs text-[var(--ncx-text-muted)]">
-                    {isCapacitorApp
-                      ? apnsToken
-                        ? "Enabled via APNs"
-                        : "APNs unavailable"
-                      : supported
+                    {supported
                       ? permission === "granted"
                         ? "Enabled in browser"
                         : "Requires browser permission"

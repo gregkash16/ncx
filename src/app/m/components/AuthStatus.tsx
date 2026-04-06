@@ -1,13 +1,9 @@
 "use client";
 
 import { signIn, signOut, useSession } from "next-auth/react";
-import { isCapacitor, startDiscordLogin } from "@/lib/capacitor";
-import { useIOSSession } from "@/lib/useIOSSession";
-import { useEffect } from "react";
 
 export default function AuthStatus() {
-  // Use custom hook that checks both NextAuth and iOS sessions
-  const { data: session, status } = useIOSSession();
+  const { data: session, status } = useSession();
 
   // Loading
   if (status === "loading") {
@@ -18,14 +14,13 @@ export default function AuthStatus() {
     );
   }
 
-  // ✅ Signed in
+  // Signed in
   if (session?.user) {
     const name = session.user.name ?? "You";
     const avatar = session.user.image;
 
     return (
       <div className="flex items-center gap-2">
-        {/* Avatar */}
         {avatar && (
           <img
             src={avatar}
@@ -34,24 +29,12 @@ export default function AuthStatus() {
           />
         )}
 
-        {/* Name */}
         <span className="text-xs font-medium text-[var(--ncx-text-primary)]">
           {name}
         </span>
 
-        {/* Sign out */}
         <button
-          onClick={async () => {
-            if (isCapacitor()) {
-              // In iOS app, clear custom session cookie
-              await fetch('/api/auth/ios-logout', { method: 'POST' });
-              // Force page reload to update UI
-              window.location.reload();
-            } else {
-              // In browser, use NextAuth's sign out
-              signOut({ callbackUrl: "/m" });
-            }
-          }}
+          onClick={() => signOut({ callbackUrl: "/m" })}
           className="
             rounded-lg
             border border-[var(--ncx-border)]
@@ -68,20 +51,10 @@ export default function AuthStatus() {
     );
   }
 
-  // ❌ Not signed in
-  const handleSignIn = () => {
-    // In iOS app with both Apple + Discord options, go to login page
-    if (isCapacitor()) {
-      window.location.href = '/m/login';
-    } else {
-      // In browser, use NextAuth's normal flow
-      signIn("discord", { callbackUrl: "/m" });
-    }
-  };
-
+  // Not signed in
   return (
     <button
-      onClick={handleSignIn}
+      onClick={() => signIn("discord", { callbackUrl: "/m" })}
       className="
         rounded-lg
         border border-[var(--ncx-border)]

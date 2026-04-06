@@ -2,7 +2,7 @@
  * /api/push/fcm-save
  *
  * Save/load/delete FCM (Android) push notification subscriptions.
- * Mirrors the pattern of apns-save for iOS.
+ * Saves FCM device tokens for Android push notifications.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
