@@ -290,8 +290,8 @@ function Table2Cards({ rows }: { rows: Table2Row[] }) {
             <Stat k="Total" v={r.avgTotalPts} />
             <Stat k="W Pts" v={r.avgWpts} />
             <Stat k="L Pts" v={r.avgLpts} />
-            <Stat k="<20" v={r.lt20} />
-            <Stat k="≥20" v={r.gte20} />
+            <Stat k="No Full Pts" v={r.lt20} />
+            <Stat k="Full Pts" v={r.gte20} />
             <Stat k="Games" v={r.totalGames} />
           </div>
         </li>

@@ -296,7 +296,7 @@ function Table1({ rows }: { rows: Table1Row[] }) {
 function Table2({ rows }: { rows: Table2Row[] }) {
   return (
     <TableWrapper headers={[
-      "Scenario","Avg Home","Avg Away","Avg Total","Avg W","Avg L","<20",">=20","Games"
+      "Scenario","Avg Home","Avg Away","Avg Total","Avg W","Avg L","No Full Pts","Full Pts","Games"
     ]}>
       {rows.map((r, i) => (
         <tr key={i}>
