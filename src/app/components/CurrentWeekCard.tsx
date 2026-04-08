@@ -182,9 +182,11 @@ function buildSeriesFromMatches(matches: MatchRow[]): SeriesRow[] {
 export default async function CurrentWeekCard({
   activeWeek,
   selectedWeek,
+  mobile,
 }: {
   activeWeek: string;
   selectedWeek?: string | null;
+  mobile?: boolean;
 }) {
   let weekLabelForCard: string;
   let matches: MatchRow[] = [];
@@ -225,10 +227,9 @@ export default async function CurrentWeekCard({
           const gamesPlayed = m.awayWins + m.homeWins;
           const gamesLeft = Math.max(0, 7 - gamesPlayed);
 
-          const href =
-            `/?tab=matchups` +
-            `&w=${encodeURIComponent(targetTab)}` +
-            `&q=${encodeURIComponent(m.homeTeam)}`;
+          const href = mobile
+            ? `/m/matchups?w=${encodeURIComponent(targetTab)}&q=${encodeURIComponent(m.homeTeam)}`
+            : `/?tab=matchups&w=${encodeURIComponent(targetTab)}&q=${encodeURIComponent(m.homeTeam)}`;
 
           return (
             <li key={i}>
@@ -239,8 +240,47 @@ export default async function CurrentWeekCard({
                   outlineColor: "rgb(var(--ncx-primary) / 0.4)",
                 }}
               >
+                {/* Mobile: simple row */}
                 <div
-                  className="grid items-center gap-x-4 rounded-xl px-6 py-4 transition-colors"
+                  className="flex md:hidden items-center justify-between rounded-xl px-4 py-3"
+                  style={{
+                    background: "rgb(0 0 0 / 0.25)",
+                    border: "1px solid var(--ncx-border)",
+                  }}
+                >
+                  <div
+                    className="flex items-center gap-2"
+                    style={{ color: "var(--ncx-text-muted)" }}
+                  >
+                    <Logo name={m.awayTeam} side="left" size={24} />
+                    <span className="text-sm">{m.awayTeam}</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div
+                      className="font-bold text-xl tabular-nums"
+                      style={{ color: "var(--ncx-text-primary)" }}
+                    >
+                      {m.awayWins} : {m.homeWins}
+                    </div>
+                    <div
+                      className="text-xs"
+                      style={{ color: "var(--ncx-text-muted)" }}
+                    >
+                      {gamesLeft} game{gamesLeft === 1 ? "" : "s"} left
+                    </div>
+                  </div>
+                  <div
+                    className="flex items-center gap-2"
+                    style={{ color: "var(--ncx-text-muted)" }}
+                  >
+                    <span className="text-sm">{m.homeTeam}</span>
+                    <Logo name={m.homeTeam} side="right" size={24} />
+                  </div>
+                </div>
+
+                {/* Desktop: full grid with win boxes */}
+                <div
+                  className="hidden md:grid items-center gap-x-4 rounded-xl px-6 py-4 transition-colors"
                   style={{
                     gridTemplateColumns: "1fr auto auto auto 1fr",
                     gridTemplateRows: "auto auto",

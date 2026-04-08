@@ -111,8 +111,60 @@ export default function IndStatsPanel({ data }: Props) {
           />
         </div>
 
+        {/* Mobile card view */}
+        <div className="md:hidden space-y-2 max-h-[70vh] overflow-auto">
+          {sorted.map((r) => (
+            <div key={`m-${r.ncxid}`} className="rounded-xl bg-zinc-900/40 border border-zinc-800 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-cyan-300 truncate">
+                    #{r.rank} {r.ncxid} • {r.first} {r.last}
+                  </div>
+                  <div className="text-xs text-zinc-400 truncate">
+                    {r.team} • {r.faction}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 grid grid-cols-4 gap-1 text-center text-xs">
+                <div className="rounded bg-zinc-800/60 px-1 py-1">
+                  <div className="text-[10px] text-zinc-500 uppercase">W-L</div>
+                  <div className="font-mono text-zinc-200">{r.wins}-{r.losses}</div>
+                </div>
+                <div className="rounded bg-zinc-800/60 px-1 py-1">
+                  <div className="text-[10px] text-zinc-500 uppercase">Pts</div>
+                  <div className="font-mono text-zinc-200">{r.points}</div>
+                </div>
+                <div className="rounded bg-zinc-800/60 px-1 py-1">
+                  <div className="text-[10px] text-zinc-500 uppercase">Win%</div>
+                  <div className="font-mono text-zinc-200">{r.winPct}</div>
+                </div>
+                <div className="rounded bg-zinc-800/60 px-1 py-1">
+                  <div className="text-[10px] text-zinc-500 uppercase">PPG</div>
+                  <div className="font-mono text-zinc-200">{r.ppg}</div>
+                </div>
+                <div className="rounded bg-zinc-800/60 px-1 py-1">
+                  <div className="text-[10px] text-zinc-500 uppercase">Eff</div>
+                  <div className="font-mono text-zinc-200">{r.efficiency}</div>
+                </div>
+                <div className="rounded bg-zinc-800/60 px-1 py-1">
+                  <div className="text-[10px] text-zinc-500 uppercase">WAR</div>
+                  <div className="font-mono text-zinc-200">{r.war}</div>
+                </div>
+                <div className="rounded bg-zinc-800/60 px-1 py-1">
+                  <div className="text-[10px] text-zinc-500 uppercase">Potato</div>
+                  <div className="font-mono text-zinc-200">{r.potato}</div>
+                </div>
+                <div className="rounded bg-zinc-800/60 px-1 py-1">
+                  <div className="text-[10px] text-zinc-500 uppercase">SOS</div>
+                  <div className="font-mono text-zinc-200">{r.sos}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* SCROLL CONTAINER: only the table area scrolls; header sticks inside it */}
-        <div className="relative w-full rounded-xl border border-zinc-800 overflow-auto max-h-[70vh]">
+        <div className="hidden md:block relative w-full rounded-xl border border-zinc-800 overflow-auto max-h-[70vh]">
           <table className="w-full table-auto">
             {/* Explicit widths so headers & cells align */}
             <colgroup>

@@ -99,7 +99,7 @@ export default async function MobileLayout({
           paddingBottom: `${NAV_PX}px`,
         }}
       >
-        <div className="w-full mx-auto max-w-screen-sm px-3 box-border overflow-x-hidden">{children}</div>
+        <div className="w-full mx-auto px-3 box-border overflow-x-hidden">{children}</div>
       </main>
 
       {/* Bottom Nav (single fixed owner) */}

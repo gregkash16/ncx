@@ -31,7 +31,7 @@ export function middleware(req: NextRequest) {
   const uaSaysMobile = /iphone|android|ipad|ipod|mobile/i.test(ua || '');
   const isMobile = deviceSaysMobile || uaSaysMobile;
 
-  if (isMobile && !onMobilePath) return NextResponse.redirect(new URL('/m', req.nextUrl));
+  // Desktop users hitting /m/ routes get redirected to desktop
   if (!isMobile && onMobilePath) return NextResponse.redirect(new URL('/', req.nextUrl));
 
   return NextResponse.next();

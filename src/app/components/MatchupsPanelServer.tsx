@@ -22,10 +22,12 @@ import type { IndRow, FactionMap } from "@/lib/googleSheets";
 type MatchupsPanelServerProps = {
   /** Raw week param from the URL (?w=WEEK 6) */
   weekParam?: string | null;
+  mobile?: boolean;
 };
 
 export default async function MatchupsPanelServer({
   weekParam,
+  mobile,
 }: MatchupsPanelServerProps) {
   // 1) Active week from DB
   const activeWeek = await getActiveWeekFromDb(); // e.g. "WEEK 7"
@@ -65,6 +67,7 @@ export default async function MatchupsPanelServer({
       factionMap={factionMap}
       listsForWeek={listsForWeek}
       enableCapsules={enableCapsules}
+      mobile={mobile}
     />
   );
 }

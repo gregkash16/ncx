@@ -1,282 +1,63 @@
 // src/app/m/team/[team]/page.tsx
-import Link from "next/link";
-import Image from "next/image";
+import TeamSchedulePanel, {
+  type TeamRosterPlayer,
+} from "@/app/components/TeamSchedulePanel";
 import {
-  fetchScheduleForTeam,
-  TeamScheduleRow,
-  getSheets,
   fetchIndStatsDataCached,
   fetchFactionMapCached,
   getDiscordMapCached,
   type IndRow,
-  type FactionMap,
 } from "@/lib/googleSheets";
-import { teamSlug } from "@/lib/slug";
-import PlayerDMLink from "@/app/components/PlayerDMLink";
 
-/* ----------------------------- helpers ----------------------------- */
-function normalizeWeekLabel(label: string): string {
-  const s = String(label ?? "").trim();
-  if (!s) return "WEEK 1";
-  const m = s.match(/week\s*(\d+)/i);
-  if (m) return `WEEK ${parseInt(m[1], 10)}`;
-  const n = parseInt(s, 10);
-  if (Number.isFinite(n) && n > 0) return `WEEK ${n}`;
-  return s.toUpperCase();
-}
+export const runtime = "nodejs";
 
-function toInt(val: unknown): number {
-  const s = String(val ?? "").trim();
-  if (s === "" || s === "-" || s === "–" || s === "—") return 0;
-  const n = parseInt(s, 10);
-  return Number.isFinite(n) ? n : 0;
-}
-
-type Status = "SCHEDULED" | "IN PROGRESS" | "FINAL";
-
-type EnrichedRow = TeamScheduleRow & {
-  week: string;
-  status: Status;
-  awayWins: number;
-  homeWins: number;
-  seriesOver: boolean;
-};
-
-async function deriveSeriesFromWeek(weekTab: string, away: string, home: string) {
-  const spreadsheetId =
-    process.env.NCX_LEAGUE_SHEET_ID || process.env.SHEETS_SPREADSHEET_ID;
-  if (!spreadsheetId) return { awayWins: 0, homeWins: 0, found: false };
-
-  const sheets = getSheets();
-  const resp = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${weekTab}!A1:Q120`,
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const data = resp.data.values ?? [];
-
-  for (let rowNum = 9; rowNum < 120; rowNum += 10) {
-    const idx = rowNum - 1;
-    const row = data[idx] ?? [];
-    const awayTeam = String(row[3] ?? "").trim();
-    const homeTeam = String(row[11] ?? "").trim();
-    if (!awayTeam && !homeTeam) continue;
-
-    const matchesDirect = awayTeam === away && homeTeam === home;
-    const matchesFlipped = awayTeam === home && homeTeam === away;
-    if (!matchesDirect && !matchesFlipped) continue;
-
-    const awayWins = toInt(row[4]);
-    const homeWins = toInt(row[12]);
-
-    if (matchesFlipped) {
-      return { awayWins: homeWins, homeWins: awayWins, found: true };
-    }
-    return { awayWins, homeWins, found: true };
-  }
-
-  return { awayWins: 0, homeWins: 0, found: false };
-}
-
-async function enrichRowWithScore(row: TeamScheduleRow): Promise<EnrichedRow> {
-  const weekTab = normalizeWeekLabel(row.week);
-  try {
-    const { awayWins, homeWins, found } = await deriveSeriesFromWeek(
-      weekTab,
-      row.away,
-      row.home
-    );
-    if (!found) {
-      return {
-        ...row,
-        week: weekTab,
-        status: "SCHEDULED",
-        awayWins: 0,
-        homeWins: 0,
-        seriesOver: false,
-      };
-    }
-    const seriesOver = awayWins >= 4 || homeWins >= 4;
-    const status: Status =
-      awayWins > 0 || homeWins > 0 ? (seriesOver ? "FINAL" : "IN PROGRESS") : "SCHEDULED";
-    return { ...row, week: weekTab, status, awayWins, homeWins, seriesOver };
-  } catch {
-    return {
-      ...row,
-      week: weekTab,
-      status: "SCHEDULED",
-      awayWins: 0,
-      homeWins: 0,
-      seriesOver: false,
-    };
-  }
-}
-
-function StatusCell({ row, teamName }: { row: EnrichedRow; teamName: string }) {
-  if (row.status === "SCHEDULED") {
-    return <span className="text-[var(--ncx-text-muted)] text-xs opacity-75">Scheduled</span>;
-  }
-  if (row.status === "IN PROGRESS") {
-    return (
-      <span className="text-xs font-semibold text-[rgb(var(--ncx-secondary-rgb))]">
-        In Progress
-      </span>
-    );
-  }
-
-  const viewingIsAway = row.away === teamName;
-  const viewingIsHome = row.home === teamName;
-  const viewingWon =
-    (viewingIsAway && row.awayWins > row.homeWins) ||
-    (viewingIsHome && row.homeWins > row.awayWins);
-  const viewingLost =
-    (viewingIsAway && row.awayWins < row.homeWins) ||
-    (viewingIsHome && row.homeWins < row.awayWins);
-
-  if (viewingWon) {
-    return (
-      <div className="flex items-center justify-end gap-1 text-[11px] text-[rgb(var(--ncx-success-rgb))] font-semibold">
-        <span>Winner</span>
-        <Image
-          src={`/logos/${teamSlug(teamName)}.webp`}
-          alt={`${teamName} logo`}
-          width={20}
-          height={20}
-          className="object-contain rounded"
-          unoptimized
-        />
-      </div>
-    );
-  }
-  if (viewingLost) {
-    return (
-      <div className="flex items-center justify-end gap-1 text-[11px] text-[rgb(var(--ncx-danger-rgb))] font-semibold">
-        <span>Loser</span>
-        <Image
-          src={`/logos/${teamSlug(teamName)}.webp`}
-          alt={`${teamName} logo`}
-          width={20}
-          height={20}
-          className="object-contain rounded"
-          unoptimized
-        />
-      </div>
-    );
-  }
-  return <span className="text-xs text-[var(--ncx-text-muted)]">Final</span>;
-}
-
-/* ----------------------------- ROSTER HELPERS ----------------------------- */
-
-type TeamRosterPlayer = {
-  ncxid: string;
-  name: string;
-  faction: string | null;
-  discordId: string | null;
-  wins: number;
-  losses: number;
-  points: number;
-  plms: number;
-  efficiency: number;
-  potato: number;
-  isCaptain: boolean;
-};
-
-const FACTION_FILE: Record<string, string> = {
-  REBELS: "Rebels.webp",
-  EMPIRE: "Empire.webp",
-  REPUBLIC: "Republic.webp",
-  CIS: "CIS.webp",
-  RESISTANCE: "Resistance.webp",
-  "FIRST ORDER": "First Order.webp",
-  SCUM: "Scum.webp",
-};
-function factionIconSrc(faction?: string | null) {
-  const key = (faction || "").toUpperCase().trim();
-  const file = FACTION_FILE[key];
-  return file ? `/factions/${file}` : "";
-}
-
-function buildNcxToDiscord(discordMap: Record<string, any> | null | undefined) {
+function buildRoster(
+  teamName: string,
+  indStats: IndRow[],
+  factionMap: Record<string, string> | null,
+  discordMap: Record<string, any> | null
+): TeamRosterPlayer[] {
   const ncxToDiscord: Record<string, string> = {};
   Object.entries(discordMap ?? {}).forEach(([discordId, payload]) => {
     const ncxid = String((payload as any)?.ncxid ?? "").trim();
-    if (ncxid) {
-      ncxToDiscord[ncxid] = discordId;
-    }
+    if (ncxid) ncxToDiscord[ncxid] = discordId;
   });
-  return ncxToDiscord;
-}
 
-function buildRosterForTeam(
-  teamName: string,
-  indStats: IndRow[] | null | undefined,
-  factionMap: FactionMap | undefined,
-  discordMap: Record<string, any> | undefined
-): TeamRosterPlayer[] {
-  if (!indStats || !teamName) return [];
-
-  const ncxToDiscord = buildNcxToDiscord(discordMap);
-
-  const players: TeamRosterPlayer[] = (indStats ?? [])
+  return indStats
     .filter((r) => String(r.team ?? "").trim() === teamName)
     .map((r) => {
       const ncxid = String(r.ncxid ?? "").trim();
-      const name =
-        `${r.first ?? ""} ${r.last ?? ""}`.trim() || ncxid || "Unknown Pilot";
-
+      const name = `${r.first ?? ""} ${r.last ?? ""}`.trim() || ncxid || "Unknown Pilot";
       const pickNum = Number(r.pick ?? 0);
-      const isCaptain = pickNum === 0;
-
-      const faction =
-        (String(r.faction ?? "").trim() ||
-          (ncxid && factionMap ? factionMap[ncxid] ?? "" : "")) ||
-        null;
-
-      const wins = Number(r.wins ?? 0);
-      const losses = Number(r.losses ?? 0);
-      const points = Number(r.points ?? 0);
-      const plms = Number(r.plms ?? 0);
-      const efficiency = Number(r.efficiency ?? 0);
-      const potato = Number(r.potato ?? 0);
-
-      const discordId = ncxid ? ncxToDiscord[ncxid] ?? null : null;
-
       return {
         ncxid,
         name,
-        faction,
-        discordId,
-        wins,
-        losses,
-        points,
-        plms,
-        efficiency,
-        potato,
-        isCaptain,
+        faction: String(r.faction ?? "").trim() || null,
+        discordId: ncxid ? ncxToDiscord[ncxid] ?? null : null,
+        discordTag: null,
+        isCaptain: pickNum === 0,
+        wins: r.wins != null ? String(r.wins) : undefined,
+        losses: r.losses != null ? String(r.losses) : undefined,
+        points: r.points != null ? String(r.points) : undefined,
+        plms: r.plms != null ? String(r.plms) : undefined,
+        games: r.games != null ? String(r.games) : undefined,
+        winPct: r.winPct != null ? String(r.winPct) : undefined,
+        ppg: r.ppg != null ? String(r.ppg) : undefined,
+        efficiency: r.efficiency != null ? String(r.efficiency) : undefined,
+        war: r.war != null ? String(r.war) : undefined,
+        h2h: r.h2h != null ? String(r.h2h) : undefined,
+        potato: r.potato != null ? String(r.potato) : undefined,
+        sos: r.sos != null ? String(r.sos) : undefined,
       };
     });
-
-  players.sort((a, b) => {
-    if (a.isCaptain !== b.isCaptain) return a.isCaptain ? -1 : 1;
-    const an = a.name.toLowerCase();
-    const bn = b.name.toLowerCase();
-    if (an !== bn) return an.localeCompare(bn);
-    return a.ncxid.localeCompare(b.ncxid);
-  });
-
-  return players;
 }
 
-/* ----------------------------- PAGE ----------------------------- */
-
-export default async function MobileTeamSchedulePage({
+export default async function MobileTeamPage({
   params,
 }: {
   params: Promise<{ team: string }>;
 }) {
   const { team } = await params;
-  const { teamName, rows } = await fetchScheduleForTeam(team);
 
   const [indStats, factionMap, discordMap] = await Promise.all([
     fetchIndStatsDataCached(),
@@ -284,242 +65,22 @@ export default async function MobileTeamSchedulePage({
     getDiscordMapCached(),
   ]);
 
-  const roster = buildRosterForTeam(teamName, indStats ?? [], factionMap, discordMap);
+  // We need the team name to build roster, but TeamSchedulePanel fetches it internally.
+  // Build roster with whatever team slug decodes to.
+  const decodedTeam = decodeURIComponent(team);
+  const allStats = indStats ?? [];
 
-  return (
-    <div className="p-3 space-y-4 text-[var(--ncx-text-primary)]">
-      {!rows.length ? (
-        <>
-          <h2 className="text-lg font-bold text-[var(--ncx-text-primary)]">
-            Team Schedule
-          </h2>
-          <p className="mt-2 text-sm text-[var(--ncx-text-muted)]">
-            Couldn&apos;t find a schedule for “{team}”.
-          </p>
-        </>
-      ) : (
-        <>
-          <header className="mb-1 flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]">
-              <Image
-                src={`/logos/${teamSlug(teamName)}.webp`}
-                alt={`${teamName} logo`}
-                width={32}
-                height={32}
-                className="object-contain"
-                unoptimized
-              />
-            </span>
-            <div>
-              <h2 className="text-lg font-extrabold tracking-wide">
-                <span className="text-[rgb(var(--ncx-primary-rgb))]">{teamName}</span>{" "}
-                <span className="text-[var(--ncx-text-primary)]/90">Team Hub</span>
-              </h2>
-              <p className="text-[11px] text-[var(--ncx-text-muted)]">
-                Tap a week to jump to that week on the Current tab.
-              </p>
-            </div>
-          </header>
-
-          {/* ROSTER (mobile) */}
-          {roster.length > 0 && (
-            <section className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/85 p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[var(--ncx-text-primary)]">
-                  Roster{" "}
-                  <span className="text-[11px] text-[var(--ncx-text-muted)]">
-                    ({roster.length})
-                  </span>
-                </h3>
-                <span className="text-[10px] text-[var(--ncx-text-muted)]">
-                  Captains marked with{" "}
-                  <span className="text-[rgb(var(--ncx-secondary-rgb))] font-semibold">★</span>
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {roster.map((p) => {
-                  const factionIcon = factionIconSrc(p.faction);
-
-                  const rowTone = p.isCaptain
-                    ? "border border-[rgb(var(--ncx-secondary-rgb)/0.55)] bg-[rgb(var(--ncx-secondary-rgb)/0.10)]"
-                    : "border border-[var(--ncx-border)] bg-[rgb(0_0_0/0.35)]";
-
-                  return (
-                    <div
-                      key={p.ncxid}
-                      className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${rowTone}`}
-                    >
-                      {/* Faction icon with glow */}
-                      {factionIcon ? (
-                        <div className="relative h-8 w-8 shrink-0 flex items-center justify-center">
-                          <span className="absolute inset-0 rounded-full bg-[rgb(var(--ncx-primary-rgb)/0.12)] blur-[6px]" />
-                          <Image
-                            src={factionIcon}
-                            alt={`${p.faction ?? "Faction"} icon`}
-                            width={32}
-                            height={32}
-                            className="relative object-contain"
-                            unoptimized
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-8 w-8 shrink-0 rounded-full bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] flex items-center justify-center text-[10px] text-[var(--ncx-text-muted)]">
-                          —
-                        </div>
-                      )}
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <PlayerDMLink
-                            name={p.name}
-                            discordId={p.discordId}
-                            titleSuffix={p.isCaptain ? "Team Captain" : "Open DM"}
-                            className="text-sm font-semibold text-[rgb(var(--ncx-primary-rgb))] hover:opacity-90"
-                          />
-                          {p.isCaptain && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-[rgb(var(--ncx-secondary-rgb)/0.65)] bg-[rgb(var(--ncx-secondary-rgb)/0.16)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--ncx-text-primary)]">
-                              ★ Captain
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-1 text-[11px] text-[var(--ncx-text-muted)] flex flex-wrap gap-x-2 gap-y-0.5">
-                          {p.faction && <span>{p.faction}</span>}
-                          <span>
-                            {p.wins}-{p.losses}
-                          </span>
-                          <span>Pts {p.points}</span>
-                          <span>PL/MS {p.plms}</span>
-                        </div>
-                      </div>
-
-                      <span className="shrink-0 rounded-full bg-[var(--ncx-panel-bg)]/90 border border-[var(--ncx-border)] px-2 py-0.5 text-[10px] text-[var(--ncx-text-primary)] font-mono">
-                        {p.ncxid}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          <TeamTable rows={rows} teamName={teamName} />
-        </>
-      )}
-    </div>
+  // Find the actual team name from ind stats that matches this slug
+  const { teamSlug: slugFn } = await import("@/lib/slug");
+  const matchedTeam = allStats.find(
+    (r) => slugFn(String(r.team ?? "").trim()) === decodedTeam
   );
-}
-
-async function TeamTable({
-  rows,
-  teamName,
-}: {
-  rows: TeamScheduleRow[];
-  teamName: string;
-}) {
-  const enriched = await Promise.all(rows.map(enrichRowWithScore));
+  const teamName = matchedTeam ? String(matchedTeam.team).trim() : "";
+  const roster = teamName ? buildRoster(teamName, allStats, factionMap ?? null, discordMap ?? null) : undefined;
 
   return (
-    <div className="rounded-2xl border border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)]/75 p-2">
-      <table className="w-full text-left text-[13px] text-[var(--ncx-text-primary)]">
-        <thead className="text-[11px] uppercase text-[var(--ncx-text-muted)]">
-          <tr className="[&>th]:py-1.5 [&>th]:px-2">
-            <th className="w-20">Week</th>
-            <th className="w-[35%]">Away</th>
-            <th className="w-[35%]">Home</th>
-            <th className="text-right w-28">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {enriched.map((r, i) => {
-            const weekLabel = normalizeWeekLabel(r.week);
-            const weekNumber = weekLabel.replace(/[^0-9]/g, "");
-            const weekHref = `/m/current?w=${encodeURIComponent(weekLabel)}`;
-
-            let rowTone = "";
-            if (r.status === "FINAL") {
-              const viewingIsAway = r.away === teamName;
-              const viewingIsHome = r.home === teamName;
-              const viewingWon =
-                (viewingIsAway && r.awayWins > r.homeWins) ||
-                (viewingIsHome && r.homeWins > r.awayWins);
-              const viewingLost =
-                (viewingIsAway && r.awayWins < r.homeWins) ||
-                (viewingIsHome && r.homeWins < r.awayWins);
-
-              if (viewingWon) {
-                rowTone =
-                  "bg-[rgb(var(--ncx-success-rgb)/0.12)] border-[rgb(var(--ncx-success-rgb)/0.28)]";
-              } else if (viewingLost) {
-                rowTone =
-                  "bg-[rgb(var(--ncx-danger-rgb)/0.12)] border-[rgb(var(--ncx-danger-rgb)/0.28)]";
-              }
-            } else if (r.status === "IN PROGRESS") {
-              rowTone =
-                "bg-[rgb(var(--ncx-secondary-rgb)/0.10)] border-[rgb(var(--ncx-secondary-rgb)/0.26)]";
-            }
-
-            return (
-              <tr
-                key={`${weekLabel}-${i}`}
-                className={`border-t border-[var(--ncx-border)] ${rowTone}`}
-              >
-                <td className="py-1.5 px-2 align-top">
-                  <Link
-                    href={weekHref}
-                    prefetch={false}
-                    className="text-xs font-semibold text-[rgb(var(--ncx-primary-rgb))] hover:underline hover:opacity-90"
-                  >
-                    {weekNumber}
-                  </Link>
-                </td>
-
-                
-                <td className="py-1.5 px-2 align-top">
-                  <Link
-                    href={`/m/team/${encodeURIComponent(teamSlug(r.away))}`}
-                    prefetch={false}
-                    className="flex items-center gap-1 min-w-0 hover:underline underline-offset-2"
-                  >
-                    <Image
-                      src={`/logos/${teamSlug(r.away)}.webp`}
-                      alt={`${r.away} logo`}
-                      width={20}
-                      height={20}
-                      className="object-contain rounded"
-                      unoptimized
-                    />
-                    <span className="truncate text-xs">{r.away}</span>
-                  </Link>
-                </td>
-
-                <td className="py-1.5 px-2 align-top">
-                  <Link
-                    href={`/m/team/${encodeURIComponent(teamSlug(r.home))}`}
-                    prefetch={false}
-                    className="flex items-center gap-1 min-w-0 hover:underline underline-offset-2"
-                  >
-                    <Image
-                      src={`/logos/${teamSlug(r.home)}.webp`}
-                      alt={`${r.home} logo`}
-                      width={20}
-                      height={20}
-                      className="object-contain rounded"
-                      unoptimized
-                    />
-                    <span className="truncate text-xs">{r.home}</span>
-                  </Link>
-                </td>
-
-                <td className="py-1.5 px-2 text-right align-top">
-                  <StatusCell row={r} teamName={teamName} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="py-4">
+      <TeamSchedulePanel team={team} mode="mobile" roster={roster} />
     </div>
   );
 }

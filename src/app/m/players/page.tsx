@@ -1,8 +1,12 @@
 // src/app/m/players/page.tsx
-import PlayersSearch from "./PlayersSearch";
+import PlayersPanelServer from "@/app/components/PlayersPanelServer";
 
 export const revalidate = 0;
 
-export default function MobilePlayersPage() {
-  return <PlayersSearch />;
+export default async function MobilePlayersPage() {
+  return (
+    <div className="py-4">
+      <PlayersPanelServer />
+    </div>
+  );
 }

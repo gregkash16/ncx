@@ -99,7 +99,7 @@ function buildRegions(rows: OverallRow[]): Region[] {
 /* ---------------------------------------------
    Region card UI
 --------------------------------------------- */
-function RegionCard({ region }: { region: Region }) {
+function RegionCard({ region, mobile }: { region: Region; mobile?: boolean }) {
   const { index, oneSeed, twoSeed, threeSeed, fourSeed } = region;
   const regionName = `Region ${index + 1}`;
   const topSeedTeam = oneSeed.team;
@@ -111,8 +111,12 @@ function RegionCard({ region }: { region: Region }) {
   const game2Away = game2Home === twoSeed ? threeSeed : twoSeed;
 
   const matchRow = (label: string, away: SeededTeam, home: SeededTeam) => {
-    const awayHref = `/?tab=team&team=${encodeURIComponent(away.slug)}`;
-    const homeHref = `/?tab=team&team=${encodeURIComponent(home.slug)}`;
+    const awayHref = mobile
+      ? `/m/team/${encodeURIComponent(away.slug)}`
+      : `/?tab=team&team=${encodeURIComponent(away.slug)}`;
+    const homeHref = mobile
+      ? `/m/team/${encodeURIComponent(home.slug)}`
+      : `/?tab=team&team=${encodeURIComponent(home.slug)}`;
 
     return (
       <div className="rounded-xl bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] border border-[var(--ncx-border)] px-3 py-2 text-sm">
@@ -212,7 +216,7 @@ function RegionCard({ region }: { region: Region }) {
 /* ---------------------------------------------
    Main Component
 --------------------------------------------- */
-export default async function PlayoffsPanel() {
+export default async function PlayoffsPanel({ mobile }: { mobile?: boolean } = {}) {
   let data: OverallRow[] = [];
   let errorMsg: string | null = null;
 
@@ -262,7 +266,7 @@ export default async function PlayoffsPanel() {
       <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.9fr_1.15fr] gap-6 items-stretch">
         <div className="space-y-4">
           {leftRegions.map((r) => (
-            <RegionCard key={r.index} region={r} />
+            <RegionCard key={r.index} region={r} mobile={mobile} />
           ))}
         </div>
 
@@ -289,7 +293,7 @@ export default async function PlayoffsPanel() {
 
         <div className="space-y-4">
           {rightRegions.map((r) => (
-            <RegionCard key={r.index} region={r} />
+            <RegionCard key={r.index} region={r} mobile={mobile} />
           ))}
         </div>
       </div>

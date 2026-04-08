@@ -1,8 +1,12 @@
 // src/app/m/advstats/page.tsx
-import MobileAdvStatsServer from "./MobileAdvStatsServer";
+import AdvStatsPanelServer from "@/app/components/AdvStatsPanelServer";
 
 export const revalidate = 60;
 
 export default async function MobileAdvStatsPage() {
-  return <MobileAdvStatsServer />;
+  return (
+    <div className="px-2 py-4">
+      <AdvStatsPanelServer />
+    </div>
+  );
 }

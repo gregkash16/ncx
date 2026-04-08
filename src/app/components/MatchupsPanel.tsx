@@ -84,6 +84,9 @@ type Props = {
   enableCapsules?: boolean;
   enableCapsulesAI?: boolean;
   capsuleTone?: "neutral" | "buster";
+
+  /** When true, renders compact mobile layouts and adjusts links */
+  mobile?: boolean;
 };
 
 function parseIntSafe(v: string | number | undefined | null): number {
@@ -669,6 +672,7 @@ export default function MatchupsPanel({
   enableCapsules = false,
   enableCapsulesAI = false,
   capsuleTone = "neutral",
+  mobile = false,
 }: Props) {
   const searchParams = useSearchParams();
   const urlQRaw = (searchParams.get("q") ?? "").trim();
@@ -820,7 +824,7 @@ export default function MatchupsPanel({
     Boolean(weekLabel && scheduleWeek) && weekLabel!.trim() === scheduleWeek!.trim();
 
   const btnBase =
-    "group relative overflow-hidden rounded-xl border bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
+    "group relative overflow-hidden rounded-xl border bg-zinc-900 px-2.5 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold text-white shadow-lg transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-pink-500/50";
   const gradient =
     "pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100";
 
@@ -882,7 +886,7 @@ export default function MatchupsPanel({
   }
 
   return (
-    <div className="p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
+    <div className="p-3 md:p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
       <h2 className="text-2xl font-bold text-center mb-4">
         <span className="text-pink-400">WEEKLY</span>{" "}
         <span className="text-cyan-400">MATCHUPS</span>
@@ -892,14 +896,16 @@ export default function MatchupsPanel({
       </h2>
 
       {activeNum && activeNum > 0 && (
-        <div className="grid grid-cols-7 gap-2 justify-center mb-5 max-w-fit mx-auto">
+        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-2 justify-center mb-5 max-w-fit mx-auto">
           {weeksPills.map((wk) => {
             const isActive = wk.toUpperCase() === (activeWeek || "").toUpperCase();
             const selected =
               (!selectedWeekRaw && isActive) ||
               wk.toUpperCase() === (selectedWeekRaw || "").toUpperCase();
 
-            const href = isActive ? "?tab=matchups" : `?tab=matchups&w=${encodeURIComponent(wk)}`;
+            const href = mobile
+              ? (isActive ? "/m/matchups" : `/m/matchups?w=${encodeURIComponent(wk)}`)
+              : (isActive ? "?tab=matchups" : `?tab=matchups&w=${encodeURIComponent(wk)}`);
 
             return (
               <a
@@ -1038,7 +1044,7 @@ export default function MatchupsPanel({
             return (
               <div
                 key={`${row.game}-${i}`}
-                className="relative p-5 rounded-xl bg-zinc-950/50 border border-zinc-800 hover:border-purple-500/40 transition"
+                className="relative p-3 md:p-5 rounded-xl bg-zinc-950/50 border border-zinc-800 hover:border-purple-500/40 transition"
                 style={gradientStyle}
               >
                 {/* Game # badge (+ stream schedule info if available) */}
@@ -1056,8 +1062,8 @@ export default function MatchupsPanel({
                   </span>
                 </div>
 
-                {/* Buttons (Capsule + Create thumbnail) */}
-                <div className="absolute -top-3 -right-3 flex items-center gap-2">
+                {/* Buttons (Capsule + Create thumbnail) — desktop only */}
+                <div className="absolute -top-3 -right-3 hidden md:flex items-center gap-2">
                   {enableCapsules && (
                     <button
                       type="button"
@@ -1083,8 +1089,8 @@ export default function MatchupsPanel({
                   </button>
                 </div>
 
-                {/* Teams row */}
-                <div className="relative z-10 flex items-center justify-between font-semibold text-lg">
+                {/* Teams row — desktop */}
+                <div className="relative z-10 hidden md:flex items-center justify-between font-semibold text-lg">
                   {/* Away */}
                   <div className="flex items-center gap-3 w-1/3 min-w-0">
                     <NextImage
@@ -1140,8 +1146,101 @@ export default function MatchupsPanel({
                   </div>
                 </div>
 
-                {/* Player names + NCX IDs + Faction icons */}
-                <div className="relative z-10 mt-3 text-sm text-zinc-200 grid grid-cols-2 gap-3">
+                {/* Teams row — mobile card */}
+                <div className="relative z-10 md:hidden mt-2">
+                  {/* Score + Scenario centered */}
+                  <div className="flex flex-col items-center mb-3">
+                    <span className="text-xs text-zinc-400 italic mb-1">
+                      {row.scenario || "No Scenario"}
+                    </span>
+                    <div className="text-3xl font-mono leading-none">
+                      <span>{awayScore}</span>
+                      <span className="mx-2">:</span>
+                      <span>{homeScore}</span>
+                    </div>
+                  </div>
+
+                  {/* Away side */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <NextImage
+                      src={awayLogo}
+                      alt={row.awayTeam || "Team"}
+                      width={28}
+                      height={28}
+                      className="inline-block object-contain shrink-0"
+                      unoptimized
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <span
+                      className={`truncate text-sm font-semibold ${
+                        awayScore > homeScore ? "text-pink-400" : "text-zinc-300"
+                      }`}
+                    >
+                      {row.awayTeam || "TBD"}
+                    </span>
+                    {awayFactionIcon && (
+                      <NextImage
+                        src={awayFactionIcon}
+                        alt="faction"
+                        width={24}
+                        height={24}
+                        className="object-contain ml-auto shrink-0"
+                        unoptimized
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    )}
+                    <PlayerDMLink
+                      name={row.awayName || "—"}
+                      discordId={row.awayDiscordId}
+                      titleSuffix={awayTooltip}
+                      className="text-pink-400 text-sm font-semibold ml-auto truncate"
+                    />
+                  </div>
+
+                  {/* Home side */}
+                  <div className="flex items-center gap-2">
+                    <NextImage
+                      src={homeLogo}
+                      alt={row.homeTeam || "Team"}
+                      width={28}
+                      height={28}
+                      className="inline-block object-contain shrink-0"
+                      unoptimized
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <span
+                      className={`truncate text-sm font-semibold ${
+                        homeScore > awayScore ? "text-cyan-400" : "text-zinc-300"
+                      }`}
+                    >
+                      {row.homeTeam || "TBD"}
+                    </span>
+                    {homeFactionIcon && (
+                      <NextImage
+                        src={homeFactionIcon}
+                        alt="faction"
+                        width={24}
+                        height={24}
+                        className="object-contain ml-auto shrink-0"
+                        unoptimized
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    )}
+                    <PlayerDMLink
+                      name={row.homeName || "—"}
+                      discordId={row.homeDiscordId}
+                      titleSuffix={homeTooltip}
+                      className="text-cyan-400 text-sm font-semibold ml-auto truncate"
+                    />
+                  </div>
+                </div>
+
+                {/* Player names + NCX IDs + Faction icons — desktop only */}
+                <div className="relative z-10 mt-3 text-sm text-zinc-200 hidden md:grid grid-cols-2 gap-3">
                   <div className="flex items-center gap-3">
                     {awayFactionIcon && (
                       <NextImage
@@ -1226,13 +1325,13 @@ export default function MatchupsPanel({
 
                 {/* Lists + precomputed ship glyphs */}
                 {(awayListUrl || homeListUrl) && (
-                  <div className="relative z-10 mt-4 flex items-center justify-between gap-6">
+                  <div className="relative z-10 mt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-6">
                     <div className="flex-1 flex justify-start">
                       {awayListUrl && (
                         <ListIcons label="Away list" listUrl={awayListUrl} letters={awayLetters} side="away" />
                       )}
                     </div>
-                    <div className="flex-1 flex justify-end">
+                    <div className="flex-1 flex justify-start md:justify-end">
                       {homeListUrl && (
                         <ListIcons label="Home list" listUrl={homeListUrl} letters={homeLetters} side="home" />
                       )}
@@ -1241,8 +1340,9 @@ export default function MatchupsPanel({
                 )}
 
                 {/* Season summary rail */}
-                <div className="relative z-10 mt-4 grid grid-cols-2 gap-3 text-xs text-zinc-300">
+                <div className="relative z-10 mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-zinc-300">
                   <div className="bg-zinc-800/60 rounded-lg px-3 py-2">
+                    <div className="md:hidden text-[10px] text-zinc-500 uppercase mb-0.5">{row.awayName || "Away"}</div>
                     <div>
                       Record:{" "}
                       <span className="text-zinc-100">
@@ -1256,7 +1356,8 @@ export default function MatchupsPanel({
                     </div>
                   </div>
 
-                  <div className="bg-zinc-800/60 rounded-lg px-3 py-2 text-right">
+                  <div className="bg-zinc-800/60 rounded-lg px-3 py-2 md:text-right">
+                    <div className="md:hidden text-[10px] text-zinc-500 uppercase mb-0.5">{row.homeName || "Home"}</div>
                     <div>
                       Record:{" "}
                       <span className="text-zinc-100">

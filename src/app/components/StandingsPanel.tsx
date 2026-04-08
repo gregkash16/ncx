@@ -322,7 +322,7 @@ function StreakPill({
    Main component
 --------------------------------------------- */
 
-export default async function StandingsPanel() {
+export default async function StandingsPanel({ mobile }: { mobile?: boolean } = {}) {
   let data: OverallRow[] = [];
   let errorMsg: string | null = null;
 
@@ -434,12 +434,12 @@ export default async function StandingsPanel() {
       <div className="overflow-x-auto">
         <table className="w-full text-left text-[var(--ncx-text-primary)]">
           <thead className="text-sm uppercase text-[var(--ncx-text-muted)]">
-            <tr className="[&>th]:py-2 [&>th]:px-2">
+            <tr className="[&>th]:py-2 [&>th]:px-1 [&>th]:md:px-2">
               <th className="w-14">Rank</th>
               <th>Team</th>
               <th className="text-right w-16">W</th>
               <th className="text-right w-16">L</th>
-              <th className="text-right w-24">GW</th>
+              <th className="text-right w-24 hidden md:table-cell">GW</th>
               <th className="text-right w-24">Pts</th>
               <th className="text-right w-24">Strk</th>
             </tr>
@@ -449,7 +449,7 @@ export default async function StandingsPanel() {
             {data.map((row) => {
               const slug = teamNameToSlug(row.team);
               const logoSrc = `/logos/${slug}.webp`;
-              const href = `/?tab=team&team=${encodeURIComponent(slug)}`;
+              const href = mobile ? `/m/team/${encodeURIComponent(slug)}` : `/?tab=team&team=${encodeURIComponent(slug)}`;
 
               const { dir, count } = getStreakForTeamFromResults(row.team, teamResults);
 
@@ -461,9 +461,9 @@ export default async function StandingsPanel() {
                   key={`${row.rank}-${row.team}`}
                   className="border-t border-[var(--ncx-border)] hover:bg-[rgb(var(--ncx-primary-rgb)/0.06)] transition-colors"
                 >
-                  <td className="py-2 px-2">{row.rank}</td>
+                  <td className="py-2 px-1 md:px-2">{row.rank}</td>
 
-                  <td className="py-2 px-2">
+                  <td className="py-2 px-1 md:px-2">
                     <a
                       href={href}
                       className="flex items-center gap-3 min-w-0 hover:underline underline-offset-2"
@@ -497,11 +497,11 @@ export default async function StandingsPanel() {
                     </a>
                   </td>
 
-                  <td className="py-2 px-2 text-right tabular-nums">{row.wins}</td>
-                  <td className="py-2 px-2 text-right tabular-nums">{row.losses}</td>
-                  <td className="py-2 px-2 text-right tabular-nums">{row.gameWins}</td>
-                  <td className="py-2 px-2 text-right tabular-nums">{row.points}</td>
-                  <td className="py-2 px-2 text-right">
+                  <td className="py-2 px-1 md:px-2 text-right tabular-nums">{row.wins}</td>
+                  <td className="py-2 px-1 md:px-2 text-right tabular-nums">{row.losses}</td>
+                  <td className="py-2 px-1 md:px-2 text-right tabular-nums hidden md:table-cell">{row.gameWins}</td>
+                  <td className="py-2 px-1 md:px-2 text-right tabular-nums">{row.points}</td>
+                  <td className="py-2 px-1 md:px-2 text-right">
                     <StreakPill dir={dir} count={count} />
                   </td>
                 </tr>

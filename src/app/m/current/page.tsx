@@ -1,9 +1,9 @@
 // src/app/m/current/page.tsx
-import MobileCurrent from "../MobileCurrent";
+import CurrentWeekCard from "@/app/components/CurrentWeekCard";
+import { getActiveWeekFromDb } from "@/lib/matchupsDb";
 
 export const revalidate = 60;
 
-// Next 15: searchParams is a Promise on server components
 export default async function MobileCurrentPage({
   searchParams,
 }: {
@@ -11,11 +11,11 @@ export default async function MobileCurrentPage({
 }) {
   const sp = await searchParams;
   const selectedWeek = (sp?.w as string | undefined) || undefined;
+  const activeWeek = await getActiveWeekFromDb();
 
-  // We only pass the raw requested week; MobileCurrent will validate it
   return (
     <div className="py-4">
-      <MobileCurrent selectedWeek={selectedWeek} />
+      <CurrentWeekCard activeWeek={activeWeek} selectedWeek={selectedWeek} mobile />
     </div>
   );
 }
