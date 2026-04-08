@@ -180,6 +180,21 @@ export default function HomeLanding({
             NCX Podcast
           </a>
 
+          <a
+            href="https://apps.apple.com/us/app/nickelcityxwing/id6761032427"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center rounded-xl border border-red-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold hover:bg-red-500/20 hover:border-red-400 transition"
+          >
+            NCX App for iOS
+          </a>
+
+          <span
+            className="flex items-center justify-center rounded-xl border border-green-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-400 cursor-default"
+          >
+            NCX App for Android (Coming Soon)
+          </span>
+
         </div>
 
         {/* NEW: Inline "Your Matchup" widget (only shows if logged in & has game) */}
