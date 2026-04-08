@@ -57,6 +57,12 @@ export async function GET() {
       scum: norm(r.scum),
     }));
 
+    const FACTION_ORDER = ['Republic', 'CIS', 'Rebels', 'Empire', 'Resistance', 'First Order', 'Scum'];
+    const factionIndex = (name: string) => {
+      const i = FACTION_ORDER.findIndex(f => f.toLowerCase() === name.toLowerCase());
+      return i === -1 ? 999 : i;
+    };
+
     const t4 = (t4Rows ?? []).map((r: any) => ({
       factionVs: norm(r.faction_vs),
       republic: norm(r.republic),
@@ -66,7 +72,7 @@ export async function GET() {
       resistance: norm(r.resistance),
       firstOrder: norm(r.first_order),
       scum: norm(r.scum),
-    }));
+    })).sort((a, b) => factionIndex(a.factionVs) - factionIndex(b.factionVs));
 
     const t5 = (t5Rows ?? []).map((r: any) => ({
       faction: norm(r.faction),

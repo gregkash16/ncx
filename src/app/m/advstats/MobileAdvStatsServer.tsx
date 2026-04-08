@@ -140,6 +140,12 @@ export default async function MobileAdvStatsServer() {
     }))
     .filter((r) => r.scenario);
 
+  const FACTION_ORDER = ['Republic', 'CIS', 'Rebels', 'Empire', 'Resistance', 'First Order', 'Scum'];
+  const factionIndex = (name: string) => {
+    const i = FACTION_ORDER.findIndex(f => f.toLowerCase() === name.toLowerCase());
+    return i === -1 ? 999 : i;
+  };
+
   const table4: Table4Row[] = (t4 ?? [])
     .map((r) => ({
       factionVs: r[0] ?? "",
@@ -151,7 +157,8 @@ export default async function MobileAdvStatsServer() {
       firstOrder: r[6] ?? "",
       scum: r[7] ?? "",
     }))
-    .filter((r) => r.factionVs);
+    .filter((r) => r.factionVs)
+    .sort((a, b) => factionIndex(a.factionVs) - factionIndex(b.factionVs));
 
   const table5: Table5Row[] = (t5 ?? [])
     .map((r) => ({
