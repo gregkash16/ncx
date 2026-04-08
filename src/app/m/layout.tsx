@@ -8,7 +8,6 @@ import MobileHeaderTitle from "./components/MobileHeaderTitle";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDiscordMapCached } from "@/lib/googleSheets";
-import ServiceWorkerBoot from "@/app/components/ServiceWorkerBoot";
 import ViewportFix from "./viewport-fix";
 
 export const metadata = {
@@ -55,11 +54,7 @@ export default async function MobileLayout({
 
   return (
     <div className="w-full overflow-x-hidden flex flex-col ncx-gradient-bg text-[var(--ncx-text-primary)]" style={{ height: '100dvh' }}>
-      {/* iOS viewport height fix for PWA white space */}
       <ViewportFix />
-
-      {/* Service Worker for PWA push notifications */}
-      <ServiceWorkerBoot />
 
 {/* Top Bar - Fixed */}
       <header className="fixed inset-x-0 top-0 z-20 border-b border-[var(--ncx-border)] bg-[var(--ncx-panel-bg)] backdrop-blur supports-[backdrop-filter]:backdrop-blur-md">

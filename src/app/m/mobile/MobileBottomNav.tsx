@@ -9,9 +9,7 @@ import {
   List as ListIcon,
   ClipboardEdit,
   CalendarDays,
-  Settings,
 } from "lucide-react";
-import NotificationsDrawer from "../../components/NotificationsDrawer";
 
 const NAV_PX = 64;
 
@@ -92,22 +90,6 @@ export default function MobileBottomNav() {
           );
         })}
 
-        {/* Settings/Notifications */}
-        <li className="flex-1 text-center">
-          <NotificationsDrawer>
-            <button
-              className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-[11px] transition-colors text-[var(--ncx-text-muted)] hover:text-[var(--ncx-text-primary)]"
-              aria-label="Notification settings"
-            >
-              <Settings
-                size={22}
-                strokeWidth={2}
-                className="transition-all"
-              />
-              Settings
-            </button>
-          </NotificationsDrawer>
-        </li>
       </ul>
     </nav>
   );

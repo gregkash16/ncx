@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSheets } from "@/lib/googleSheets";
 import { sql } from "@vercel/postgres";
-import webpush from "web-push";
 import mysql from "mysql2/promise";
 
 /* ------------------------- Shared helpers ------------------------- */
@@ -125,86 +124,13 @@ type LookupResult =
 type SheetsClient = ReturnType<typeof getSheets>;
 
 /* ------------------------- Push helpers ------------------------- */
-let vapidReady = false;
-function ensureVapid() {
-  if (vapidReady) return;
-  const subject = process.env.VAPID_MAILTO || "mailto:noreply@nickelcityxwing.com";
-  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const priv = process.env.VAPID_PRIVATE_KEY;
-  if (!pub || !priv) throw new Error("Missing VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env vars.");
-  webpush.setVapidDetails(subject, pub, priv);
-  vapidReady = true;
-}
 
-async function sendPushToAll(payload: { title: string; body: string; url: string }) {
-  ensureVapid();
-  const { rows } = await sql`SELECT endpoint, p256dh, auth FROM push_subscriptions`;
-  const subs = rows.map((r) => ({
-    endpoint: r.endpoint,
-    keys: { p256dh: r.p256dh, auth: r.auth },
-  }));
-  const msg = JSON.stringify(payload);
-
-  await Promise.allSettled(
-    subs.map(async (s) => {
-      try {
-        await webpush.sendNotification(s as any, msg);
-      } catch (e: any) {
-        if (e?.statusCode === 404 || e?.statusCode === 410) {
-          await sql`DELETE FROM push_subscriptions WHERE endpoint = ${s.endpoint}`;
-        }
-      }
-    })
-  );
-
-  return subs.length;
-}
-
-// Filtered push sender — only notifies users who selected these teams
+// Filtered push sender — sends FCM notifications to matching devices
 async function sendPushForTeams(
   teams: string[],
   payload: { title: string; body: string; url: string }
 ) {
-  ensureVapid();
-
-  const teamsJson = JSON.stringify(
-    teams.map((t) => (t ?? "").trim()).filter(Boolean)
-  );
-
-  // Get web push subscriptions
-  const { rows } = await sql`
-    SELECT endpoint, p256dh, auth
-    FROM push_subscriptions
-    WHERE
-      all_teams = TRUE
-      OR EXISTS (
-        SELECT 1
-        FROM json_array_elements_text(${teamsJson}::json) j
-        WHERE j = ANY(push_subscriptions.teams)
-      )
-  `;
-
-  const subs = rows.map((r) => ({
-    endpoint: r.endpoint,
-    keys: { p256dh: r.p256dh, auth: r.auth },
-  }));
-
-  const msg = JSON.stringify(payload);
-
-  // Send web push notifications
-  await Promise.allSettled(
-    subs.map(async (s) => {
-      try {
-        await webpush.sendNotification(s as any, msg);
-      } catch (e: any) {
-        if (e?.statusCode === 404 || e?.statusCode === 410) {
-          await sql`DELETE FROM push_subscriptions WHERE endpoint = ${s.endpoint}`;
-        }
-      }
-    })
-  );
-
-// Get FCM device tokens (Android)
+  // FCM device tokens (Android)
   let fcmCount = 0;
   try {
     // Ensure table exists (may not have been created yet)

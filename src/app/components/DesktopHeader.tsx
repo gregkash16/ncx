@@ -1,8 +1,6 @@
 // src/app/components/DesktopHeader.tsx
 "use client";
 
-import NotificationsDrawer from "../components/NotificationsDrawer";
-import { Menu } from "lucide-react";
 import { useSession, signOut, signIn } from "next-auth/react";
 
 export default function DesktopHeader() {
@@ -21,20 +19,6 @@ export default function DesktopHeader() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2">
         {/* Left: menu + logo */}
         <div className="flex items-center gap-3">
-          <NotificationsDrawer title="Notifications">
-            <button
-              aria-label="Open menu"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border transition active:scale-95"
-              style={{
-                background: "rgb(0 0 0 / 0.25)",
-                borderColor: "var(--ncx-border)",
-                color: "var(--ncx-text-primary)",
-              }}
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-          </NotificationsDrawer>
-
           <a href="/" className="flex items-center gap-2">
             <img
               src="/logo.webp"
