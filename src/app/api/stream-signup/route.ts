@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { slotDay, slotGame } = body;
 
-    if (!["tuesday", "thursday"].includes(slotDay) || ![1, 2, 3].includes(slotGame)) {
+    if (!["tuesday", "thursday"].includes(slotDay) || ![1, 2].includes(slotGame)) {
       return NextResponse.json(
         { error: "Invalid slot_day or slot_game" },
         { status: 400 }
@@ -327,7 +327,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { slotDay, slotGame, gameNumber } = body;
 
-    if (!["tuesday", "thursday"].includes(slotDay) || ![1, 2, 3].includes(slotGame)) {
+    if (!["tuesday", "thursday"].includes(slotDay) || ![1, 2].includes(slotGame)) {
       return NextResponse.json({ error: "Invalid slot" }, { status: 400 });
     }
     if (!gameNumber) {

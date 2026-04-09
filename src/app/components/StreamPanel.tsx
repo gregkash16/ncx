@@ -72,7 +72,7 @@ function factionImage(faction: string): string | null {
 }
 
 /* ─── Time zone helpers ─── */
-const SLOT_TIMES_ET = ["6:30 PM", "~7:45 PM", "~9:00 PM"];
+const SLOT_TIMES_ET = ["6:30 PM", "~7:45 PM"];
 
 function getLocalTimezone(): string {
   try {
@@ -550,7 +550,6 @@ export default function StreamPanel() {
         </h3>
         <SlotCard day={day} game={1} />
         <SlotCard day={day} game={2} />
-        <SlotCard day={day} game={3} />
       </div>
     );
   }
