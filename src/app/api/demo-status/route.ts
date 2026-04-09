@@ -1,7 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
-  return NextResponse.json({
-    demoMode: process.env.DEMO_MODE === 'true',
-  });
+export async function GET(req: NextRequest) {
+  const appVersion = req.nextUrl.searchParams.get('v');
+  const demoVersion = process.env.VERSION || '';
+  const demoOn = process.env.DEMO_MODE === 'true'
+    && !!appVersion
+    && appVersion === demoVersion;
+
+  return NextResponse.json({ demoMode: demoOn });
 }
