@@ -1,7 +1,7 @@
 // src/app/components/IndStatsPanel.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { IndRow } from "@/lib/googleSheets";
 
@@ -90,6 +90,25 @@ export default function IndStatsPanel({ data }: Props) {
     }
   };
 
+  const exportCsv = useCallback(() => {
+    const headers = ["Rank","NCXID","First","Last","Pick","Team","Faction","W","L","Pts","PL/MS","GP","Win%","PPG","Eff","WAR","H2H","Potato","SOS"];
+    const keys: (keyof IndRow)[] = ["rank","ncxid","first","last","pick","team","faction","wins","losses","points","plms","games","winPct","ppg","efficiency","war","h2h","potato","sos"];
+    const csvRows = [headers.join(",")];
+    for (const r of sorted) {
+      csvRows.push(keys.map(k => {
+        const v = r[k] ?? "";
+        return v.toString().includes(",") ? `"${v}"` : v.toString();
+      }).join(","));
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = query.trim() ? `ncx_stats_${query.trim().replace(/\s+/g, "_")}.csv` : "ncx_individual_stats.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [sorted, query]);
+
   const rowCls =
     "even:bg-zinc-900/30 odd:bg-zinc-900/10 hover:bg-zinc-800/40 transition-colors border-b border-zinc-800";
   const cell = "px-3 py-2 text-sm text-zinc-200";
@@ -103,12 +122,24 @@ export default function IndStatsPanel({ data }: Props) {
             INDIVIDUAL STATS
           </h2>
 
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter by name, NCXID, team, faction…"
-            className="w-full md:w-96 bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-          />
+          <div className="flex items-center gap-3">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter by name, NCXID, team, faction…"
+              className="w-full md:w-96 bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            />
+            <span className="text-xs text-zinc-400 whitespace-nowrap tabular-nums">
+              {filtered.length} player{filtered.length !== 1 ? "s" : ""}
+            </span>
+            <button
+              onClick={exportCsv}
+              title="Export filtered stats as CSV"
+              className="px-3 py-1.5 text-xs font-medium text-cyan-300 bg-cyan-900/30 hover:bg-cyan-800/40 border border-cyan-700/50 rounded-lg transition-colors whitespace-nowrap cursor-pointer hover:shadow-[0_0_8px_rgba(34,211,238,0.15)]"
+            >
+              Export CSV
+            </button>
+          </div>
         </div>
 
         {/* Mobile card view */}
