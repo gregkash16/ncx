@@ -130,9 +130,13 @@ async function sendPushForTeams(
   teams: string[],
   payload: { title: string; body: string; url: string }
 ) {
-  // FCM device tokens (Android)
+  // FCM device tokens (Android/iOS)
   let fcmCount = 0;
   try {
+    const teamsJson = JSON.stringify(
+      teams.map((t) => (t ?? "").trim()).filter(Boolean)
+    );
+
     // Ensure table exists (may not have been created yet)
     await sql`
       CREATE TABLE IF NOT EXISTS fcm_subscriptions (
@@ -169,7 +173,7 @@ async function sendPushForTeams(
     console.error("Failed to send FCM notifications:", e);
   }
 
-  return subs.length + fcmCount;
+  return fcmCount;
 }
 
 /* ------------------------- Role helpers ------------------------- */
