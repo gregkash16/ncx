@@ -1944,6 +1944,16 @@ export async function POST(req: NextRequest) {
             } catch (clinchPushErr) {
               console.warn("⚠️ Series clinch push failed:", clinchPushErr);
             }
+          } else if (awayWins === 3 && homeWins === 3) {
+            try {
+              await sendPushForTeams([awayTeam, homeTeam], {
+                title: "GAME 7 ALERT",
+                body: `${awayTeam} v ${homeTeam} is going to GAME 7`,
+                url: "/m/current",
+              });
+            } catch (game7PushErr) {
+              console.warn("⚠️ Game 7 alert push failed:", game7PushErr);
+            }
           }
         } finally {
           await conn.end();
