@@ -1912,27 +1912,40 @@ export async function POST(req: NextRequest) {
     }
 
     // ---- Series clinch push notification ----
-    if (hasScoreInputs && a !== undefined && h !== undefined && Number(a) > 0 && Number(h) > 0) {
+    if (hasScoreInputs && a !== undefined && h !== undefined && Number(a) > 0 && Number(h) > 0 && gameNo) {
       try {
         const conn = await getMySqlConn();
         try {
-          const [seriesRows] = await conn.execute<any[]>(
+          // Count wins in the series EXCLUDING the current game, so we can detect
+          // the transition this report causes. Without this exclusion, the clinch
+          // notification fires on every subsequent game in an already-decided series
+          // (e.g. 4-1 clinch fires again at 4-2, 4-3).
+          const [priorRows] = await conn.execute<any[]>(
             `SELECT awayPts, homePts FROM S9.weekly_matchups
              WHERE week_label = ? AND awayTeam = ? AND homeTeam = ?
+             AND game <> ?
              AND awayPts > 0 AND homePts > 0`,
-            [canonicalWeekLabel, awayTeam, homeTeam]
+            [canonicalWeekLabel, awayTeam, homeTeam, gameNo]
           );
 
-          let awayWins = 0;
-          let homeWins = 0;
-          for (const row of seriesRows ?? []) {
-            if (Number(row.awayPts) > Number(row.homePts)) awayWins++;
-            else if (Number(row.homePts) > Number(row.awayPts)) homeWins++;
+          let priorAwayWins = 0;
+          let priorHomeWins = 0;
+          for (const row of priorRows ?? []) {
+            if (Number(row.awayPts) > Number(row.homePts)) priorAwayWins++;
+            else if (Number(row.homePts) > Number(row.awayPts)) priorHomeWins++;
           }
 
-          if (awayWins === 4 || homeWins === 4) {
-            const winner = awayWins === 4 ? awayTeam : homeTeam;
-            const loser = awayWins === 4 ? homeTeam : awayTeam;
+          const awayWonThisGame = Number(a) > Number(h);
+          const homeWonThisGame = Number(h) > Number(a);
+          const newAwayWins = priorAwayWins + (awayWonThisGame ? 1 : 0);
+          const newHomeWins = priorHomeWins + (homeWonThisGame ? 1 : 0);
+
+          const awayJustClinched = priorAwayWins === 3 && awayWonThisGame;
+          const homeJustClinched = priorHomeWins === 3 && homeWonThisGame;
+
+          if (awayJustClinched || homeJustClinched) {
+            const winner = awayJustClinched ? awayTeam : homeTeam;
+            const loser = awayJustClinched ? homeTeam : awayTeam;
             const weekNum = canonicalWeekLabel.replace(/^WEEK\s*/i, "");
 
             try {
@@ -1944,7 +1957,7 @@ export async function POST(req: NextRequest) {
             } catch (clinchPushErr) {
               console.warn("⚠️ Series clinch push failed:", clinchPushErr);
             }
-          } else if (awayWins === 3 && homeWins === 3) {
+          } else if (newAwayWins === 3 && newHomeWins === 3) {
             try {
               await sendPushForTeams([awayTeam, homeTeam], {
                 title: "GAME 7 ALERT",
