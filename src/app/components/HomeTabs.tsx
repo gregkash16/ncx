@@ -178,7 +178,7 @@ export default function HomeTabs({
 
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
-          active === "indstats" || active === "advstats" || active === "prevseasons" || active === "stream"
+          active === "indstats" || active === "advstats" || active === "prevseasons" || active === "stream" || active === "playoffs"
             ? "w-full max-w-[115rem]"
             : "max-w-6xl"
         }`}

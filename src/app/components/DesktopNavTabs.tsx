@@ -17,7 +17,8 @@ type TabKey =
   | "podcast"
   | "prevseasons"
   | "arcade"
-  | "stream";
+  | "stream"
+  | "playoffs";
 
 const row1: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "home",      label: "Home",         href: "/" },
@@ -29,6 +30,7 @@ const row1: Array<{ key: TabKey; label: string; href: string }> = [
 ];
 
 const row2Base: Array<{ key: TabKey; label: string; href: string }> = [
+  { key: "playoffs",  label: "Playoffs",     href: "/?tab=playoffs" },
   { key: "indstats",  label: "Ind. Stats",   href: "/?tab=indstats" },
   { key: "advstats",  label: "Adv. Stats",   href: "/?tab=advstats" },
   { key: "players",     label: "Players",       href: "/?tab=players" },

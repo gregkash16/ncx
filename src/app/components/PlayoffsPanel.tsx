@@ -15,26 +15,18 @@ export type OverallRow = {
   points: number;
 };
 
-type SeedNumber = 1 | 2 | 3 | 4;
-
-type SeededTeam = {
-  seed: SeedNumber;
-  rank: number;
-  team: string;
-  wins: number;
-  losses: number;
-  gameWins: number;
-  points: number;
-  slug: string;
+type BracketDef = {
+  label: string;
+  topMatch: [number, number];
+  bottomMatch: [number, number];
 };
 
-type Region = {
-  index: number;
-  oneSeed: SeededTeam;
-  twoSeed: SeededTeam;
-  threeSeed: SeededTeam;
-  fourSeed: SeededTeam;
-};
+const BRACKETS: BracketDef[] = [
+  { label: "Bracket A", topMatch: [1, 16], bottomMatch: [8, 12] },
+  { label: "Bracket B", topMatch: [2, 15], bottomMatch: [7, 11] },
+  { label: "Bracket C", topMatch: [3, 14], bottomMatch: [6, 10] },
+  { label: "Bracket D", topMatch: [4, 13], bottomMatch: [5, 9] },
+];
 
 /* ---------------------------------------------
    Load standings from MySQL
@@ -42,9 +34,7 @@ type Region = {
 async function fetchOverallStandingsFromDb(): Promise<OverallRow[]> {
   const sql =
     "SELECT `rank`, `team`, `wins`, `losses`, `game_wins`, `points` FROM `overall_standings` ORDER BY `rank` ASC";
-
   const [rows] = await pool.query<any[]>(sql);
-
   return (rows ?? []).map((r) => ({
     rank: Number(r.rank),
     team: String(r.team ?? ""),
@@ -56,160 +46,145 @@ async function fetchOverallStandingsFromDb(): Promise<OverallRow[]> {
 }
 
 /* ---------------------------------------------
-   Helpers
+   Seed slot (single team row in a matchup)
 --------------------------------------------- */
-function toSeeded(row: OverallRow, seed: SeedNumber): SeededTeam {
-  const slug = teamSlug(row.team);
-  return {
-    seed,
-    rank: row.rank,
-    team: row.team,
-    wins: row.wins,
-    losses: row.losses,
-    gameWins: row.gameWins,
-    points: row.points,
-    slug,
-  };
-}
+function SeedSlot({
+  seedRank,
+  row,
+  mobile,
+}: {
+  seedRank: number;
+  row: OverallRow | undefined;
+  mobile?: boolean;
+}) {
+  const teamName = row?.team ?? "TBD";
+  const slug = row ? teamSlug(row.team) : "";
+  const href = row
+    ? mobile
+      ? `/m/team/${encodeURIComponent(slug)}`
+      : `/?tab=team&team=${encodeURIComponent(slug)}`
+    : undefined;
 
-function buildRegions(rows: OverallRow[]): Region[] {
-  if (!rows || rows.length < 16) return [];
+  const inner = (
+    <div className="flex items-center gap-2 rounded-md bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.4)] border border-[var(--ncx-border)] px-2 py-1.5 hover:bg-white/5 transition-colors h-9">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-[rgb(var(--ncx-highlight-rgb)/0.18)] text-[10px] font-bold text-[rgb(var(--ncx-highlight-rgb))]">
+        {seedRank}
+      </span>
+      {row ? (
+        <Image
+          src={`/logos/${slug}.webp`}
+          alt={teamName}
+          width={22}
+          height={22}
+          unoptimized
+          className="shrink-0"
+        />
+      ) : (
+        <span className="inline-block h-[22px] w-[22px] shrink-0" />
+      )}
+      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--ncx-text-primary)]">
+        {teamName}
+      </span>
+      {row && (
+        <span className="shrink-0 text-[10px] text-[var(--ncx-text-muted)]">
+          {row.wins}-{row.losses}
+        </span>
+      )}
+    </div>
+  );
 
-  const top16 = rows.slice(0, 16);
-
-  const oneSeeds = top16.slice(0, 4).map((r) => toSeeded(r, 1));
-  const twoSeeds = top16.slice(4, 8).map((r) => toSeeded(r, 2));
-  const threeSeeds = top16.slice(8, 12).map((r) => toSeeded(r, 3));
-  const fourSeeds = top16.slice(12, 16).map((r) => toSeeded(r, 4));
-
-  // "difficulty" ordering: worse rank number is harder
-  const twoByDifficulty = [...twoSeeds].sort((a, b) => b.rank - a.rank);
-  const threeByDifficulty = [...threeSeeds].sort((a, b) => b.rank - a.rank);
-  const fourByDifficulty = [...fourSeeds].sort((a, b) => b.rank - a.rank);
-
-  return oneSeeds.map((oneSeed, idx) => ({
-    index: idx,
-    oneSeed,
-    twoSeed: twoByDifficulty[idx],
-    threeSeed: threeByDifficulty[idx],
-    fourSeed: fourByDifficulty[idx],
-  }));
+  return href ? <a href={href} className="block">{inner}</a> : inner;
 }
 
 /* ---------------------------------------------
-   Region card UI
+   Matchup (two seed slots stacked)
 --------------------------------------------- */
-function RegionCard({ region, mobile }: { region: Region; mobile?: boolean }) {
-  const { index, oneSeed, twoSeed, threeSeed, fourSeed } = region;
-  const regionName = `Region ${index + 1}`;
-  const topSeedTeam = oneSeed.team;
+function Matchup({
+  match,
+  byRank,
+  mobile,
+}: {
+  match: [number, number];
+  byRank: Map<number, OverallRow>;
+  mobile?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <SeedSlot seedRank={match[0]} row={byRank.get(match[0])} mobile={mobile} />
+      <SeedSlot seedRank={match[1]} row={byRank.get(match[1])} mobile={mobile} />
+    </div>
+  );
+}
 
-  const game1Home = oneSeed;
-  const game1Away = fourSeed;
-
-  const game2Home = twoSeed.rank < threeSeed.rank ? twoSeed : threeSeed;
-  const game2Away = game2Home === twoSeed ? threeSeed : twoSeed;
-
-  const matchRow = (label: string, away: SeededTeam, home: SeededTeam) => {
-    const awayHref = mobile
-      ? `/m/team/${encodeURIComponent(away.slug)}`
-      : `/?tab=team&team=${encodeURIComponent(away.slug)}`;
-    const homeHref = mobile
-      ? `/m/team/${encodeURIComponent(home.slug)}`
-      : `/?tab=team&team=${encodeURIComponent(home.slug)}`;
-
-    return (
-      <div className="rounded-xl bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] border border-[var(--ncx-border)] px-3 py-2 text-sm">
-        <div className="text-[11px] uppercase text-[var(--ncx-text-muted)] mb-1 flex justify-between">
-          <span>{label}</span>
-          <span>Higher seed is home</span>
-        </div>
-
-        <div className="flex items-center justify-between gap-2">
-          <a
-            href={awayHref}
-            className="flex items-center gap-2 min-w-0 hover:underline"
-          >
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.18)] border border-[var(--ncx-border)] overflow-hidden shrink-0">
-              <Image
-                src={`/logos/${away.slug}.webp`}
-                alt={away.team}
-                width={28}
-                height={28}
-                unoptimized
-              />
-            </span>
-            <span className="truncate">
-              <span className="text-xs text-[var(--ncx-text-muted)] mr-1">
-                ({away.seed})
-              </span>
-              <span className="text-[var(--ncx-text-primary)]">{away.team}</span>
-              <span className="ml-1 text-[11px] text-[var(--ncx-text-muted)]">
-                #{away.rank}
-              </span>
-            </span>
-          </a>
-
-          <span className="mx-1 text-[11px] text-[var(--ncx-text-muted)]">at</span>
-
-          <a
-            href={homeHref}
-            className="flex items-center gap-2 min-w-0 justify-end hover:underline"
-          >
-            <span className="truncate">
-              <span className="text-xs text-[var(--ncx-text-muted)] mr-1">
-                ({home.seed})
-              </span>
-              <span className="text-[var(--ncx-text-primary)]">{home.team}</span>
-              <span className="ml-1 text-[11px] text-[var(--ncx-text-muted)]">
-                #{home.rank}
-              </span>
-            </span>
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.18)] border border-[var(--ncx-border)] overflow-hidden shrink-0">
-              <Image
-                src={`/logos/${home.slug}.webp`}
-                alt={home.team}
-                width={28}
-                height={28}
-                unoptimized
-              />
-            </span>
-          </a>
-        </div>
+/* ---------------------------------------------
+   Round 1 bracket card (two matchups + label)
+--------------------------------------------- */
+function R1Card({
+  def,
+  byRank,
+  mobile,
+}: {
+  def: BracketDef;
+  byRank: Map<number, OverallRow>;
+  mobile?: boolean;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-[rgb(var(--ncx-highlight-rgb))] px-1">
+        {def.label}
       </div>
-    );
-  };
+      <Matchup match={def.topMatch} byRank={byRank} mobile={mobile} />
+      <div className="h-3" />
+      <Matchup match={def.bottomMatch} byRank={byRank} mobile={mobile} />
+    </div>
+  );
+}
+
+/* ---------------------------------------------
+   TBD slot for future rounds
+--------------------------------------------- */
+function TbdSlot({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.25)] border border-dashed border-[var(--ncx-border)] px-2 py-1.5 h-9">
+      <span className="text-xs text-[var(--ncx-text-muted)] italic">{label}</span>
+    </div>
+  );
+}
+
+/* ---------------------------------------------
+   SVG bracket connector lines
+   Draws lines from two source boxes to one target
+--------------------------------------------- */
+function BracketConnector({ side }: { side: "left" | "right" }) {
+  // For the left side, lines go right →
+  // For the right side, lines go left ←
+  const isLeft = side === "left";
 
   return (
-    <section className="rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] p-4 space-y-3">
-      <header className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.18)] border border-[var(--ncx-border)] flex items-center justify-center">
-          <Image
-            src={`/logos/${oneSeed.slug}.webp`}
-            alt={topSeedTeam}
-            width={40}
-            height={40}
-            unoptimized
-          />
-        </div>
-        <div>
-          <div className="text-xs uppercase text-[var(--ncx-text-muted)]">
-            {regionName}
-          </div>
-          <div className="text-sm font-semibold text-[var(--ncx-text-primary)]">
-            Top Seed:{" "}
-            <span className="text-[rgb(var(--ncx-primary-rgb))]">
-              {topSeedTeam} (1) – #{oneSeed.rank}
-            </span>
-          </div>
-        </div>
-      </header>
-
-      <div className="space-y-2">
-        {matchRow("First Round – Game 1", game1Away, game1Home)}
-        {matchRow("First Round – Game 2", game2Away, game2Home)}
-      </div>
-    </section>
+    <svg
+      className="shrink-0 hidden xl:block"
+      width="32"
+      height="100%"
+      viewBox="0 0 32 100"
+      preserveAspectRatio="none"
+      style={{ height: "100%" }}
+    >
+      {isLeft ? (
+        <>
+          <line x1="0" y1="25" x2="16" y2="25" stroke="rgb(var(--ncx-highlight-rgb))" strokeWidth="1.5" strokeOpacity="0.4" />
+          <line x1="0" y1="75" x2="16" y2="75" stroke="rgb(var(--ncx-highlight-rgb))" strokeWidth="1.5" strokeOpacity="0.4" />
+          <line x1="16" y1="25" x2="16" y2="75" stroke="rgb(var(--ncx-highlight-rgb))" strokeWidth="1.5" strokeOpacity="0.4" />
+          <line x1="16" y1="50" x2="32" y2="50" stroke="rgb(var(--ncx-highlight-rgb))" strokeWidth="1.5" strokeOpacity="0.4" />
+        </>
+      ) : (
+        <>
+          <line x1="32" y1="25" x2="16" y2="25" stroke="rgb(var(--ncx-highlight-rgb))" strokeWidth="1.5" strokeOpacity="0.4" />
+          <line x1="32" y1="75" x2="16" y2="75" stroke="rgb(var(--ncx-highlight-rgb))" strokeWidth="1.5" strokeOpacity="0.4" />
+          <line x1="16" y1="25" x2="16" y2="75" stroke="rgb(var(--ncx-highlight-rgb))" strokeWidth="1.5" strokeOpacity="0.4" />
+          <line x1="16" y1="50" x2="0" y2="50" stroke="rgb(var(--ncx-highlight-rgb))" strokeWidth="1.5" strokeOpacity="0.4" />
+        </>
+      )}
+    </svg>
   );
 }
 
@@ -223,7 +198,7 @@ export default async function PlayoffsPanel({ mobile }: { mobile?: boolean } = {
   try {
     data = await fetchOverallStandingsFromDb();
   } catch (err) {
-    console.error("❌ PlayoffsPanel DB error:", err);
+    console.error("PlayoffsPanel DB error:", err);
     errorMsg = "Database unavailable. Please try again.";
   }
 
@@ -243,8 +218,7 @@ export default async function PlayoffsPanel({ mobile }: { mobile?: boolean } = {
     );
   }
 
-  const regions = buildRegions(data);
-  if (!regions.length) {
+  if (data.length < 16) {
     return (
       <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)] text-sm text-[var(--ncx-text-muted)] text-center">
         Need 16 teams for playoffs.
@@ -252,49 +226,86 @@ export default async function PlayoffsPanel({ mobile }: { mobile?: boolean } = {
     );
   }
 
-  const [region1, region2, region3, region4] = regions;
-  const leftRegions = [region1, region4];
-  const rightRegions = [region2, region3];
+  const byRank = new Map(data.map((r) => [r.rank, r]));
+  const [bracketA, bracketB, bracketC, bracketD] = BRACKETS;
 
   return (
-    <div className="p-6 rounded-2xl bg-[var(--ncx-panel-bg)] border border-[var(--ncx-border)]">
-      <h2 className="text-2xl font-bold tracking-wide text-center mb-4">
-        <span className="text-[rgb(var(--ncx-highlight-rgb))]">PLAYOFF</span>{" "}
-        <span className="text-[rgb(var(--ncx-primary-rgb))]">BRACKET</span>
-      </h2>
+    <div className="py-4 space-y-5">
+      {/* Header */}
+      <div className="text-center">
+        <h2 className="text-2xl font-bold tracking-wide">
+          <span className="text-[rgb(var(--ncx-highlight-rgb))]">PLAYOFF</span>{" "}
+          <span className="text-[rgb(var(--ncx-primary-rgb))]">BRACKET</span>
+        </h2>
+        <p className="text-xs text-[var(--ncx-text-muted)] mt-1">
+          Top 16 teams seeded by standings. Brackets update live.
+        </p>
+      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.9fr_1.15fr] gap-6 items-stretch">
-        <div className="space-y-4">
-          {leftRegions.map((r) => (
-            <RegionCard key={r.index} region={r} mobile={mobile} />
-          ))}
+      {/* ── Bracket grid ── */}
+      <div className="grid grid-cols-[1fr] xl:grid-cols-[minmax(0,1fr)_32px_minmax(0,0.7fr)_80px_minmax(0,0.7fr)_32px_minmax(0,1fr)] items-stretch gap-y-6 xl:gap-y-0">
+
+        {/* ─── LEFT: Round 1 (A top, D bottom) ─── */}
+        <div className="flex flex-col justify-between gap-6 xl:gap-4">
+          <R1Card def={bracketA} byRank={byRank} mobile={mobile} />
+          <R1Card def={bracketD} byRank={byRank} mobile={mobile} />
         </div>
 
-        <div className="flex flex-col justify-center gap-4">
-          <section className="rounded-2xl bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.12)] border border-[var(--ncx-border)] p-4 text-sm">
-            <h3 className="text-center text-sm font-semibold text-[rgb(var(--ncx-primary-rgb))] mb-2 uppercase">
-              Final Four
-            </h3>
-            <div className="space-y-3 text-xs text-[var(--ncx-text-primary)] text-center">
-              <div>Winner Region 1 vs Winner Region 4</div>
-              <div>Winner Region 2 vs Winner Region 3</div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl bg-[rgb(var(--ncx-bg-start-rgb,10_47_102)/0.14)] border border-[rgb(var(--ncx-highlight-rgb)/0.60)] p-4 text-sm">
-            <h3 className="text-center text-sm font-semibold text-[rgb(var(--ncx-highlight-rgb))] mb-2 uppercase">
-              Championship
-            </h3>
-            <div className="text-xs text-[var(--ncx-text-primary)] text-center">
-              Winner Semifinal 1 vs Winner Semifinal 2
-            </div>
-          </section>
+        {/* Connector: R1 left → Semifinal left */}
+        <div className="hidden xl:flex items-stretch">
+          <BracketConnector side="left" />
         </div>
 
-        <div className="space-y-4">
-          {rightRegions.map((r) => (
-            <RegionCard key={r.index} region={r} mobile={mobile} />
-          ))}
+        {/* ─── LEFT SEMIFINAL ─── */}
+        <div className="flex flex-col justify-center">
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[rgb(var(--ncx-primary-rgb))] px-1">
+              Semifinal 1
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <TbdSlot label="Winner Bracket A" />
+              <TbdSlot label="Winner Bracket D" />
+            </div>
+          </div>
+        </div>
+
+        {/* ─── CENTER: Championship ─── */}
+        <div className="flex flex-col items-center justify-center">
+          <div className="rounded-xl border-2 border-[rgb(var(--ncx-highlight-rgb)/0.5)] bg-[rgb(var(--ncx-highlight-rgb)/0.08)] px-3 py-4 text-center w-full">
+            <div className="text-[9px] font-bold uppercase tracking-widest text-[rgb(var(--ncx-highlight-rgb))] mb-2">
+              Finals
+            </div>
+            <div className="w-8 h-8 mx-auto rounded-lg bg-[rgb(var(--ncx-highlight-rgb)/0.15)] flex items-center justify-center mb-2">
+              <span className="text-base">🏆</span>
+            </div>
+            <div className="text-[10px] text-[var(--ncx-text-muted)] leading-tight">
+              SF1 Winner<br />vs<br />SF2 Winner
+            </div>
+          </div>
+        </div>
+
+        {/* ─── RIGHT SEMIFINAL ─── */}
+        <div className="flex flex-col justify-center">
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[rgb(var(--ncx-primary-rgb))] px-1">
+              Semifinal 2
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <TbdSlot label="Winner Bracket B" />
+              <TbdSlot label="Winner Bracket C" />
+            </div>
+          </div>
+        </div>
+
+        {/* Connector: Semifinal right → R1 right */}
+        <div className="hidden xl:flex items-stretch">
+          <BracketConnector side="right" />
+        </div>
+
+        {/* ─── RIGHT: Round 1 (B top, C bottom) ─── */}
+        <div className="flex flex-col justify-between gap-6 xl:gap-4">
+          <R1Card def={bracketB} byRank={byRank} mobile={mobile} />
+          <R1Card def={bracketC} byRank={byRank} mobile={mobile} />
         </div>
       </div>
     </div>
