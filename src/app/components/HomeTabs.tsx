@@ -90,6 +90,7 @@ export default function HomeTabs({
   if (active === "prefs" && !hasPrefs) active = "home";
   if (active === "podcast" && !hasPodcast) active = "home";
   if (active === "prevseasons" && !hasPrevSeasons) active = "home";
+  if (active === "builder" && !builderPanel) active = "home";
 
   /* ───────────── Button styling ───────────── */
 

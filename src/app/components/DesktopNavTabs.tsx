@@ -21,14 +21,13 @@ type TabKey =
   | "playoffs"
   | "builder";
 
-const row1: Array<{ key: TabKey; label: string; href: string }> = [
+const row1Base: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "home",      label: "Home",         href: "/" },
   { key: "current",   label: "Current Week", href: "/?tab=current" },
   { key: "matchups",  label: "Matchups",     href: "/?tab=matchups" },
   { key: "standings", label: "Standings",    href: "/?tab=standings" },
   { key: "report",    label: "Report a Game", href: "/?tab=report" },
   { key: "stream",    label: "Stream",        href: "/?tab=stream" },
-  { key: "builder",  label: "Builder",       href: "/?tab=builder" },
 ];
 
 const row2Base: Array<{ key: TabKey; label: string; href: string }> = [
@@ -41,12 +40,16 @@ const row2Base: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "arcade",      label: "Arcade",         href: "/?tab=arcade" },
 ];
 
-export default function DesktopNavTabs() {
+export default function DesktopNavTabs({ showBuilder = false }: { showBuilder?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const rawTab = (searchParams.get("tab") as TabKey | null) ?? "home";
   const preSeasonEnabled = process.env.NEXT_PUBLIC_PRE_SEASON === "true";
+
+  const row1 = showBuilder
+    ? [...row1Base, { key: "builder" as TabKey, label: "Builder", href: "/?tab=builder" }]
+    : row1Base;
 
   const row2 = preSeasonEnabled
     ? [...row2Base, { key: "prefs" as TabKey, label: "S9 Signups", href: "/?tab=prefs" }]

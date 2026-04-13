@@ -27,6 +27,7 @@ import MatchupBuilder from "../components/MatchupBuilder";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getSheets } from "@/lib/googleSheets";
 import {
   getDiscordMapCached,
   fetchMatchupsDataCached,
@@ -59,6 +60,8 @@ function normalizeDiscordId(v: unknown): string {
 
 const enableCapsules = process.env.NEXT_PUBLIC_MATCH_CAPSULES === "1";
 const enableCapsulesAI = process.env.NEXT_PUBLIC_MATCH_CAPSULES_AI === "1";
+
+const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"];
 
 const preSeasonEnabled = process.env.PRE_SEASON === "true";
 
@@ -213,6 +216,29 @@ export default async function HomePage({
     }
   }
 
+  // Determine if Builder tab should be visible (captains + admins only)
+  let showBuilder = false;
+  if (session?.user) {
+    const rawId = (session.user as any).discordId ?? (session.user as any).id;
+    const sid = normalizeDiscordId(rawId);
+    if (ADMIN_DISCORD_IDS.includes(sid)) {
+      showBuilder = true;
+    } else if (sid) {
+      try {
+        const sheets = getSheets();
+        const res = await sheets.spreadsheets.values.get({
+          spreadsheetId: process.env.NCX_LEAGUE_SHEET_ID!,
+          range: "NCXID!K2:O25",
+          valueRenderOption: "FORMATTED_VALUE",
+        });
+        const captainRows = res.data.values ?? [];
+        showBuilder = captainRows.some((r) => normalizeDiscordId(r?.[4]) === sid);
+      } catch {
+        // If sheets call fails, hide builder
+      }
+    }
+  }
+
   const [
     { weekTab: activeWeek, matches: activeMatches },
     indStats,
@@ -295,7 +321,7 @@ export default async function HomePage({
       <section className="w-full px-4 pb-24">
         <div className="w-full max-w-[110rem] mx-auto">
           <Suspense fallback={null}>
-            <DesktopNavTabs />
+            <DesktopNavTabs showBuilder={showBuilder} />
           </Suspense>
 
           <HomeTabs
@@ -358,7 +384,7 @@ export default async function HomePage({
             }
             arcadePanel={<ArcadePanel key="arcade" />}
             streamPanel={<StreamPanel key="stream" />}
-            builderPanel={<MatchupBuilder key="builder" />}
+            builderPanel={showBuilder ? <MatchupBuilder key="builder" /> : undefined}
           />
         </div>
       </section>
