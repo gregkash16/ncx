@@ -5,20 +5,19 @@ import { pool } from "@/lib/db";
 import type { MatchRow } from "@/lib/googleSheets";
 
 /**
- * Shape of a row from your MySQL S8_matchups table.
- * Only include the columns you actually select.
+ * Shape of a row from the MySQL weekly_matchups table.
  */
 interface DbMatchRow extends RowDataPacket {
-  week: string;
+  week_label: string;
   game: string | number;
-  away_id: string | null;
-  away_name: string | null;
-  away_team: string | null;
-  away_pts: number | null;
-  home_id: string | null;
-  home_name: string | null;
-  home_team: string | null;
-  home_pts: number | null;
+  awayId: string | null;
+  awayName: string | null;
+  awayTeam: string | null;
+  awayPts: number | null;
+  homeId: string | null;
+  homeName: string | null;
+  homeTeam: string | null;
+  homePts: number | null;
   scenario: string | null;
 }
 
@@ -36,21 +35,21 @@ export function normalizeWeekLabel(label?: string | null): string {
 
 /**
  * Determine the active week from MySQL.
- * Uses the highest WEEK N found in S8_matchups.
+ * Uses the highest WEEK N found in weekly_matchups.
  */
 export async function getActiveWeekFromDb(): Promise<string> {
   const [rows] = await pool.query<RowDataPacket[]>(
     `
-      SELECT DISTINCT week
-      FROM S8_matchups
-      WHERE week IS NOT NULL AND week <> ''
+      SELECT DISTINCT week_label
+      FROM weekly_matchups
+      WHERE week_label IS NOT NULL AND week_label <> ''
     `
   );
 
   if (!rows.length) return "WEEK 1";
 
   const weeks = rows
-    .map((r) => normalizeWeekLabel((r as any).week))
+    .map((r) => normalizeWeekLabel((r as any).week_label))
     .map((w) => {
       const m = w.match(/WEEK\s*(\d+)/i);
       return m ? { label: w, num: parseInt(m[1], 10) } : null;
@@ -73,19 +72,19 @@ export async function getMatchupsForWeek(
   const [rows] = await pool.query<DbMatchRow[]>(
     `
       SELECT
-        week,
+        week_label,
         game,
-        away_id,
-        away_name,
-        away_team,
-        away_pts,
-        home_id,
-        home_name,
-        home_team,
-        home_pts,
+        awayId,
+        awayName,
+        awayTeam,
+        awayPts,
+        homeId,
+        homeName,
+        homeTeam,
+        homePts,
         scenario
-      FROM S8_matchups
-      WHERE week = ?
+      FROM weekly_matchups
+      WHERE week_label = ?
       ORDER BY CAST(game AS UNSIGNED)
     `,
     [week]
@@ -94,7 +93,6 @@ export async function getMatchupsForWeek(
   return rows.map((r, idx) => {
     const gameNum = Number(String(r.game ?? "").trim());
 
-    // Use game number when valid; otherwise fall back to index
     const seriesNo =
       Number.isFinite(gameNum) && gameNum > 0 ? gameNum : idx + 1;
 
@@ -102,20 +100,20 @@ export async function getMatchupsForWeek(
       game: String(r.game ?? ""),
       seriesNo,
 
-      awayId: String(r.away_id ?? ""),
-      awayName: String(r.away_name ?? ""),
-      awayTeam: String(r.away_team ?? ""),
+      awayId: String(r.awayId ?? ""),
+      awayName: String(r.awayName ?? ""),
+      awayTeam: String(r.awayTeam ?? ""),
       awayW: "",
       awayL: "",
-      awayPts: r.away_pts != null ? String(r.away_pts) : "",
+      awayPts: r.awayPts != null ? String(r.awayPts) : "",
       awayPLMS: "",
 
-      homeId: String(r.home_id ?? ""),
-      homeName: String(r.home_name ?? ""),
-      homeTeam: String(r.home_team ?? ""),
+      homeId: String(r.homeId ?? ""),
+      homeName: String(r.homeName ?? ""),
+      homeTeam: String(r.homeTeam ?? ""),
       homeW: "",
       homeL: "",
-      homePts: r.home_pts != null ? String(r.home_pts) : "",
+      homePts: r.homePts != null ? String(r.homePts) : "",
       homePLMS: "",
 
       scenario: String(r.scenario ?? ""),

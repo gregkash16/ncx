@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { getSheets } from "@/lib/googleSheets";
+import { sql } from "@vercel/postgres";
 
 export const dynamic = "force-dynamic";
 
@@ -169,7 +170,51 @@ export async function POST(req: NextRequest) {
       await triggerSeed();
     } catch (seedErr) {
       console.error("[matchup-builder/finalize] Seed sync failed:", seedErr);
-      // Don't fail the request — the sheet is already updated
+    }
+
+    // Push notification — "Matchups for AWAY vs HOME have been set for WEEK X"
+    try {
+      const weekNum = week.replace(/^WEEK\s*/i, "");
+      const teamsJson = JSON.stringify(
+        [awayTeam, homeTeam].map((t: string) => (t ?? "").trim()).filter(Boolean)
+      );
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS fcm_subscriptions (
+          device_token TEXT PRIMARY KEY,
+          all_teams BOOLEAN DEFAULT TRUE,
+          teams TEXT[] DEFAULT '{}'
+        )
+      `;
+
+      const { rows: fcmRows } = await sql`
+        SELECT device_token
+        FROM fcm_subscriptions
+        WHERE
+          all_teams = TRUE
+          OR EXISTS (
+            SELECT 1
+            FROM json_array_elements_text(${teamsJson}::json) j
+            WHERE j = ANY(fcm_subscriptions.teams)
+          )
+      `;
+
+      console.log(`[matchup-builder/finalize] FCM: found ${fcmRows.length} matching subscriptions`);
+
+      if (fcmRows.length > 0) {
+        const { sendFCMToDevices } = await import("@/lib/fcm");
+        const result = await sendFCMToDevices(
+          fcmRows.map((r) => r.device_token),
+          {
+            title: "Matchups Set",
+            body: `Matchups for ${awayTeam} vs ${homeTeam} have been set for WEEK ${weekNum}`,
+            url: "/",
+          }
+        );
+        console.log(`[matchup-builder/finalize] FCM: sent=${result.sent}, failed=${result.failed}`);
+      }
+    } catch (pushErr) {
+      console.warn("[matchup-builder/finalize] Push notification failed:", pushErr);
     }
 
     return NextResponse.json({ ok: true });

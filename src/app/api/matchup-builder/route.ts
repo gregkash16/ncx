@@ -185,15 +185,27 @@ export async function GET(req: NextRequest) {
     );
     const slots = slotRows as any[];
 
-    // Get rosters from individual_stats
+    // Get rosters from individual_stats + all_time_stats
     const [awayRosterRows] = await pool.query(
-      `SELECT ncxid, first_name, last_name, faction, wins, losses, points, ppg, war, winper, games, plms
-       FROM S9.individual_stats WHERE team = ? ORDER BY CAST(pick_no AS UNSIGNED)`,
+      `SELECT i.ncxid, i.first_name, i.last_name, i.faction,
+              i.wins, i.losses, i.points, i.ppg, i.war, i.winper, i.games, i.plms,
+              a.wins AS at_wins, a.losses AS at_losses, a.points AS at_points,
+              a.adj_ppg AS at_adjPpg, a.win_pct AS at_winPct, a.games AS at_games, a.plms AS at_plms,
+              a.championships AS at_championships
+       FROM S9.individual_stats i
+       LEFT JOIN S9.all_time_stats a ON a.ncxid = i.ncxid
+       WHERE i.team = ? ORDER BY CAST(i.pick_no AS UNSIGNED)`,
       [awayTeam]
     );
     const [homeRosterRows] = await pool.query(
-      `SELECT ncxid, first_name, last_name, faction, wins, losses, points, ppg, war, winper, games, plms
-       FROM S9.individual_stats WHERE team = ? ORDER BY CAST(pick_no AS UNSIGNED)`,
+      `SELECT i.ncxid, i.first_name, i.last_name, i.faction,
+              i.wins, i.losses, i.points, i.ppg, i.war, i.winper, i.games, i.plms,
+              a.wins AS at_wins, a.losses AS at_losses, a.points AS at_points,
+              a.adj_ppg AS at_adjPpg, a.win_pct AS at_winPct, a.games AS at_games, a.plms AS at_plms,
+              a.championships AS at_championships
+       FROM S9.individual_stats i
+       LEFT JOIN S9.all_time_stats a ON a.ncxid = i.ncxid
+       WHERE i.team = ? ORDER BY CAST(i.pick_no AS UNSIGNED)`,
       [homeTeam]
     );
 
@@ -221,6 +233,16 @@ export async function GET(req: NextRequest) {
         games: r.games,
         plms: r.plms,
         assigned: assignedSet.has(r.ncxid),
+        allTime: {
+          wins: r.at_wins ?? 0,
+          losses: r.at_losses ?? 0,
+          points: r.at_points ?? 0,
+          adjPpg: r.at_adjPpg ?? "—",
+          winPct: r.at_winPct ?? "—",
+          games: r.at_games ?? 0,
+          plms: r.at_plms ?? 0,
+          championships: r.at_championships ?? 0,
+        },
       }));
 
     // Determine role and turn

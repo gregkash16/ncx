@@ -5,6 +5,17 @@ import { useEffect, useState, useCallback, useRef } from "react";
 
 /* ── Types ── */
 
+type AllTimeStats = {
+  wins: number;
+  losses: number;
+  points: number;
+  adjPpg: string;
+  winPct: string;
+  games: number;
+  plms: number;
+  championships: number;
+};
+
 type RosterPlayer = {
   ncxid: string;
   name: string;
@@ -20,6 +31,7 @@ type RosterPlayer = {
   games: number;
   plms: number;
   assigned: boolean;
+  allTime: AllTimeStats;
 };
 
 type SlotData = {
@@ -461,7 +473,9 @@ export default function MatchupBuilder() {
                 <button
                   disabled={!isClickable || actionLoading}
                   onClick={() => isClickable && handleSelectPlayer(p.ncxid, side)}
-                  className={`w-full text-left rounded-lg border px-3 py-2 transition ${
+                  className={`w-full rounded-lg border px-3 py-2 transition ${
+                    side === "home" ? "text-right" : "text-left"
+                  } ${
                     isSelected
                       ? "bg-cyan-950/50 border-cyan-400 ring-1 ring-cyan-400/50 shadow-lg shadow-cyan-500/10"
                       : isVetoBlocked
@@ -473,7 +487,7 @@ export default function MatchupBuilder() {
                             : "bg-zinc-900/60 border-zinc-700 cursor-default"
                   }`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-2 ${side === "home" ? "flex-row-reverse" : ""}`}>
                     {img && (
                       <img src={img} alt={p.faction} className="w-5 h-5 object-contain" />
                     )}
@@ -491,18 +505,46 @@ export default function MatchupBuilder() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-zinc-400">
-                    <span>{p.wins}W-{p.losses}L</span>
-                    <span>PPG: {p.ppg ?? "—"}</span>
-                    <span>WAR: {p.war ?? "—"}</span>
-                    <span>W%: {p.winPct ?? "—"}</span>
-                    <span>PTS: {p.points ?? "—"}</span>
-                  </div>
+                  {side === "away" ? (
+                    <div className="mt-1 flex items-center gap-x-2 text-[11px]">
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-zinc-400">
+                        <span className="text-cyan-500/70 font-semibold">S9</span>
+                        <span>{p.wins} W - {p.losses} L</span>
+                        <span>PPG: {p.ppg ?? "—"}</span>
+                        <span>WAR: {p.war ?? "—"}</span>
+                        <span>W%: {p.winPct ?? "—"}</span>
+                      </div>
+                      <span className="text-zinc-600 font-bold">|</span>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-zinc-500">
+                        <span className="text-purple-400/70 font-semibold">ALL</span>
+                        <span>{p.allTime.wins} W - {p.allTime.losses} L</span>
+                        <span>aPPG: {p.allTime.adjPpg != null && p.allTime.adjPpg !== "—" ? Number(p.allTime.adjPpg).toFixed(1) : "—"}</span>
+                        <span>W%: {p.allTime.winPct}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-1 flex items-center gap-x-2 text-[11px] justify-end">
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-zinc-500 justify-end">
+                        <span className="text-purple-400/70 font-semibold">ALL</span>
+                        <span>{p.allTime.wins} W - {p.allTime.losses} L</span>
+                        <span>aPPG: {p.allTime.adjPpg != null && p.allTime.adjPpg !== "—" ? Number(p.allTime.adjPpg).toFixed(1) : "—"}</span>
+                        <span>W%: {p.allTime.winPct}</span>
+                      </div>
+                      <span className="text-zinc-600 font-bold">|</span>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-zinc-400 justify-end">
+                        <span className="text-cyan-500/70 font-semibold">S9</span>
+                        <span>{p.wins} W - {p.losses} L</span>
+                        <span>PPG: {p.ppg ?? "—"}</span>
+                        <span>WAR: {p.war ?? "—"}</span>
+                        <span>W%: {p.winPct ?? "—"}</span>
+                      </div>
+                    </div>
+                  )}
                 </button>
 
                 {/* Confirm / Cancel buttons */}
                 {isSelected && (
-                  <div className="flex gap-2 mt-1.5 ml-1">
+                  <div className={`flex gap-2 mt-1.5 ${side === "home" ? "justify-end mr-1" : "ml-1"}`}>
                     <button
                       onClick={handleConfirmPick}
                       disabled={actionLoading}
