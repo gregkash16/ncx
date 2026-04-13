@@ -301,12 +301,12 @@ const MAX_SPEED = 14;
 
 // ─── Keys ────────────────────────────────────────────────────────
 const keys = {};
-canvas.addEventListener('keydown', e => {
+document.addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (['a','d',' ','arrowleft','arrowright','arrowup','arrowdown','r','l','w','s'].includes(e.key.toLowerCase())) e.preventDefault();
   ensureAudio();
 });
-canvas.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 canvas.addEventListener('mousedown', () => { canvas.focus(); ensureAudio(); });
 
 // ─── Ball constructor ────────────────────────────────────────────
@@ -1174,7 +1174,7 @@ function drawLeaderboard() {
 }
 
 // ─── Input handling (state-specific) ─────────────────────────────
-canvas.addEventListener('keydown', function handleKey(e) {
+document.addEventListener('keydown', function handleKey(e) {
   const k = e.key.toLowerCase();
 
   if (state === TITLE) {
