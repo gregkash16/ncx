@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Star Wars Pinball</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+  canvas { display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ─── Star Wars Pinball ───────────────────────────────────────────
+// A/D = flippers, Space = plunger, L = leaderboard on title
+// ──────────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 480, H = 720;
+canvas.width = W; canvas.height = H;
+canvas.tabIndex = 0; canvas.style.outline = 'none';
+canvas.focus();
+
+// ─── Fixed timestep ──────────────────────────────────────────────
+const _TICK = 1000 / 90;
+let _acc = 0, _lastTime = 0;
+
+// ─── Audio context ───────────────────────────────────────────────
+let audioCtx;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playTone(freq, dur, type, vol) {
+  ensureAudio();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type || 'square';
+  o.frequency.value = freq;
+  g.gain.value = vol || 0.1;
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + dur);
+}
+
+function sfxBumper()   { playTone(880, 0.08, 'square', 0.12); setTimeout(() => playTone(1100, 0.06, 'square', 0.08), 30); }
+function sfxFlipper()  { playTone(220, 0.05, 'triangle', 0.08); }
+function sfxPlunger()  { playTone(110, 0.15, 'sawtooth', 0.06); }
+function sfxTarget()   { playTone(660, 0.1, 'square', 0.1); setTimeout(() => playTone(990, 0.1, 'square', 0.08), 60); }
+function sfxDrain()    { playTone(130, 0.4, 'sawtooth', 0.12); setTimeout(() => playTone(90, 0.5, 'sawtooth', 0.1), 200); }
+function sfxLaunch()   { playTone(180, 0.2, 'sawtooth', 0.1); setTimeout(() => playTone(350, 0.15, 'triangle', 0.08), 100); }
+function sfxSlingshot(){ playTone(500, 0.06, 'square', 0.1); setTimeout(() => playTone(700, 0.05, 'square', 0.08), 25); }
+function sfxRamp()     { playTone(440, 0.08, 'sine', 0.08); setTimeout(() => playTone(660, 0.08, 'sine', 0.08), 60); setTimeout(() => playTone(880, 0.12, 'sine', 0.1), 120); }
+function sfxMultiplier(){ playTone(523, 0.1, 'sine', 0.1); setTimeout(() => playTone(659, 0.1, 'sine', 0.1), 80); setTimeout(() => playTone(784, 0.15, 'sine', 0.12), 160); }
+function sfxExtraBall(){ for(let i=0;i<5;i++) setTimeout(()=>playTone(400+i*100,0.12,'sine',0.1),i*70); }
+
+// ─── Music ───────────────────────────────────────────────────────
+let musicPlaying = false;
+let musicNodes = [];
+
+function stopMusic() {
+  for (const n of musicNodes) { try { n.stop(); } catch(e){} }
+  musicNodes = [];
+  musicPlaying = false;
+}
+
+function startMusic() {
+  if (musicPlaying) return;
+  ensureAudio();
+  musicPlaying = true;
+
+  // Upbeat bass line — bouncy root-fifth pattern in C major
+  const bassNotes = [131, 131, 196, 196, 165, 165, 196, 220];
+  let bassIdx = 0;
+  const bassTempo = 320; // ms per note
+
+  function playBass() {
+    if (!musicPlaying) return;
+    const freq = bassNotes[bassIdx % bassNotes.length];
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'triangle';
+    o.frequency.value = freq;
+    g.gain.value = 0.025;
+    g.gain.linearRampToValueAtTime(0.02, audioCtx.currentTime + bassTempo/1000 * 0.5);
+    g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + bassTempo/1000 * 0.9);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    o.stop(audioCtx.currentTime + bassTempo/1000);
+    bassIdx++;
+    setTimeout(playBass, bassTempo);
+  }
+
+  // Cheerful melody — major pentatonic, peppy rhythm
+  const melody = [523, 587, 659, 784, 880, 784, 659, 784, 587, 523, 440, 523,
+                  659, 784, 880, 1047, 880, 784, 659, 587, 523, 587, 659, 523];
+  const melodyDurs = [280, 280, 280, 560, 280, 280, 280, 560, 280, 280, 280, 560,
+                      280, 280, 280, 560, 280, 280, 280, 560, 280, 280, 280, 560];
+  let melIdx = 0;
+
+  function playMelody() {
+    if (!musicPlaying) return;
+    const freq = melody[melIdx % melody.length];
+    const dur = melodyDurs[melIdx % melodyDurs.length] / 1000;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    g.gain.value = 0;
+    g.gain.linearRampToValueAtTime(0.022, audioCtx.currentTime + 0.03);
+    g.gain.linearRampToValueAtTime(0.018, audioCtx.currentTime + dur * 0.6);
+    g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + dur * 0.95);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    o.stop(audioCtx.currentTime + dur);
+    melIdx++;
+    setTimeout(playMelody, melodyDurs[(melIdx - 1) % melodyDurs.length]);
+  }
+
+  // Light hi-hat tick — filtered noise pulse for rhythm
+  function playTick() {
+    if (!musicPlaying) return;
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.03, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+    const src = audioCtx.createBufferSource();
+    const filt = audioCtx.createBiquadFilter();
+    const g = audioCtx.createGain();
+    src.buffer = buf;
+    filt.type = 'highpass'; filt.frequency.value = 8000;
+    g.gain.value = 0.012;
+    src.connect(filt); filt.connect(g); g.connect(audioCtx.destination);
+    src.start();
+    setTimeout(playTick, bassTempo / 2);
+  }
+
+  // Stagger layers in
+  playBass();
+  setTimeout(playMelody, 160);
+  setTimeout(playTick, 80);
+}
+
+// ─── Game state ──────────────────────────────────────────────────
+const TITLE = 0, PLUNGER = 1, PLAYING = 2, BALL_LOST = 3, GAME_OVER = 4, NAME_ENTRY = 5, LEADERBOARD = 6;
+let state = TITLE;
+let score = 0, balls = 3, highScore = 0, multiplier = 1;
+let ball = null;
+let plungerCharge = 0;
+let ballLostTimer = 0;
+let leaderboard = [];
+let nameChars = [65, 65, 65]; // A, A, A
+let nameCursor = 0;
+let starField = [];
+let flashEffects = [];
+let scorePopups = [];
+let titlePulse = 0;
+
+// ─── Stars background ───────────────────────────────────────────
+for (let i = 0; i < 80; i++) {
+  starField.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1.5 + 0.5, b: Math.random() });
+}
+
+// ─── Table geometry ──────────────────────────────────────────────
+// Table bounds
+const TL = 30;  // left edge
+const TR = 410; // right edge (plunger lane starts here)
+const TT = 40;  // top
+const TB = 680; // bottom (drain)
+const PLR = 450; // plunger lane right edge
+
+// Center of play area for flipper placement
+const CX = (TL + TR) / 2; // 220
+
+// Wall segments [x1, y1, x2, y2]
+const walls = [
+  // Left wall - upper curve
+  [TL, TB - 80, TL - 8, TB - 160],
+  [TL - 8, TB - 160, TL - 12, 380],
+  [TL - 12, 380, TL - 8, 250],
+  [TL - 8, 250, TL, 160],
+  [TL, 160, TL + 15, 100],
+  [TL + 15, 100, TL + 50, 60],
+  // Top wall
+  [TL + 50, 60, TL + 100, TT],
+  [TL + 100, TT, TR - 60, TT],
+  [TR - 60, TT, TR, 60],
+  // Plunger lane separator — keeps ball in play area during game
+  [TR + 5, 220, TR + 5, TB - 80],
+  // Plunger lane outer wall
+  [PLR, 90, PLR, TB + 10],
+  // Plunger lane top — ANGLED wall that deflects ball LEFT into play area
+  [PLR, 90, TR + 5, 52],
+  // Short lip to prevent ball re-entering plunger lane from play area
+  [TR + 5, 52, TR, 60],
+  // Bottom-left wall → guides ball to left flipper (no gaps!)
+  [TL, TB - 80, TL + 25, TB - 30],
+  [TL + 25, TB - 30, CX - 70, TB - 6],
+  // Bottom-right wall → guides ball to right flipper, then to plunger lane
+  [CX + 70, TB - 6, TR - 25, TB - 30],
+  [TR - 25, TB - 30, TR + 4, TB - 80],
+];
+
+// ─── Flippers ────────────────────────────────────────────────────
+const FLIP_LEN = 55;
+const FLIP_REST_ANG = 0.45;   // radians below horizontal
+const FLIP_ACTIVE_ANG = -0.55; // radians above horizontal
+const FLIP_SPEED_UP = 0.20;
+const FLIP_SPEED_DOWN = 0.07;
+const FLIP_RADIUS = 5;
+
+const flippers = [
+  { // Left — pivot connects to bottom-left wall end
+    px: CX - 70, py: TB - 6,
+    dir: 1,
+    angle: FLIP_REST_ANG,
+    active: false,
+  },
+  { // Right — pivot connects to bottom-right wall start
+    px: CX + 70, py: TB - 6,
+    dir: -1,
+    angle: FLIP_REST_ANG,
+    active: false,
+  },
+];
+
+// ─── Bumpers ─────────────────────────────────────────────────────
+// TIE fighter bumpers + Death Star center — centered on play area
+const bumpers = [
+  { x: CX - 70, y: 180, r: 22, pts: 10, label: 'TIE', flash: 0 },
+  { x: CX,      y: 140, r: 22, pts: 10, label: 'TIE', flash: 0 },
+  { x: CX + 70, y: 180, r: 22, pts: 10, label: 'TIE', flash: 0 },
+  { x: CX,      y: 240, r: 28, pts: 50, label: 'DS', flash: 0 },  // Death Star
+  { x: CX - 55, y: 310, r: 18, pts: 15, label: 'TIE', flash: 0 },
+  { x: CX + 55, y: 310, r: 18, pts: 15, label: 'TIE', flash: 0 },
+];
+
+// ─── Slingshots ──────────────────────────────────────────────────
+const slingshots = [
+  { // Left slingshot — just above and outside left flipper
+    x1: TL + 28, y1: TB - 160, x2: TL + 28, y2: TB - 80,
+    x3: TL + 65, y3: TB - 115,
+    nx: 1, ny: -0.3,
+    pts: 5, flash: 0,
+  },
+  { // Right slingshot — just above and outside right flipper
+    x1: TR - 28, y1: TB - 160, x2: TR - 28, y2: TB - 80,
+    x3: TR - 65, y3: TB - 115,
+    nx: -1, ny: -0.3,
+    pts: 5, flash: 0,
+  },
+];
+
+// ─── Targets ─────────────────────────────────────────────────────
+// Drop targets that light up when hit
+const targetSets = [
+  { // Left lane: S-T-A-R
+    targets: [
+      { x: TL + 45, y: 400, hit: false, letter: 'S' },
+      { x: TL + 45, y: 430, hit: false, letter: 'T' },
+      { x: TL + 45, y: 460, hit: false, letter: 'A' },
+      { x: TL + 45, y: 490, hit: false, letter: 'R' },
+    ],
+    bonus: 500, label: 'STAR',
+  },
+  { // Right lane: W-A-R-S
+    targets: [
+      { x: TR - 45, y: 400, hit: false, letter: 'W' },
+      { x: TR - 45, y: 430, hit: false, letter: 'A' },
+      { x: TR - 45, y: 460, hit: false, letter: 'R' },
+      { x: TR - 45, y: 490, hit: false, letter: 'S' },
+    ],
+    bonus: 500, label: 'WARS',
+  },
+];
+
+// ─── Rollover lanes (top) ───────────────────────────────────────
+const rollovers = [
+  { x: CX - 90, y: 80, r: 10, lit: false, label: 'X' },
+  { x: CX - 45, y: 68, r: 10, lit: false, label: 'W' },
+  { x: CX,      y: 62, r: 10, lit: false, label: 'I' },
+  { x: CX + 45, y: 68, r: 10, lit: false, label: 'N' },
+  { x: CX + 90, y: 80, r: 10, lit: false, label: 'G' },
+];
+
+// ─── Ramp entrance ──────────────────────────────────────────────
+const ramp = {
+  x: CX - 30, y: 355, w: 60, h: 14,
+  active: true, flash: 0, pts: 200,
+};
+
+// ─── Physics constants ───────────────────────────────────────────
+const GRAVITY = 0.11;
+const BALL_R = 7;
+const BALL_DAMP = 0.998;
+const BUMPER_FORCE = 5.5;
+const SLING_FORCE = 6;
+const MAX_SPEED = 14;
+
+// ─── Keys ────────────────────────────────────────────────────────
+const keys = {};
+canvas.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (['a','d',' ','arrowleft','arrowright','arrowup','arrowdown','r','l','w','s'].includes(e.key.toLowerCase())) e.preventDefault();
+  ensureAudio();
+});
+canvas.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+canvas.addEventListener('mousedown', () => { canvas.focus(); ensureAudio(); });
+
+// ─── Ball constructor ────────────────────────────────────────────
+function newBall() {
+  return { x: (TR + 4 + PLR) / 2, y: TB - 20, vx: 0, vy: 0, trail: [] };
+}
+
+// ─── Collision helpers ───────────────────────────────────────────
+function dist(x1, y1, x2, y2) { return Math.sqrt((x2-x1)**2 + (y2-y1)**2); }
+
+function pointToSegDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len2 = dx*dx + dy*dy;
+  if (len2 === 0) return { d: dist(px, py, x1, y1), cx: x1, cy: y1 };
+  let t = ((px-x1)*dx + (py-y1)*dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t*dx, cy = y1 + t*dy;
+  return { d: dist(px, py, cx, cy), cx, cy, t };
+}
+
+function reflectOffSegment(bx, by, bvx, bvy, x1, y1, x2, y2, restitution) {
+  const seg = pointToSegDist(bx, by, x1, y1, x2, y2);
+  if (seg.d < BALL_R + 2) {
+    // Normal from segment to ball
+    let nx = bx - seg.cx, ny = by - seg.cy;
+    const nd = Math.sqrt(nx*nx + ny*ny);
+    if (nd < 0.001) return false;
+    nx /= nd; ny /= nd;
+    // Push ball out
+    ball.x = seg.cx + nx * (BALL_R + 2.5);
+    ball.y = seg.cy + ny * (BALL_R + 2.5);
+    // Reflect velocity
+    const dot = bvx * nx + bvy * ny;
+    if (dot < 0) {
+      const rest = restitution || 0.5;
+      ball.vx = bvx - (1 + rest) * dot * nx;
+      ball.vy = bvy - (1 + rest) * dot * ny;
+      return true;
+    }
+  }
+  return false;
+}
+
+// ─── Flipper collision ───────────────────────────────────────────
+function flipperCollision(f) {
+  const ang = f.dir === 1 ? f.angle : Math.PI - f.angle;
+  const tipX = f.px + Math.cos(ang) * FLIP_LEN;
+  const tipY = f.py + Math.sin(ang) * FLIP_LEN;
+  const seg = pointToSegDist(ball.x, ball.y, f.px, f.py, tipX, tipY);
+
+  if (seg.d < BALL_R + FLIP_RADIUS + 1) {
+    let nx = ball.x - seg.cx, ny = ball.y - seg.cy;
+    const nd = Math.sqrt(nx*nx + ny*ny);
+    if (nd < 0.001) return;
+    nx /= nd; ny /= nd;
+
+    // Push out
+    ball.x = seg.cx + nx * (BALL_R + FLIP_RADIUS + 2);
+    ball.y = seg.cy + ny * (BALL_R + FLIP_RADIUS + 2);
+
+    // Reflect
+    const dot = ball.vx * nx + ball.vy * ny;
+    if (dot < 0) {
+      ball.vx -= (1 + 0.5) * dot * nx;
+      ball.vy -= (1 + 0.5) * dot * ny;
+    }
+
+    // Add flipper angular velocity impulse
+    if (f.active) {
+      const distFromPivot = seg.t * FLIP_LEN;
+      const impulse = distFromPivot * FLIP_SPEED_UP * 2.8;
+      // Perpendicular to flipper direction (upward)
+      ball.vy -= impulse * 1.2;
+      ball.vx += f.dir * impulse * 0.4;
+    }
+  }
+}
+
+// ─── Add score ───────────────────────────────────────────────────
+function addScore(pts, x, y) {
+  const actual = pts * multiplier;
+  score += actual;
+  if (score > highScore) highScore = score;
+  scorePopups.push({ x, y, val: actual, life: 45 });
+}
+
+// ─── Reset targets ───────────────────────────────────────────────
+function resetTargets() {
+  for (const set of targetSets) {
+    for (const t of set.targets) t.hit = false;
+  }
+}
+
+function resetRollovers() {
+  for (const r of rollovers) r.lit = false;
+}
+
+// ─── Update ──────────────────────────────────────────────────────
+function update() {
+  titlePulse += 0.03;
+
+  // Decay flash effects
+  for (const b of bumpers) if (b.flash > 0) b.flash--;
+  for (const s of slingshots) if (s.flash > 0) s.flash--;
+  if (ramp.flash > 0) ramp.flash--;
+  flashEffects = flashEffects.filter(f => { f.life--; return f.life > 0; });
+  scorePopups = scorePopups.filter(p => { p.life--; p.y -= 0.8; return p.life > 0; });
+
+  if (state === TITLE || state === LEADERBOARD) return;
+
+  if (state === BALL_LOST) {
+    ballLostTimer--;
+    if (ballLostTimer <= 0) {
+      if (balls <= 0) {
+        state = GAME_OVER;
+        ballLostTimer = 120;
+        stopMusic();
+      } else {
+        state = PLUNGER;
+        ball = newBall();
+        plungerCharge = 0;
+      }
+    }
+    return;
+  }
+
+  if (state === GAME_OVER) {
+    ballLostTimer--;
+    if (ballLostTimer <= 0) {
+      // Check if qualifies for leaderboard
+      if (leaderboard.length < 5 || score > leaderboard[leaderboard.length - 1].score) {
+        state = NAME_ENTRY;
+        nameChars = [65, 65, 65];
+        nameCursor = 0;
+      } else {
+        state = TITLE;
+      }
+    }
+    return;
+  }
+
+  // ─── Plunger state ──────────────────────────────────────
+  if (state === PLUNGER) {
+    // plungerLock: space was held from title screen, wait for release first
+    if (plungerLock) {
+      if (!keys[' ']) plungerLock = false;
+      return;
+    }
+    if (keys[' ']) {
+      plungerCharge = Math.min(plungerCharge + 0.018, 1);
+    } else if (plungerCharge > 0) {
+      // Launch!
+      const force = 8 + plungerCharge * 14;
+      ball.vy = -force;
+      ball.vx = 0;
+      state = PLAYING;
+      sfxLaunch();
+      plungerCharge = 0;
+    }
+    return;
+  }
+
+  // ─── Flipper update ─────────────────────────────────────
+  const leftActive = keys['a'] || keys['arrowleft'];
+  const rightActive = keys['d'] || keys['arrowright'];
+
+  for (const f of flippers) {
+    const isActive = (f.dir === 1) ? leftActive : rightActive;
+    const wasActive = f.active;
+    f.active = isActive;
+    if (isActive && !wasActive) sfxFlipper();
+    if (isActive) {
+      f.angle = Math.max(FLIP_ACTIVE_ANG, f.angle - FLIP_SPEED_UP);
+    } else {
+      f.angle = Math.min(FLIP_REST_ANG, f.angle + FLIP_SPEED_DOWN);
+    }
+  }
+
+  if (!ball) return;
+
+  // ─── Ball physics ───────────────────────────────────────
+  ball.vy += GRAVITY;
+  ball.vx *= BALL_DAMP;
+  ball.vy *= BALL_DAMP;
+
+  // Speed cap
+  const spd = Math.sqrt(ball.vx**2 + ball.vy**2);
+  if (spd > MAX_SPEED) {
+    ball.vx *= MAX_SPEED / spd;
+    ball.vy *= MAX_SPEED / spd;
+  }
+
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  // Trail
+  ball.trail.push({ x: ball.x, y: ball.y });
+  if (ball.trail.length > 8) ball.trail.shift();
+
+  // ─── Wall collisions ─────────────────────────────────────
+  for (const w of walls) {
+    reflectOffSegment(ball.x, ball.y, ball.vx, ball.vy, w[0], w[1], w[2], w[3], 0.4);
+  }
+
+  // ─── Flipper collisions ───────────────────────────────────
+  for (const f of flippers) {
+    flipperCollision(f);
+  }
+
+  // ─── Bumper collisions ────────────────────────────────────
+  for (const b of bumpers) {
+    const d = dist(ball.x, ball.y, b.x, b.y);
+    if (d < BALL_R + b.r) {
+      // Push ball away
+      let nx = ball.x - b.x, ny = ball.y - b.y;
+      const nd = Math.sqrt(nx*nx + ny*ny) || 1;
+      nx /= nd; ny /= nd;
+      ball.x = b.x + nx * (BALL_R + b.r + 2);
+      ball.y = b.y + ny * (BALL_R + b.r + 2);
+      ball.vx = nx * BUMPER_FORCE + ball.vx * 0.3;
+      ball.vy = ny * BUMPER_FORCE + ball.vy * 0.3;
+      addScore(b.pts, b.x, b.y - b.r);
+      b.flash = 12;
+      sfxBumper();
+      flashEffects.push({ x: b.x, y: b.y, r: b.r, life: 15, type: 'bumper' });
+    }
+  }
+
+  // ─── Slingshot collisions ─────────────────────────────────
+  for (const s of slingshots) {
+    const seg = pointToSegDist(ball.x, ball.y, s.x1, s.y1, s.x2, s.y2);
+    if (seg.d < BALL_R + 8) {
+      const nl = Math.sqrt(s.nx**2 + s.ny**2);
+      ball.vx += (s.nx / nl) * SLING_FORCE;
+      ball.vy += (s.ny / nl) * SLING_FORCE;
+      addScore(s.pts, (s.x1+s.x2)/2, (s.y1+s.y2)/2);
+      s.flash = 10;
+      sfxSlingshot();
+    }
+  }
+
+  // ─── Target collisions ────────────────────────────────────
+  for (const set of targetSets) {
+    let allHit = true;
+    for (const t of set.targets) {
+      if (!t.hit) {
+        const d = dist(ball.x, ball.y, t.x, t.y);
+        if (d < BALL_R + 10) {
+          t.hit = true;
+          addScore(25, t.x, t.y - 10);
+          sfxTarget();
+          // Deflect ball slightly
+          ball.vx += (ball.x > t.x ? 2 : -2);
+        }
+      }
+      if (!t.hit) allHit = false;
+    }
+    if (allHit) {
+      // Completed set bonus
+      addScore(set.bonus, set.targets[0].x, set.targets[0].y - 30);
+      multiplier = Math.min(multiplier + 1, 5);
+      sfxMultiplier();
+      flashEffects.push({ x: set.targets[0].x, y: set.targets[1].y, r: 40, life: 30, type: 'bonus' });
+      // Reset after brief delay
+      setTimeout(() => {
+        for (const t of set.targets) t.hit = false;
+      }, 500);
+    }
+  }
+
+  // ─── Rollover lanes ───────────────────────────────────────
+  let allLit = true;
+  for (const r of rollovers) {
+    if (!r.lit) {
+      const d = dist(ball.x, ball.y, r.x, r.y);
+      if (d < BALL_R + r.r) {
+        r.lit = true;
+        addScore(30, r.x, r.y - 12);
+        sfxTarget();
+      }
+    }
+    if (!r.lit) allLit = false;
+  }
+  if (allLit) {
+    // X-WING bonus
+    addScore(1000, CX, 60);
+    sfxExtraBall();
+    flashEffects.push({ x: CX, y: 70, r: 60, life: 40, type: 'bonus' });
+    resetRollovers();
+  }
+
+  // ─── Ramp ─────────────────────────────────────────────────
+  if (ramp.active && ball.x > ramp.x && ball.x < ramp.x + ramp.w &&
+      ball.y > ramp.y - 5 && ball.y < ramp.y + ramp.h + 5 && ball.vy < -2) {
+    addScore(ramp.pts, ramp.x + ramp.w/2, ramp.y - 15);
+    sfxRamp();
+    ramp.flash = 20;
+    // Fling ball to upper area
+    ball.vy = -12;
+    ball.vx += (Math.random() - 0.5) * 3;
+    flashEffects.push({ x: ramp.x + ramp.w/2, y: ramp.y, r: 30, life: 20, type: 'bonus' });
+  }
+
+  // ─── Drain detection ─────────────────────────────────────
+  if (ball.y > TB + 20) {
+    balls--;
+    ball = null;
+    multiplier = 1;
+    state = BALL_LOST;
+    ballLostTimer = 60;
+    sfxDrain();
+  }
+
+  // ─── Keep ball in bounds (safety) ─────────────────────────
+  if (ball) {
+    if (ball.x < TL - 20) { ball.x = TL - 18; ball.vx = Math.abs(ball.vx) * 0.5; }
+    if (ball.x > PLR + 5) { ball.x = PLR + 3; ball.vx = -Math.abs(ball.vx) * 0.5; }
+    if (ball.y < TT - 10) { ball.y = TT - 8; ball.vy = Math.abs(ball.vy) * 0.5; }
+  }
+}
+
+// ─── Drawing helpers ─────────────────────────────────────────────
+function drawStarField() {
+  for (const s of starField) {
+    const b = 0.4 + 0.6 * Math.sin(titlePulse * 2 + s.b * 6);
+    ctx.fillStyle = `rgba(200,220,255,${b * 0.7})`;
+    ctx.fillRect(s.x, s.y, s.s, s.s);
+  }
+}
+
+function drawTIE(x, y, r, flash) {
+  // Hexagonal wings + ball cockpit
+  ctx.save();
+  ctx.translate(x, y);
+  const glow = flash > 0 ? 1 : 0;
+
+  // Wings
+  ctx.strokeStyle = glow ? '#fff' : '#8899aa';
+  ctx.lineWidth = 2;
+  const wr = r * 1.1;
+  // Left wing
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 - Math.PI/2;
+    const px = -r * 0.5 + Math.cos(a) * wr * 0.45;
+    const py = Math.sin(a) * wr * 0.9;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath(); ctx.stroke();
+  // Right wing
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 - Math.PI/2;
+    const px = r * 0.5 + Math.cos(a) * wr * 0.45;
+    const py = Math.sin(a) * wr * 0.9;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath(); ctx.stroke();
+
+  // Center strut
+  ctx.strokeStyle = glow ? '#fff' : '#667';
+  ctx.beginPath(); ctx.moveTo(-r*0.4, 0); ctx.lineTo(r*0.4, 0); ctx.stroke();
+
+  // Cockpit
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.32, 0, Math.PI * 2);
+  ctx.fillStyle = glow ? '#4af' : '#445566';
+  ctx.fill();
+  ctx.strokeStyle = glow ? '#adf' : '#778';
+  ctx.stroke();
+
+  // Viewport
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.15, 0, Math.PI * 2);
+  ctx.fillStyle = glow ? '#fff' : '#223';
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawDeathStar(x, y, r, flash) {
+  ctx.save();
+  ctx.translate(x, y);
+  const glow = flash > 0;
+
+  // Main sphere
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  const grad = ctx.createRadialGradient(-r*0.3, -r*0.3, 0, 0, 0, r);
+  grad.addColorStop(0, glow ? '#aabbcc' : '#667788');
+  grad.addColorStop(1, glow ? '#556677' : '#334455');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = glow ? '#adf' : '#556';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Trench line
+  ctx.beginPath();
+  ctx.ellipse(0, -r*0.15, r * 0.95, r * 0.12, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = glow ? '#89a' : '#445';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Superlaser dish
+  ctx.beginPath();
+  ctx.arc(-r*0.25, -r*0.35, r * 0.28, 0, Math.PI * 2);
+  ctx.fillStyle = glow ? '#5c8' : '#2a3a2a';
+  ctx.fill();
+  ctx.strokeStyle = glow ? '#8ea' : '#3a4a3a';
+  ctx.stroke();
+
+  // Surface details
+  ctx.strokeStyle = glow ? '#789' : '#3a4a5a';
+  ctx.lineWidth = 0.5;
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.8, r * i * 0.25);
+    ctx.lineTo(r * 0.8, r * i * 0.25);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawFlipper(f) {
+  const ang = f.dir === 1 ? f.angle : Math.PI - f.angle;
+  const tipX = f.px + Math.cos(ang) * FLIP_LEN;
+  const tipY = f.py + Math.sin(ang) * FLIP_LEN;
+
+  ctx.save();
+  // Flipper body — lightsaber glow effect
+  const color = f.dir === 1 ? '#4488ff' : '#4488ff';
+  const glowColor = f.dir === 1 ? 'rgba(68,136,255,0.3)' : 'rgba(68,136,255,0.3)';
+
+  // Glow
+  ctx.shadowColor = color;
+  ctx.shadowBlur = f.active ? 15 : 8;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = FLIP_RADIUS * 2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(f.px, f.py);
+  ctx.lineTo(tipX, tipY);
+  ctx.stroke();
+
+  // Core
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#aaccff';
+  ctx.lineWidth = FLIP_RADIUS;
+  ctx.beginPath();
+  ctx.moveTo(f.px, f.py);
+  ctx.lineTo(tipX, tipY);
+  ctx.stroke();
+
+  // Pivot
+  ctx.beginPath();
+  ctx.arc(f.px, f.py, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#556';
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawBall() {
+  if (!ball) return;
+
+  // Trail
+  for (let i = 0; i < ball.trail.length; i++) {
+    const t = ball.trail[i];
+    const a = (i / ball.trail.length) * 0.4;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, BALL_R * (i / ball.trail.length) * 0.7, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,100,50,${a})`;
+    ctx.fill();
+  }
+
+  // Ball glow
+  ctx.save();
+  ctx.shadowColor = '#ff6633';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+  const bg = ctx.createRadialGradient(ball.x - 2, ball.y - 2, 0, ball.x, ball.y, BALL_R);
+  bg.addColorStop(0, '#ffffee');
+  bg.addColorStop(0.4, '#ffaa44');
+  bg.addColorStop(1, '#cc4400');
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawTable() {
+  // Table surface
+  ctx.fillStyle = '#0a0f18';
+  ctx.fillRect(0, 0, W, H);
+
+  drawStarField();
+
+  // Table border glow
+  ctx.strokeStyle = '#1a2a3a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (const w of walls) {
+    ctx.moveTo(w[0], w[1]);
+    ctx.lineTo(w[2], w[3]);
+  }
+  ctx.stroke();
+
+  // Walls with glow
+  ctx.strokeStyle = '#334466';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (const w of walls) {
+    ctx.moveTo(w[0], w[1]);
+    ctx.lineTo(w[2], w[3]);
+  }
+  ctx.stroke();
+
+  // Slingshots
+  for (const s of slingshots) {
+    ctx.beginPath();
+    ctx.moveTo(s.x1, s.y1);
+    ctx.lineTo(s.x3, s.y3);
+    ctx.lineTo(s.x2, s.y2);
+    ctx.strokeStyle = s.flash > 0 ? '#ffaa00' : '#445566';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = s.flash > 0 ? 'rgba(255,170,0,0.2)' : 'rgba(50,60,80,0.3)';
+    ctx.fill();
+  }
+
+  // Bumpers
+  for (const b of bumpers) {
+    if (b.label === 'DS') {
+      drawDeathStar(b.x, b.y, b.r, b.flash);
+    } else {
+      drawTIE(b.x, b.y, b.r, b.flash);
+    }
+  }
+
+  // Targets
+  for (const set of targetSets) {
+    for (const t of set.targets) {
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 9, 0, Math.PI * 2);
+      ctx.fillStyle = t.hit ? '#FFD700' : '#333';
+      ctx.fill();
+      ctx.strokeStyle = t.hit ? '#ffee88' : '#555';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = t.hit ? '#000' : '#888';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(t.letter, t.x, t.y);
+    }
+    // Label
+    ctx.fillStyle = '#667';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(set.label, set.targets[0].x, set.targets[0].y - 18);
+  }
+
+  // Rollovers
+  for (const r of rollovers) {
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+    ctx.fillStyle = r.lit ? 'rgba(255,215,0,0.4)' : 'rgba(40,50,60,0.4)';
+    ctx.fill();
+    ctx.strokeStyle = r.lit ? '#FFD700' : '#445';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = r.lit ? '#FFD700' : '#556';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(r.label, r.x, r.y);
+  }
+  // Label above rollovers
+  ctx.fillStyle = '#667';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('X - W - I - N - G', CX, 48);
+
+  // Ramp
+  ctx.fillStyle = ramp.flash > 0 ? 'rgba(0,255,150,0.3)' : 'rgba(30,50,40,0.4)';
+  ctx.fillRect(ramp.x, ramp.y, ramp.w, ramp.h);
+  ctx.strokeStyle = ramp.flash > 0 ? '#0f8' : '#2a4a3a';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(ramp.x, ramp.y, ramp.w, ramp.h);
+  ctx.fillStyle = ramp.flash > 0 ? '#0f8' : '#4a6a5a';
+  ctx.font = '8px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('KESSEL RUN', ramp.x + ramp.w/2, ramp.y + ramp.h/2 + 3);
+
+  // Plunger lane
+  const plungerCX = (TR + 4 + PLR) / 2; // center of plunger lane
+  if (state === PLUNGER && plungerCharge > 0) {
+    const py = TB - 10;
+    const barH = 80;
+    ctx.fillStyle = '#222';
+    ctx.fillRect(plungerCX - 7, py - barH, 14, barH);
+    ctx.fillStyle = `rgb(${Math.floor(255 * plungerCharge)}, ${Math.floor(100 * (1-plungerCharge))}, 50)`;
+    ctx.fillRect(plungerCX - 7, py - barH * plungerCharge, 14, barH * plungerCharge);
+    ctx.strokeStyle = '#555';
+    ctx.strokeRect(plungerCX - 7, py - barH, 14, barH);
+  }
+
+  // Plunger spring visual
+  if (state === PLUNGER) {
+    const springY = TB - 5 + plungerCharge * 25;
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    const sx = plungerCX;
+    for (let i = 0; i < 5; i++) {
+      const yy = springY + i * 5;
+      ctx.beginPath();
+      ctx.moveTo(sx - 6, yy);
+      ctx.lineTo(sx + 6, yy + 2.5);
+      ctx.lineTo(sx - 6, yy + 5);
+      ctx.stroke();
+    }
+  }
+
+  // Flippers
+  for (const f of flippers) drawFlipper(f);
+
+  // Ball
+  drawBall();
+
+  // Flash effects
+  for (const f of flashEffects) {
+    const a = f.life / (f.type === 'bonus' ? 30 : 15);
+    const expand = f.type === 'bonus' ? f.r + (30 - f.life) * 2 : f.r + (15 - f.life) * 1.5;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, expand, 0, Math.PI * 2);
+    ctx.strokeStyle = f.type === 'bonus' ? `rgba(255,215,0,${a})` : `rgba(100,180,255,${a})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Score popups
+  for (const p of scorePopups) {
+    const a = p.life / 45;
+    ctx.fillStyle = `rgba(255,215,0,${a})`;
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`+${p.val}`, p.x, p.y);
+  }
+}
+
+function drawHUD() {
+  // Score
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`SCORE: ${score.toLocaleString()}`, 10, 22);
+
+  // High score
+  ctx.fillStyle = '#889';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(`HI: ${highScore.toLocaleString()}`, W - 10, 22);
+
+  // Balls remaining
+  ctx.fillStyle = '#ff8844';
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'left';
+  let ballText = '';
+  for (let i = 0; i < balls; i++) ballText += '\u25CF ';
+  ctx.fillText(ballText.trim(), 10, 38);
+
+  // Multiplier
+  if (multiplier > 1) {
+    ctx.fillStyle = '#0f8';
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`x${multiplier}`, W - 10, 38);
+  }
+}
+
+function drawTitle() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  drawStarField();
+
+  // Title
+  const pulse = 0.85 + 0.15 * Math.sin(titlePulse * 2);
+  ctx.save();
+  ctx.fillStyle = `rgba(255,215,0,${pulse})`;
+  ctx.font = 'bold 42px monospace';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#FFD700';
+  ctx.shadowBlur = 20;
+  ctx.fillText('STAR WARS', W/2, 220);
+  ctx.font = 'bold 36px monospace';
+  ctx.fillText('PINBALL', W/2, 270);
+  ctx.restore();
+
+  // Decorative line
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(W/2 - 120, 290);
+  ctx.lineTo(W/2 + 120, 290);
+  ctx.stroke();
+
+  // Instructions
+  ctx.fillStyle = '#8899aa';
+  ctx.font = '14px monospace';
+  ctx.fillText('A / D  =  FLIPPERS', W/2, 340);
+  ctx.fillText('SPACE  =  LAUNCH BALL', W/2, 365);
+
+  // Start prompt
+  const sa = 0.5 + 0.5 * Math.sin(titlePulse * 3);
+  ctx.fillStyle = `rgba(100,180,255,${sa})`;
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText('PRESS SPACE TO START', W/2, 440);
+
+  // Leaderboard hint
+  ctx.fillStyle = '#556';
+  ctx.font = '11px monospace';
+  ctx.fillText('L = LEADERBOARD', W/2, 480);
+
+  // High score
+  if (highScore > 0) {
+    ctx.fillStyle = '#667';
+    ctx.font = '13px monospace';
+    ctx.fillText(`HIGH SCORE: ${highScore.toLocaleString()}`, W/2, 530);
+  }
+
+  // Draw small TIE fighter decoration
+  drawTIE(120, 180, 18, 0);
+  drawTIE(360, 180, 18, 0);
+  drawDeathStar(W/2, 140, 22, 0);
+}
+
+function drawBallLost() {
+  drawTable();
+  drawHUD();
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(0, H/2 - 30, W, 60);
+  ctx.fillStyle = '#ff4444';
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(balls > 0 ? 'BALL LOST' : 'GAME OVER', W/2, H/2 + 8);
+}
+
+function drawGameOver() {
+  drawTable();
+  drawHUD();
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, H/2 - 60, W, 120);
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 28px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('GAME OVER', W/2, H/2 - 20);
+  ctx.fillStyle = '#aaa';
+  ctx.font = '16px monospace';
+  ctx.fillText(`FINAL SCORE: ${score.toLocaleString()}`, W/2, H/2 + 15);
+}
+
+function drawNameEntry() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  drawStarField();
+
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 22px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('NEW HIGH SCORE!', W/2, 200);
+
+  ctx.fillStyle = '#aaa';
+  ctx.font = '16px monospace';
+  ctx.fillText(`${score.toLocaleString()}`, W/2, 240);
+
+  ctx.fillStyle = '#889';
+  ctx.font = '14px monospace';
+  ctx.fillText('ENTER YOUR NAME', W/2, 290);
+
+  // Name characters
+  for (let i = 0; i < 3; i++) {
+    const x = W/2 - 40 + i * 40;
+    const y = 350;
+    const isCurrent = i === nameCursor;
+
+    // Up arrow
+    if (isCurrent) {
+      ctx.fillStyle = '#FFD700';
+      ctx.font = '16px monospace';
+      ctx.fillText('\u25B2', x, y - 30);
+    }
+
+    // Character
+    ctx.fillStyle = isCurrent ? '#FFD700' : '#667';
+    ctx.font = 'bold 32px monospace';
+    ctx.fillText(String.fromCharCode(nameChars[i]), x, y);
+
+    // Down arrow
+    if (isCurrent) {
+      ctx.fillStyle = '#FFD700';
+      ctx.font = '16px monospace';
+      ctx.fillText('\u25BC', x, y + 25);
+    }
+
+    // Underline
+    ctx.strokeStyle = isCurrent ? '#FFD700' : '#444';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - 12, y + 8);
+    ctx.lineTo(x + 12, y + 8);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#556';
+  ctx.font = '11px monospace';
+  ctx.fillText('W/S = CHANGE    A/D = MOVE    SPACE = CONFIRM', W/2, 430);
+}
+
+function drawLeaderboard() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  drawStarField();
+
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('TOP SCORES', W/2, 180);
+
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(W/2 - 100, 195);
+  ctx.lineTo(W/2 + 100, 195);
+  ctx.stroke();
+
+  if (leaderboard.length === 0) {
+    ctx.fillStyle = '#556';
+    ctx.font = '14px monospace';
+    ctx.fillText('NO SCORES YET', W/2, 300);
+  } else {
+    for (let i = 0; i < leaderboard.length; i++) {
+      const e = leaderboard[i];
+      const y = 240 + i * 40;
+      // Rank
+      ctx.fillStyle = i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : '#889';
+      ctx.font = 'bold 18px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${i + 1}.`, W/2 - 80, y);
+      // Name
+      ctx.textAlign = 'left';
+      ctx.fillText(e.name, W/2 - 60, y);
+      // Score
+      ctx.textAlign = 'right';
+      ctx.fillText(e.score.toLocaleString(), W/2 + 110, y);
+    }
+  }
+
+  const sa = 0.5 + 0.5 * Math.sin(titlePulse * 3);
+  ctx.fillStyle = `rgba(100,180,255,${sa})`;
+  ctx.font = '14px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('PRESS ANY KEY TO RETURN', W/2, 500);
+}
+
+// ─── Input handling (state-specific) ─────────────────────────────
+canvas.addEventListener('keydown', function handleKey(e) {
+  const k = e.key.toLowerCase();
+
+  if (state === TITLE) {
+    if (k === ' ') {
+      startGame();
+      e.preventDefault();
+    } else if (k === 'l') {
+      state = LEADERBOARD;
+    }
+    return;
+  }
+
+  if (state === LEADERBOARD) {
+    state = TITLE;
+    return;
+  }
+
+  if (state === NAME_ENTRY) {
+    if (k === 'w' || k === 'arrowup') {
+      nameChars[nameCursor] = nameChars[nameCursor] >= 90 ? 65 : nameChars[nameCursor] + 1;
+    } else if (k === 's' || k === 'arrowdown') {
+      nameChars[nameCursor] = nameChars[nameCursor] <= 65 ? 90 : nameChars[nameCursor] - 1;
+    } else if (k === 'd' || k === 'arrowright') {
+      nameCursor = Math.min(2, nameCursor + 1);
+    } else if (k === 'a' || k === 'arrowleft') {
+      nameCursor = Math.max(0, nameCursor - 1);
+    } else if (k === ' ' || k === 'enter') {
+      submitScore();
+    }
+    return;
+  }
+});
+
+let plungerLock = false; // prevent space-to-start from also charging plunger
+function startGame() {
+  score = 0;
+  balls = 3;
+  multiplier = 1;
+  ball = newBall();
+  plungerCharge = 0;
+  state = PLUNGER;
+  plungerLock = true; // will unlock when space is released
+  resetTargets();
+  resetRollovers();
+  scorePopups = [];
+  flashEffects = [];
+  ensureAudio();
+  startMusic();
+}
+
+// ─── Leaderboard API ─────────────────────────────────────────────
+async function fetchLeaderboard() {
+  try {
+    const res = await fetch('/api/pinball');
+    if (res.ok) {
+      leaderboard = await res.json();
+      if (leaderboard.length > 0) highScore = leaderboard[0].score;
+    }
+  } catch(e) { /* offline / dev */ }
+}
+
+async function submitScore() {
+  const name = String.fromCharCode(...nameChars);
+  try {
+    const res = await fetch('/api/pinball', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, score }),
+    });
+    if (res.ok) leaderboard = await res.json();
+  } catch(e) { /* offline */ }
+  state = LEADERBOARD;
+}
+
+// ─── Render ──────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  switch (state) {
+    case TITLE: drawTitle(); break;
+    case LEADERBOARD: drawLeaderboard(); break;
+    case NAME_ENTRY: drawNameEntry(); break;
+    case BALL_LOST: drawBallLost(); break;
+    case GAME_OVER: drawGameOver(); break;
+    default:
+      drawTable();
+      drawHUD();
+      if (state === PLUNGER) {
+        const sa = 0.5 + 0.5 * Math.sin(titlePulse * 3);
+        ctx.fillStyle = `rgba(100,180,255,${sa})`;
+        ctx.font = '14px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('HOLD SPACE TO LAUNCH', W/2, H/2);
+      }
+      break;
+  }
+}
+
+// ─── Main loop ───────────────────────────────────────────────────
+function loop(timestamp) {
+  if (!_lastTime) _lastTime = timestamp;
+  _acc += timestamp - _lastTime;
+  _lastTime = timestamp;
+  if (_acc > _TICK * 5) _acc = _TICK * 5;
+  while (_acc >= _TICK) {
+    update();
+    _acc -= _TICK;
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ─── Init ────────────────────────────────────────────────────────
+fetchLeaderboard();
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html><head><title>Pinball Thumb Generator</title></head>
+<body style="background:#000;display:flex;justify-content:center;align-items:center;height:100vh">
+<canvas id="c" width="640" height="360"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 640, H = 360;
+
+// Background
+ctx.fillStyle = '#0a0f18';
+ctx.fillRect(0, 0, W, H);
+
+// Stars
+for (let i = 0; i < 60; i++) {
+  ctx.fillStyle = `rgba(200,220,255,${Math.random()*0.5+0.2})`;
+  ctx.fillRect(Math.random()*W, Math.random()*H, Math.random()*1.5+0.5, Math.random()*1.5+0.5);
+}
+
+// Table outline (simplified)
+ctx.strokeStyle = '#334466';
+ctx.lineWidth = 2;
+ctx.beginPath();
+ctx.moveTo(180, 340);
+ctx.lineTo(160, 280);
+ctx.lineTo(155, 150);
+ctx.lineTo(170, 80);
+ctx.lineTo(210, 40);
+ctx.lineTo(430, 40);
+ctx.lineTo(460, 80);
+ctx.lineTo(470, 150);
+ctx.lineTo(470, 340);
+ctx.stroke();
+
+// TIE bumpers
+function drawTIE(x, y, r) {
+  ctx.strokeStyle = '#8899aa';
+  ctx.lineWidth = 1.5;
+  // Left wing
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i/6)*Math.PI*2 - Math.PI/2;
+    const px = x - r*0.5 + Math.cos(a)*r*0.5;
+    const py = y + Math.sin(a)*r*0.9;
+    i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+  }
+  ctx.closePath(); ctx.stroke();
+  // Right wing
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i/6)*Math.PI*2 - Math.PI/2;
+    const px = x + r*0.5 + Math.cos(a)*r*0.5;
+    const py = y + Math.sin(a)*r*0.9;
+    i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+  }
+  ctx.closePath(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x-r*0.4,y); ctx.lineTo(x+r*0.4,y); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, r*0.32, 0, Math.PI*2);
+  ctx.fillStyle = '#445566'; ctx.fill(); ctx.strokeStyle='#778'; ctx.stroke();
+}
+
+drawTIE(270, 120, 22);
+drawTIE(340, 100, 22);
+drawTIE(410, 130, 18);
+
+// Death Star
+ctx.beginPath();
+ctx.arc(340, 170, 28, 0, Math.PI*2);
+const grad = ctx.createRadialGradient(333, 163, 0, 340, 170, 28);
+grad.addColorStop(0, '#667788');
+grad.addColorStop(1, '#334455');
+ctx.fillStyle = grad; ctx.fill();
+ctx.strokeStyle = '#556'; ctx.lineWidth = 2; ctx.stroke();
+ctx.beginPath();
+ctx.ellipse(340, 166, 26, 3.5, 0, 0, Math.PI*2);
+ctx.strokeStyle = '#445'; ctx.lineWidth = 1.5; ctx.stroke();
+ctx.beginPath(); ctx.arc(332, 160, 8, 0, Math.PI*2);
+ctx.fillStyle = '#2a3a2a'; ctx.fill();
+
+// Flippers (lightsaber style)
+ctx.shadowColor = '#4488ff';
+ctx.shadowBlur = 12;
+ctx.strokeStyle = '#4488ff';
+ctx.lineWidth = 8;
+ctx.lineCap = 'round';
+ctx.beginPath(); ctx.moveTo(240, 310); ctx.lineTo(300, 290); ctx.stroke();
+ctx.beginPath(); ctx.moveTo(400, 310); ctx.lineTo(340, 290); ctx.stroke();
+ctx.shadowBlur = 0;
+ctx.strokeStyle = '#aaccff';
+ctx.lineWidth = 4;
+ctx.beginPath(); ctx.moveTo(240, 310); ctx.lineTo(300, 290); ctx.stroke();
+ctx.beginPath(); ctx.moveTo(400, 310); ctx.lineTo(340, 290); ctx.stroke();
+
+// Ball
+ctx.save();
+ctx.shadowColor = '#ff6633';
+ctx.shadowBlur = 12;
+ctx.beginPath();
+ctx.arc(350, 230, 7, 0, Math.PI*2);
+const bg = ctx.createRadialGradient(348, 228, 0, 350, 230, 7);
+bg.addColorStop(0, '#ffffee');
+bg.addColorStop(0.4, '#ffaa44');
+bg.addColorStop(1, '#cc4400');
+ctx.fillStyle = bg; ctx.fill();
+ctx.restore();
+
+// Title
+ctx.save();
+ctx.fillStyle = '#FFD700';
+ctx.shadowColor = '#FFD700';
+ctx.shadowBlur = 15;
+ctx.font = 'bold 36px monospace';
+ctx.textAlign = 'center';
+ctx.fillText('STAR WARS', 320, 200);
+ctx.font = 'bold 28px monospace';
+ctx.fillText('PINBALL', 320, 235);
+ctx.restore();
+
+// Download
+setTimeout(() => {
+  const a = document.createElement('a');
+  a.download = 'pinball-thumb.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}, 500);
+</script>
+</body>
+</html>

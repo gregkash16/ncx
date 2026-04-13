@@ -18,6 +18,7 @@ const password = match ? match[1].trim() : '';
   await conn.query('TRUNCATE TABLE railway.tauntaun_run_leaderboard');
   await conn.query('TRUNCATE TABLE railway.pod_racer_leaderboard');
   await conn.query('TRUNCATE TABLE railway.last_stand_leaderboard');
-  console.log('All 4 leaderboards cleared.');
+  await conn.query('TRUNCATE TABLE railway.pinball_leaderboard');
+  console.log('All 5 leaderboards cleared.');
   await conn.end();
 })();

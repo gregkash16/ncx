@@ -28,6 +28,12 @@ const games = [
     description: "First-person blaster defense. Mow down stormtroopers before they overwhelm you.",
     image: "/last-stand/last-stand-thumb.png",
   },
+  {
+    slug: "pinball",
+    title: "Star Wars Pinball",
+    description: "Classic pinball with TIE fighter bumpers, a Death Star, and lightsaber flippers.",
+    image: "/pinball/pinball-thumb.png",
+  },
 ];
 
 export default function ArcadePanel() {
