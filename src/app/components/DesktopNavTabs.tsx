@@ -18,7 +18,8 @@ type TabKey =
   | "prevseasons"
   | "arcade"
   | "stream"
-  | "playoffs";
+  | "playoffs"
+  | "builder";
 
 const row1: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "home",      label: "Home",         href: "/" },
@@ -27,6 +28,7 @@ const row1: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "standings", label: "Standings",    href: "/?tab=standings" },
   { key: "report",    label: "Report a Game", href: "/?tab=report" },
   { key: "stream",    label: "Stream",        href: "/?tab=stream" },
+  { key: "builder",  label: "Builder",       href: "/?tab=builder" },
 ];
 
 const row2Base: Array<{ key: TabKey; label: string; href: string }> = [
