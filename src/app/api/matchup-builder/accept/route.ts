@@ -37,9 +37,12 @@ export async function POST(req: NextRequest) {
   const conn = await pool.getConnection();
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-
-    const discordId = normalizeDiscordId((session.user as any).discordId ?? (session.user as any).id);
+    const sessionId = session?.user
+      ? normalizeDiscordId((session.user as any).discordId ?? (session.user as any).id)
+      : "";
+    const headerId = normalizeDiscordId(req.headers.get("x-discord-id"));
+    const discordId = sessionId || headerId;
+    if (!discordId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     const isAdmin = (ADMIN_DISCORD_IDS as readonly string[]).includes(discordId);
     const sheets = getSheets();
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
