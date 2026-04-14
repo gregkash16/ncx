@@ -51,12 +51,14 @@ export async function GET(req: NextRequest) {
     const sessionId = session?.user
       ? normalizeDiscordId((session.user as any).discordId ?? (session.user as any).id)
       : "";
-    const headerId = normalizeDiscordId(req.headers.get("x-discord-id"));
+    const headerRaw = (req.headers.get("x-discord-id") ?? "").trim();
+    const isAppleAuth = headerRaw.startsWith("apple-") && process.env.DEMO_MODE === "true";
+    const headerId = isAppleAuth ? "" : normalizeDiscordId(headerRaw);
     const discordId = sessionId || headerId;
-    if (!discordId) {
+    if (!discordId && !isAppleAuth) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    const isAdmin = (ADMIN_DISCORD_IDS as readonly string[]).includes(discordId);
+    const isAdmin = isAppleAuth || (ADMIN_DISCORD_IDS as readonly string[]).includes(discordId);
 
     const sheets = getSheets();
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
@@ -316,11 +318,14 @@ export async function DELETE(req: NextRequest) {
     const sessionId = session?.user
       ? normalizeDiscordId((session.user as any).discordId ?? (session.user as any).id)
       : "";
-    const headerId = normalizeDiscordId(req.headers.get("x-discord-id"));
+    const headerRaw = (req.headers.get("x-discord-id") ?? "").trim();
+    const isAppleAuth = headerRaw.startsWith("apple-") && process.env.DEMO_MODE === "true";
+    const headerId = isAppleAuth ? "" : normalizeDiscordId(headerRaw);
     const discordId = sessionId || headerId;
-    if (!discordId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (!discordId && !isAppleAuth) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    if (!(ADMIN_DISCORD_IDS as readonly string[]).includes(discordId)) {
+    const isAdmin = isAppleAuth || (ADMIN_DISCORD_IDS as readonly string[]).includes(discordId);
+    if (!isAdmin) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
 
