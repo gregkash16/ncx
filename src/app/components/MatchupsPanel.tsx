@@ -705,6 +705,12 @@ export default function MatchupsPanel({
     [selectedWeekRaw]
   );
 
+  const isCurrentWeek = useMemo(() => {
+    const a = (activeWeek ?? "").trim().toUpperCase();
+    const w = (weekLabel ?? "").trim().toUpperCase();
+    return Boolean(a) && a === w;
+  }, [activeWeek, weekLabel]);
+
   const weeksPills = useMemo(() => {
     if (!activeNum || activeNum <= 0) return [] as string[];
     return Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1));
@@ -1163,7 +1169,7 @@ export default function MatchupsPanel({
 
                 {/* LIVE / END LIVE pill + Create thumbnail button — desktop only */}
                 <div className="absolute -top-3 -right-3 hidden md:flex items-center gap-2">
-                  {isLive ? (
+                  {isCurrentWeek && isLive ? (
                     <button
                       type="button"
                       onClick={() => handleEndLive(row.game)}
@@ -1173,7 +1179,7 @@ export default function MatchupsPanel({
                       <span className="ncx-live-dot" />
                       {submittingLive ? "Ending…" : "End Live"}
                     </button>
-                  ) : (
+                  ) : isCurrentWeek && !isLive ? (
                     <div className="relative">
                       <button
                         type="button"
@@ -1272,7 +1278,7 @@ export default function MatchupsPanel({
                         </div>
                       )}
                     </div>
-                  )}
+                  ) : null}
 
                   <button
                     type="button"
