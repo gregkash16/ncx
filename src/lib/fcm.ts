@@ -153,13 +153,19 @@ export async function sendFCMToDevices(
   );
 
   if (staleTokens.length > 0) {
+    console.log(`FCM: purging ${staleTokens.length} stale tokens from fcm_subscriptions`);
     try {
       const { sql } = await import('@vercel/postgres');
-      await sql`
-        DELETE FROM fcm_subscriptions
-        WHERE device_token = ANY(${staleTokens as any}::text[])
-      `;
-      console.log(`FCM: purged ${staleTokens.length} stale tokens from fcm_subscriptions`);
+      let purged = 0;
+      for (const token of staleTokens) {
+        try {
+          const result = await sql`DELETE FROM fcm_subscriptions WHERE device_token = ${token}`;
+          purged += result.rowCount ?? 0;
+        } catch (e) {
+          console.warn(`FCM: failed to purge token ${token.slice(0, 20)}...:`, e);
+        }
+      }
+      console.log(`FCM: purged ${purged}/${staleTokens.length} stale tokens`);
     } catch (e) {
       console.warn('FCM: failed to purge stale tokens:', e);
     }
