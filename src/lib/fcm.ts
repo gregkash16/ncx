@@ -62,10 +62,23 @@ async function getAccessToken(): Promise<string> {
 
 export async function sendFCMToDevices(
   deviceTokens: string[],
-  payload: { title: string; body: string; url?: string }
+  payload: { title: string; body: string; url?: string },
+  meta?: { category: string; trigger: string }
 ) {
   if (!FCM_PROJECT_ID || !FCM_CLIENT_EMAIL || !getFcmPrivateKey()) {
     console.warn('FCM not configured — skipping Android push notifications');
+    if (meta) {
+      const { logPushNotification } = await import('@/lib/pushLog');
+      await logPushNotification({
+        category: meta.category,
+        title: payload.title,
+        body: payload.body,
+        trigger: meta.trigger,
+        recipientCount: deviceTokens.length,
+        sent: 0,
+        failed: 0,
+      });
+    }
     return { sent: 0, failed: 0 };
   }
 
@@ -128,6 +141,19 @@ export async function sendFCMToDevices(
       }
     })
   );
+
+  if (meta) {
+    const { logPushNotification } = await import('@/lib/pushLog');
+    await logPushNotification({
+      category: meta.category,
+      title: payload.title,
+      body: payload.body,
+      trigger: meta.trigger,
+      recipientCount: deviceTokens.length,
+      sent,
+      failed,
+    });
+  }
 
   return { sent, failed };
 }

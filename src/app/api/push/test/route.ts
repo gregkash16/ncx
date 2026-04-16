@@ -25,10 +25,17 @@ async function sendTest() {
     return NextResponse.json({ sent: 0, failed: 0, total: 0, note: 'No subscribers' });
   }
 
-  const result = await sendFCMToDevices(tokens, {
-    title: 'Development',
-    body: 'This is a Test Push notification',
-  });
+  const result = await sendFCMToDevices(
+    tokens,
+    {
+      title: 'Development',
+      body: 'This is a Test Push notification',
+    },
+    {
+      category: 'test',
+      trigger: 'manual: /api/push/test',
+    }
+  );
 
   return NextResponse.json({ ...result, total: tokens.length });
 }

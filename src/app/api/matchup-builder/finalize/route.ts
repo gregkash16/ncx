@@ -214,9 +214,24 @@ export async function POST(req: NextRequest) {
             title: "Matchups Set",
             body: `Matchups for ${awayTeam} vs ${homeTeam} have been set for WEEK ${weekNum}`,
             url: "/",
+          },
+          {
+            category: "matchup_builder",
+            trigger: `matchup-builder/finalize: WEEK ${weekNum} ${awayTeam} vs ${homeTeam}`,
           }
         );
         console.log(`[matchup-builder/finalize] FCM: sent=${result.sent}, failed=${result.failed}`);
+      } else {
+        const { logPushNotification } = await import("@/lib/pushLog");
+        await logPushNotification({
+          category: "matchup_builder",
+          title: "Matchups Set",
+          body: `Matchups for ${awayTeam} vs ${homeTeam} have been set for WEEK ${weekNum}`,
+          trigger: `matchup-builder/finalize: WEEK ${weekNum} ${awayTeam} vs ${homeTeam}`,
+          recipientCount: 0,
+          sent: 0,
+          failed: 0,
+        });
       }
     } catch (pushErr) {
       console.warn("[matchup-builder/finalize] Push notification failed:", pushErr);

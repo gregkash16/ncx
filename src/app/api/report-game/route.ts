@@ -128,7 +128,8 @@ type SheetsClient = ReturnType<typeof getSheets>;
 // Filtered push sender — sends FCM notifications to matching devices
 async function sendPushForTeams(
   teams: string[],
-  payload: { title: string; body: string; url: string }
+  payload: { title: string; body: string; url: string },
+  meta?: { category: string; trigger: string }
 ) {
   // FCM device tokens (Android/iOS)
   let fcmCount = 0;
@@ -164,10 +165,22 @@ async function sendPushForTeams(
       const { sendFCMToDevices } = await import("@/lib/fcm");
       const result = await sendFCMToDevices(
         fcmRows.map((r) => r.device_token),
-        payload
+        payload,
+        meta
       );
       console.log(`FCM: sent=${result.sent}, failed=${result.failed}`);
       fcmCount = fcmRows.length;
+    } else if (meta) {
+      const { logPushNotification } = await import("@/lib/pushLog");
+      await logPushNotification({
+        category: meta.category,
+        title: payload.title,
+        body: payload.body,
+        trigger: meta.trigger,
+        recipientCount: 0,
+        sent: 0,
+        failed: 0,
+      });
     }
   } catch (e) {
     console.error("Failed to send FCM notifications:", e);
@@ -1855,11 +1868,14 @@ export async function POST(req: NextRequest) {
         const bodyText = `${awayName} - ${awayTeam} ${a} — ${h} ${homeTeam} - ${homeName}`;
         const url = "/m/current"
 
-        pushed = await sendPushForTeams([awayTeam, homeTeam], {
-          title,
-          body: bodyText,
-          url,
-        });
+        pushed = await sendPushForTeams(
+          [awayTeam, homeTeam],
+          { title, body: bodyText, url },
+          {
+            category: "game_report",
+            trigger: `report-game: ${canonicalWeekLabel} G${gameNo} ${awayTeam} v ${homeTeam}`,
+          }
+        );
       } catch (pushErr) {
         console.warn("⚠️ Push send failed:", pushErr);
       }
@@ -1949,21 +1965,35 @@ export async function POST(req: NextRequest) {
             const weekNum = canonicalWeekLabel.replace(/^WEEK\s*/i, "");
 
             try {
-              await sendPushForTeams([awayTeam, homeTeam], {
-                title: "Series Complete",
-                body: `${winner} has defeated ${loser} in WEEK ${weekNum}`,
-                url: "/m/current",
-              });
+              await sendPushForTeams(
+                [awayTeam, homeTeam],
+                {
+                  title: "Series Complete",
+                  body: `${winner} has defeated ${loser} in WEEK ${weekNum}`,
+                  url: "/m/current",
+                },
+                {
+                  category: "series_clinch",
+                  trigger: `report-game: WEEK ${weekNum} ${winner} def ${loser}`,
+                }
+              );
             } catch (clinchPushErr) {
               console.warn("⚠️ Series clinch push failed:", clinchPushErr);
             }
           } else if (newAwayWins === 3 && newHomeWins === 3) {
             try {
-              await sendPushForTeams([awayTeam, homeTeam], {
-                title: "GAME 7 ALERT",
-                body: `${awayTeam} v ${homeTeam} is going to GAME 7`,
-                url: "/m/current",
-              });
+              await sendPushForTeams(
+                [awayTeam, homeTeam],
+                {
+                  title: "GAME 7 ALERT",
+                  body: `${awayTeam} v ${homeTeam} is going to GAME 7`,
+                  url: "/m/current",
+                },
+                {
+                  category: "game_7_alert",
+                  trigger: `report-game: ${canonicalWeekLabel} ${awayTeam} v ${homeTeam}`,
+                }
+              );
             } catch (game7PushErr) {
               console.warn("⚠️ Game 7 alert push failed:", game7PushErr);
             }
