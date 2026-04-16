@@ -82,6 +82,8 @@ export async function POST(request: Request) {
     const homeTeam = body?.homeTeam ? String(body.homeTeam).trim() : "";
     const awayName = body?.awayName ? String(body.awayName).trim() : "";
     const homeName = body?.homeName ? String(body.homeName).trim() : "";
+    const awayNcxId = body?.awayNcxId ? String(body.awayNcxId).trim().toUpperCase() : "";
+    const homeNcxId = body?.homeNcxId ? String(body.homeNcxId).trim().toUpperCase() : "";
 
     if (!weekLabel || !game || !provider || !streamUrl) {
       return NextResponse.json(
@@ -141,18 +143,48 @@ export async function POST(request: Request) {
           return id ? `<@&${id}>` : teamName;
         };
 
+        const discordIds: Record<string, string> = {};
+        const wantedNcx = [awayNcxId, homeNcxId].filter(Boolean);
+        if (wantedNcx.length) {
+          try {
+            const [mapRows] = await pool.query<any[]>(
+              `SELECT ncxid, discord_id
+                 FROM S9.discord_map
+                WHERE UPPER(ncxid) IN (?)`,
+              [wantedNcx]
+            );
+            for (const r of mapRows ?? []) {
+              if (r?.ncxid && r?.discord_id) {
+                discordIds[String(r.ncxid).toUpperCase()] = String(r.discord_id);
+              }
+            }
+          } catch (e) {
+            console.warn("⚠️ discord_map lookup failed:", e);
+          }
+        }
+
+        const playerLabel = (ncxid: string, name: string) => {
+          const did = ncxid ? discordIds[ncxid] : "";
+          if (did && name) return `<@${did}> (${name})`;
+          if (did) return `<@${did}>`;
+          return name;
+        };
+
+        const awayPlayer = playerLabel(awayNcxId, awayName);
+        const homePlayer = playerLabel(homeNcxId, homeName);
+
         const awaySide =
-          awayTeam && awayName
-            ? `${teamMention(awayTeam)} • ${awayName}`
+          awayTeam && awayPlayer
+            ? `${teamMention(awayTeam)} • ${awayPlayer}`
             : awayTeam
               ? teamMention(awayTeam)
-              : awayName || "Away";
+              : awayPlayer || "Away";
         const homeSide =
-          homeTeam && homeName
-            ? `${homeName} • ${teamMention(homeTeam)}`
+          homeTeam && homePlayer
+            ? `${homePlayer} • ${teamMention(homeTeam)}`
             : homeTeam
               ? teamMention(homeTeam)
-              : homeName || "Home";
+              : homePlayer || "Home";
         const content =
           `🔴 **LIVE NOW** — ${weekLabel} — GAME ${game} — ${awaySide} vs ${homeSide} — ${streamUrl}`;
         try {

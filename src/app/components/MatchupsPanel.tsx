@@ -808,6 +808,8 @@ export default function MatchupsPanel({
       homeTeam?: string;
       awayName?: string;
       homeName?: string;
+      awayNcxId?: string;
+      homeNcxId?: string;
     }
   ) {
     const provider = liveProvider[game] ?? "NCX";
@@ -847,6 +849,8 @@ export default function MatchupsPanel({
           homeTeam: meta?.homeTeam ?? null,
           awayName: meta?.awayName ?? null,
           homeName: meta?.homeName ?? null,
+          awayNcxId: meta?.awayNcxId ?? null,
+          homeNcxId: meta?.homeNcxId ?? null,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -1310,6 +1314,8 @@ export default function MatchupsPanel({
                                   homeTeam: row.homeTeam,
                                   awayName: row.awayName,
                                   homeName: row.homeName,
+                                  awayNcxId: row.awayId,
+                                  homeNcxId: row.homeId,
                                 })
                               }
                               className="rounded-md bg-yellow-400 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-zinc-900 hover:bg-yellow-300 disabled:opacity-60 disabled:cursor-not-allowed"
