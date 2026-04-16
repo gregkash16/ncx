@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const LIVE_MAX_MS = 2 * 60 * 60 * 1000;
+const LIVE_CHANGED_EVENT = "ncx:live-changed";
 
 function parseStartedAtMs(s?: string | null): number {
   if (!s) return 0;
@@ -93,9 +94,12 @@ export default function DesktopNavTabs({ showBuilder = false }: { showBuilder?: 
 
     check();
     const id = setInterval(check, 30_000);
+    const onLiveChanged = () => check();
+    window.addEventListener(LIVE_CHANGED_EVENT, onLiveChanged);
     return () => {
       cancelled = true;
       clearInterval(id);
+      window.removeEventListener(LIVE_CHANGED_EVENT, onLiveChanged);
     };
   }, []);
 

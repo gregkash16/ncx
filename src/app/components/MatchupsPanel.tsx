@@ -67,6 +67,7 @@ type LiveEntry = {
 
 const LIVE_MAX_MS = 2 * 60 * 60 * 1000; // 2 hours
 const NCX_TWITCH_URL = "http://www.twitch.tv/nickelcityxwing";
+const LIVE_CHANGED_EVENT = "ncx:live-changed";
 
 // Preset stream providers. NCX is always first, Other is always last,
 // everything else is listed alphabetically by label in between.
@@ -780,9 +781,12 @@ export default function MatchupsPanel({
     refreshLive();
     const poll = setInterval(refreshLive, 30_000);
     const tick = setInterval(() => setNowMs(Date.now()), 30_000);
+    const onLiveChanged = () => refreshLive();
+    window.addEventListener(LIVE_CHANGED_EVENT, onLiveChanged);
     return () => {
       clearInterval(poll);
       clearInterval(tick);
+      window.removeEventListener(LIVE_CHANGED_EVENT, onLiveChanged);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekLabel]);
@@ -837,6 +841,7 @@ export default function MatchupsPanel({
       if (!res.ok) throw new Error(json?.error || "Failed");
       setOpenLivePopover(null);
       await refreshLive();
+      window.dispatchEvent(new CustomEvent(LIVE_CHANGED_EVENT));
     } catch (e: any) {
       setLiveError((p) => ({ ...p, [game]: e?.message || "Failed" }));
     } finally {
@@ -860,6 +865,7 @@ export default function MatchupsPanel({
           delete next[game];
           return next;
         });
+        window.dispatchEvent(new CustomEvent(LIVE_CHANGED_EVENT));
       }
     } catch {
       // ignore
