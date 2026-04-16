@@ -3,6 +3,18 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+
+const LIVE_MAX_MS = 2 * 60 * 60 * 1000;
+
+function parseStartedAtMs(s?: string | null): number {
+  if (!s) return 0;
+  const t = Date.parse(s);
+  if (Number.isFinite(t)) return t;
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return 0;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+}
 
 type TabKey =
   | "home"
@@ -57,21 +69,56 @@ export default function DesktopNavTabs({ showBuilder = false }: { showBuilder?: 
 
   const active: TabKey | null = pathname === "/" ? rawTab : null;
 
+  const [hasLive, setHasLive] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function check() {
+      try {
+        const res = await fetch("/api/live-matchups", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        const list: Array<{ startedAt: string }> = Array.isArray(json?.live) ? json.live : [];
+        const now = Date.now();
+        const anyLive = list.some((e) => {
+          const t = parseStartedAtMs(e.startedAt);
+          return t && now - t < LIVE_MAX_MS;
+        });
+        if (!cancelled) setHasLive(anyLive);
+      } catch {
+        // ignore transient errors
+      }
+    }
+
+    check();
+    const id = setInterval(check, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
   function renderTab({ key, label, href }: { key: TabKey; label: string; href: string }) {
     const isActive =
       pathname === "/" &&
       !(!preSeasonEnabled && key === "prefs") &&
       active === key;
 
+    const isLiveTab = key === "matchups" && hasLive;
+
     return (
       <Link
         key={key}
         href={href}
         scroll={false}
-        className="group relative overflow-hidden rounded-xl border px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2"
+        className={[
+          "group relative overflow-hidden rounded-xl border px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2",
+          isLiveTab ? "ncx-live-fire border-red-500" : "",
+        ].join(" ")}
         style={{
           background: "var(--ncx-bg-panel)",
-          borderColor: "var(--ncx-border)",
+          ...(isLiveTab ? {} : { borderColor: "var(--ncx-border)" }),
           color: "var(--ncx-text-primary)",
         }}
       >
@@ -94,7 +141,10 @@ export default function DesktopNavTabs({ showBuilder = false }: { showBuilder?: 
           />
         )}
 
-        <span className="relative z-10">{label}</span>
+        <span className="relative z-10 inline-flex items-center gap-2">
+          {isLiveTab && <span className="ncx-live-dot" aria-hidden="true" />}
+          {label}
+        </span>
       </Link>
     );
   }
