@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
-import { getSheets } from "@/lib/googleSheets";
+import { getCaptainTeams } from "@/lib/captains";
 
 export const dynamic = "force-dynamic";
 
@@ -12,26 +12,7 @@ const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"] as const;
 function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
 }
-function norm(v: unknown) { return String(v ?? "").trim(); }
 function teamKey(s: string): string { return String(s ?? "").trim().toUpperCase(); }
-
-type SheetsClient = ReturnType<typeof getSheets>;
-
-async function getCaptainTeamsForDiscord(
-  sheets: SheetsClient, spreadsheetId: string, discordId: string
-): Promise<string[]> {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId, range: "NCXID!K2:O25", valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = res.data.values ?? [];
-  const teams: string[] = [];
-  for (const r of rows) {
-    const team = norm(r?.[0]);
-    const disc = normalizeDiscordId(r?.[4]);
-    if (team && disc === discordId) teams.push(team);
-  }
-  return teams;
-}
 
 export async function POST(req: NextRequest) {
   const conn = await pool.getConnection();
@@ -46,9 +27,7 @@ export async function POST(req: NextRequest) {
     const discordId = sessionId || headerId;
     if (!discordId && !isAppleAuth) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     const isAdmin = isAppleAuth || (ADMIN_DISCORD_IDS as readonly string[]).includes(discordId);
-    const sheets = getSheets();
-    const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-    const captainTeams = await getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId);
+    const captainTeams = await getCaptainTeams(discordId);
 
     const body = await req.json();
     const { week, awayTeam, homeTeam, slot, ncxid, side } = body;

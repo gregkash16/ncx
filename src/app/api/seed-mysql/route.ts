@@ -671,6 +671,38 @@ async function loadDiscordMap(sheets: any, conn: mysql.Connection) {
   }
 }
 
+async function loadCaptains(sheets: any, conn: mysql.Connection) {
+  const rows = await getSheetValues(
+    sheets,
+    NCX_LEAGUE_SHEET_ID,
+    "NCXID!K2:O25"
+  );
+
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS S9.captains (
+      team_name VARCHAR(255) NOT NULL,
+      discord_id VARCHAR(32) NOT NULL,
+      PRIMARY KEY (team_name, discord_id)
+    )
+  `);
+  await conn.execute("DELETE FROM S9.captains");
+
+  const sql = "INSERT IGNORE INTO S9.captains (team_name, discord_id) VALUES (?, ?)";
+  let written = 0;
+  for (const r0 of rows) {
+    const r = [...r0, "", "", "", "", ""].slice(0, 5);
+    const team = norm(r[0]);
+    const disc = String(r[4] ?? "")
+      .trim()
+      .replace(/[<@!>]/g, "")
+      .replace(/\D/g, "");
+    if (!team || !disc) continue;
+    await conn.execute(sql, [team, disc]);
+    written++;
+  }
+  return written;
+}
+
 async function loadNcxid(sheets: any, conn: mysql.Connection) {
   const rows = await getSheetValues(
     sheets,
@@ -1229,6 +1261,7 @@ export async function GET(req: NextRequest) {
       await loadStreamSchedule(sheets, conn);
       await loadDiscordMap(sheets, conn);
       await loadNcxid(sheets, conn);
+      results.captains = await loadCaptains(sheets, conn);
       await loadAdvStats(sheets, conn);
       await loadAllTimeStats(sheets, conn);
       await loadTeamSchedule(sheets, conn);

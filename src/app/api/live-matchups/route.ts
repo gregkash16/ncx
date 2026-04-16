@@ -1,11 +1,14 @@
 // src/app/api/live-matchups/route.ts
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 let ensured = false;
+let ensuredClickLog = false;
 
 async function ensureTable() {
   if (ensured) return;
@@ -17,10 +20,44 @@ async function ensureTable() {
       stream_name VARCHAR(255),
       stream_url TEXT NOT NULL,
       started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      started_by_discord_id VARCHAR(32),
       PRIMARY KEY (week_label, game)
     )
   `);
+  // Add column to existing tables created before started_by was tracked.
+  try {
+    await pool.query(
+      `ALTER TABLE S9.live_matchups ADD COLUMN started_by_discord_id VARCHAR(32)`
+    );
+  } catch {
+    // Column already exists — expected on all runs after the first.
+  }
   ensured = true;
+}
+
+async function ensureClickLogTable() {
+  if (ensuredClickLog) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS railway.live (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      clicked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      discord_id VARCHAR(32) NOT NULL,
+      discord_name VARCHAR(255),
+      week_label VARCHAR(32),
+      game VARCHAR(16),
+      provider VARCHAR(32),
+      stream_name VARCHAR(255),
+      stream_url TEXT,
+      is_new TINYINT(1) NOT NULL DEFAULT 0,
+      INDEX idx_clicked_at (clicked_at),
+      INDEX idx_discord_id (discord_id)
+    )
+  `);
+  ensuredClickLog = true;
+}
+
+function normalizeDiscordId(v: unknown): string {
+  return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
 }
 
 async function purgeExpired() {
@@ -38,9 +75,9 @@ export async function GET(request: Request) {
     const week = searchParams.get("week");
 
     const sql = week
-      ? `SELECT week_label, game, provider, stream_name, stream_url, started_at
+      ? `SELECT week_label, game, provider, stream_name, stream_url, started_at, started_by_discord_id
            FROM S9.live_matchups WHERE week_label = ?`
-      : `SELECT week_label, game, provider, stream_name, stream_url, started_at
+      : `SELECT week_label, game, provider, stream_name, stream_url, started_at, started_by_discord_id
            FROM S9.live_matchups`;
 
     const [rows] = await pool.query<any[]>(sql, week ? [week] : []);
@@ -55,6 +92,10 @@ export async function GET(request: Request) {
         r.started_at instanceof Date
           ? r.started_at.toISOString()
           : String(r.started_at),
+      startedByDiscordId:
+        r.started_by_discord_id != null
+          ? String(r.started_by_discord_id)
+          : null,
     }));
 
     return NextResponse.json({ live });
@@ -69,6 +110,21 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    const discordId = normalizeDiscordId(
+      (session?.user as any)?.discordId ?? (session?.user as any)?.id
+    );
+    if (!session?.user || !discordId) {
+      return NextResponse.json(
+        { error: "Sign in with Discord to go live" },
+        { status: 401 }
+      );
+    }
+    const discordName =
+      (session.user as any)?.name != null
+        ? String((session.user as any).name)
+        : null;
+
     await ensureTable();
 
     const body = await request.json();
@@ -100,22 +156,47 @@ export async function POST(request: Request) {
     }
 
     const [existing] = await pool.query<any[]>(
-      `SELECT week_label FROM S9.live_matchups WHERE week_label = ? AND game = ?`,
+      `SELECT started_by_discord_id FROM S9.live_matchups WHERE week_label = ? AND game = ?`,
       [weekLabel, game]
     );
     const isNew = !Array.isArray(existing) || existing.length === 0;
+    if (!isNew) {
+      const owner = existing[0]?.started_by_discord_id
+        ? String(existing[0].started_by_discord_id)
+        : null;
+      // Allow legacy rows (no owner recorded) to be claimed by any signed-in user.
+      if (owner && owner !== discordId) {
+        return NextResponse.json(
+          { error: "Only the user who started this stream can change it" },
+          { status: 403 }
+        );
+      }
+    }
 
     await pool.query(
       `INSERT INTO S9.live_matchups
-         (week_label, game, provider, stream_name, stream_url, started_at)
-       VALUES (?, ?, ?, ?, ?, NOW())
+         (week_label, game, provider, stream_name, stream_url, started_at, started_by_discord_id)
+       VALUES (?, ?, ?, ?, ?, NOW(), ?)
        ON DUPLICATE KEY UPDATE
          provider = VALUES(provider),
          stream_name = VALUES(stream_name),
          stream_url = VALUES(stream_url),
-         started_at = NOW()`,
-      [weekLabel, game, provider, streamName, streamUrl]
+         started_at = NOW(),
+         started_by_discord_id = VALUES(started_by_discord_id)`,
+      [weekLabel, game, provider, streamName, streamUrl, discordId]
     );
+
+    try {
+      await ensureClickLogTable();
+      await pool.query(
+        `INSERT INTO railway.live
+           (discord_id, discord_name, week_label, game, provider, stream_name, stream_url, is_new)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [discordId, discordName, weekLabel, game, provider, streamName, streamUrl, isNew ? 1 : 0]
+      );
+    } catch (e) {
+      console.warn("⚠️ railway.live click log failed:", e);
+    }
 
     if (isNew) {
       const webhook = process.env.DISCORD_LIVE_WEBHOOK_URL;
@@ -211,6 +292,17 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    const discordId = normalizeDiscordId(
+      (session?.user as any)?.discordId ?? (session?.user as any)?.id
+    );
+    if (!session?.user || !discordId) {
+      return NextResponse.json(
+        { error: "Sign in with Discord to end live" },
+        { status: 401 }
+      );
+    }
+
     await ensureTable();
 
     const { searchParams } = new URL(request.url);
@@ -222,6 +314,23 @@ export async function DELETE(request: Request) {
         { error: "Missing weekLabel or game" },
         { status: 400 }
       );
+    }
+
+    const [existing] = await pool.query<any[]>(
+      `SELECT started_by_discord_id FROM S9.live_matchups WHERE week_label = ? AND game = ?`,
+      [weekLabel, game]
+    );
+    if (Array.isArray(existing) && existing.length > 0) {
+      const owner = existing[0]?.started_by_discord_id
+        ? String(existing[0].started_by_discord_id)
+        : null;
+      // Allow legacy rows (no owner recorded) to be ended by any signed-in user.
+      if (owner && owner !== discordId) {
+        return NextResponse.json(
+          { error: "Only the user who started this stream can end it" },
+          { status: 403 }
+        );
+      }
     }
 
     await pool.query(

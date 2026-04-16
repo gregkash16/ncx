@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { useSession, signIn } from "next-auth/react";
 import NextImage from "next/image";
 import type { IndRow, FactionMap, MatchRow } from "@/lib/googleSheets";
 import { teamSlug } from "@/lib/slug";
@@ -63,6 +64,7 @@ type LiveEntry = {
   streamName: string | null;
   streamUrl: string;
   startedAt: string; // ISO
+  startedByDiscordId: string | null;
 };
 
 const LIVE_MAX_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -709,6 +711,11 @@ export default function MatchupsPanel({
   const urlQRaw = (searchParams.get("q") ?? "").trim();
   const selectedWeekRaw = (searchParams.get("w") ?? "").trim();
 
+  const { data: authSession } = useSession();
+  const myDiscordId =
+    ((authSession?.user as any)?.discordId as string | undefined) ?? "";
+  const isDiscordSignedIn = Boolean(myDiscordId);
+
   const [openScout, setOpenScout] = useState<string | null>(null);
   const [scoutById, setScoutById] = useState<
     Record<string, { loading?: boolean; error?: string; data?: ScoutPayload }>
@@ -1204,7 +1211,12 @@ export default function MatchupsPanel({
 
                 {/* LIVE / END LIVE pill + Create thumbnail button — desktop only */}
                 <div className="absolute -top-3 -right-3 hidden md:flex items-center gap-2">
-                  {isCurrentWeek && !isDone && isLive ? (
+                  {isCurrentWeek &&
+                  !isDone &&
+                  isLive &&
+                  isDiscordSignedIn &&
+                  (!live?.startedByDiscordId ||
+                    live.startedByDiscordId === myDiscordId) ? (
                     <button
                       type="button"
                       onClick={() => handleEndLive(row.game)}
@@ -1218,10 +1230,19 @@ export default function MatchupsPanel({
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          if (!isDiscordSignedIn) {
+                            signIn("discord");
+                            return;
+                          }
                           setOpenLivePopover((cur) =>
                             cur === row.game ? null : row.game
-                          )
+                          );
+                        }}
+                        title={
+                          isDiscordSignedIn
+                            ? undefined
+                            : "Sign in with Discord to go live"
                         }
                         className="inline-flex items-center rounded-lg bg-yellow-400 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-900 shadow-md shadow-yellow-500/40 hover:bg-yellow-300"
                       >

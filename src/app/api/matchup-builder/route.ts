@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
-import { getSheets } from "@/lib/googleSheets";
+import { getCaptainTeams } from "@/lib/captains";
 
 export const dynamic = "force-dynamic";
 
@@ -19,28 +19,6 @@ function norm(v: unknown) {
 }
 function teamKey(s: string): string {
   return String(s ?? "").trim().toUpperCase();
-}
-
-type SheetsClient = ReturnType<typeof getSheets>;
-
-async function getCaptainTeamsForDiscord(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  discordId: string
-): Promise<string[]> {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "NCXID!K2:O25",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = res.data.values ?? [];
-  const teams: string[] = [];
-  for (const r of rows) {
-    const team = norm(r?.[0]);
-    const disc = normalizeDiscordId(r?.[4]);
-    if (team && disc === discordId) teams.push(team);
-  }
-  return teams;
 }
 
 /* ── main ── */
@@ -60,9 +38,7 @@ export async function GET(req: NextRequest) {
     }
     const isAdmin = isAppleAuth || (ADMIN_DISCORD_IDS as readonly string[]).includes(discordId);
 
-    const sheets = getSheets();
-    const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-    const captainTeams = await getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId);
+    const captainTeams = await getCaptainTeams(discordId);
 
     if (!isAdmin && captainTeams.length === 0) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
