@@ -801,7 +801,15 @@ export default function MatchupsPanel({
     return out;
   }, [liveGames, nowMs]);
 
-  async function handleGoLive(game: string) {
+  async function handleGoLive(
+    game: string,
+    meta?: {
+      awayTeam?: string;
+      homeTeam?: string;
+      awayName?: string;
+      homeName?: string;
+    }
+  ) {
     const provider = liveProvider[game] ?? "NCX";
     let streamUrl = "";
     let streamName: string | null = null;
@@ -835,6 +843,10 @@ export default function MatchupsPanel({
           provider,
           streamName,
           streamUrl,
+          awayTeam: meta?.awayTeam ?? null,
+          homeTeam: meta?.homeTeam ?? null,
+          awayName: meta?.awayName ?? null,
+          homeName: meta?.homeName ?? null,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -1292,7 +1304,14 @@ export default function MatchupsPanel({
                             <button
                               type="button"
                               disabled={submittingLive}
-                              onClick={() => handleGoLive(row.game)}
+                              onClick={() =>
+                                handleGoLive(row.game, {
+                                  awayTeam: row.awayTeam,
+                                  homeTeam: row.homeTeam,
+                                  awayName: row.awayName,
+                                  homeName: row.homeName,
+                                })
+                              }
                               className="rounded-md bg-yellow-400 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-zinc-900 hover:bg-yellow-300 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                               {submittingLive ? "Starting…" : "Go Live"}

@@ -78,6 +78,10 @@ export async function POST(request: Request) {
     const streamName =
       body?.streamName != null ? String(body.streamName).trim() : null;
     const streamUrl = String(body?.streamUrl ?? "").trim();
+    const awayTeam = body?.awayTeam ? String(body.awayTeam).trim() : "";
+    const homeTeam = body?.homeTeam ? String(body.homeTeam).trim() : "";
+    const awayName = body?.awayName ? String(body.awayName).trim() : "";
+    const homeName = body?.homeName ? String(body.homeName).trim() : "";
 
     if (!weekLabel || !game || !provider || !streamUrl) {
       return NextResponse.json(
@@ -93,6 +97,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const [existing] = await pool.query<any[]>(
+      `SELECT week_label FROM S9.live_matchups WHERE week_label = ? AND game = ?`,
+      [weekLabel, game]
+    );
+    const isNew = !Array.isArray(existing) || existing.length === 0;
+
     await pool.query(
       `INSERT INTO S9.live_matchups
          (week_label, game, provider, stream_name, stream_url, started_at)
@@ -104,6 +114,27 @@ export async function POST(request: Request) {
          started_at = NOW()`,
       [weekLabel, game, provider, streamName, streamUrl]
     );
+
+    if (isNew) {
+      const webhook = process.env.DISCORD_LIVE_WEBHOOK_URL;
+      if (webhook) {
+        const awaySide =
+          awayTeam && awayName ? `${awayTeam} || ${awayName}` : awayTeam || awayName || "Away";
+        const homeSide =
+          homeTeam && homeName ? `${homeName} || ${homeTeam}` : homeTeam || homeName || "Home";
+        const content =
+          `🔴 **LIVE NOW** — ${weekLabel} — GAME ${game} — ${awaySide} vs ${homeSide} — ${streamUrl}`;
+        try {
+          await fetch(webhook, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content }),
+          });
+        } catch (e) {
+          console.warn("⚠️ Live webhook post failed:", e);
+        }
+      }
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
