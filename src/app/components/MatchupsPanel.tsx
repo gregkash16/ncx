@@ -77,6 +77,8 @@ type StreamPreset = { key: string; label: string; url: string; streamName: strin
 const STREAM_PRESETS: StreamPreset[] = [
   { key: "NCX", label: "NCX", url: NCX_TWITCH_URL, streamName: "Nickel City X-Wing" },
   { key: "FIRECAST", label: "Firecast Focus", url: "http://www.twitch.tv/firecastfocus", streamName: "Firecast Focus" },
+  { key: "SNIPES", label: "Snipes", url: "https://www.twitch.tv/nsniper_101", streamName: "Snipes" },
+  { key: "PSO", label: "PSO", url: "https://www.twitch.tv/polish_system_open_x_wing", streamName: "PSO" },
 ];
 const STREAM_PRESET_OPTIONS: StreamPreset[] = [
   STREAM_PRESETS[0],
