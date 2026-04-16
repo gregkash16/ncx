@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSheets } from "@/lib/googleSheets";
 import { getCaptainTeams } from "@/lib/captains";
+import { pool } from "@/lib/db";
 import { sql } from "@vercel/postgres";
 import mysql from "mysql2/promise";
 
@@ -152,21 +153,21 @@ async function sendPushForTeams(
 
 /* ------------------------- Role helpers ------------------------- */
 
-async function getNcxIdForDiscord(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  discordId: string
-) {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "Discord_ID!A:D",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = res.data.values ?? [];
-  const hit = rows.find((r) => normalizeDiscordId(r?.[3]) === discordId);
+// MySQL-backed lookup. The S9.discord_map table is refreshed every reseed
+// and stays consistent with the Discord_ID Sheet tab.
+async function getNcxIdForDiscord(discordId: string) {
+  if (!discordId) return null;
+  const [rows] = await pool.query<any[]>(
+    `SELECT ncxid, first_name, last_name FROM S9.discord_map WHERE discord_id = ? LIMIT 1`,
+    [discordId]
+  );
+  const hit = (rows ?? [])[0];
   if (!hit) return null;
-
-  return { ncxid: hit[0] ?? "", first: hit[1] ?? "", last: hit[2] ?? "" };
+  return {
+    ncxid: String(hit.ncxid ?? ""),
+    first: String(hit.first_name ?? ""),
+    last: String(hit.last_name ?? ""),
+  };
 }
 
 // Captain lookup moved to MySQL — see `src/lib/captains.ts`. The old
@@ -292,7 +293,7 @@ export async function GET(request: NextRequest) {
     const sheets = getSheets();
 
     const [who, captainTeams] = await Promise.all([
-      getNcxIdForDiscord(sheets, spreadsheetId, discordId || ""),
+      getNcxIdForDiscord(discordId || ""),
       getCaptainTeams(discordId || ""),
     ]);
 
@@ -308,13 +309,11 @@ export async function GET(request: NextRequest) {
     const myNcxid = (who?.ncxid ?? "").toUpperCase();
     const captainTeamKeys = captainTeams.map(teamKey);
 
-    // 1) Active week
-    const weekRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "SCHEDULE!U2",
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const weekTab = norm(weekRes.data.values?.[0]?.[0]) || "WEEK 1";
+    // 1) Active week — pulled from MySQL (refreshed every reseed)
+    const [cwRows] = await pool.query<any[]>(
+      "SELECT week_label FROM S9.current_week LIMIT 1"
+    );
+    const weekTab = norm(cwRows?.[0]?.week_label) || "WEEK 1";
 
     // 2) Week rows
     const dataRes = await sheets.spreadsheets.values.get({
@@ -566,7 +565,7 @@ export async function POST(req: NextRequest) {
     const discordId = isNativeAppleAuthPost ? "" : normalizeDiscordId(raw);
 
     const [who, captainTeams] = await Promise.all([
-      getNcxIdForDiscord(sheets, spreadsheetId, discordId || ""),
+      getNcxIdForDiscord(discordId || ""),
       getCaptainTeams(discordId || ""),
     ]);
 
@@ -580,13 +579,12 @@ export async function POST(req: NextRequest) {
     const myNcxid = (who?.ncxid ?? "").toUpperCase();
     const captainTeamKeys = captainTeams.map(teamKey);
 
-    // Active week
-    const weekRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "SCHEDULE!U2",
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const weekTab = norm(weekRes.data.values?.[0]?.[0]) || "WEEK 1";
+    // Active week — pulled from MySQL (S9.current_week is refreshed every
+    // reseed and stays in sync with the SCHEDULE!U2 cell).
+    const [cwRows] = await pool.query<any[]>(
+      "SELECT week_label FROM S9.current_week LIMIT 1"
+    );
+    const weekTab = norm(cwRows?.[0]?.week_label) || "WEEK 1";
     const canonicalWeekLabel = normalizeWeekLabel(weekTab);
 
     // Confirm the row exists
@@ -694,85 +692,27 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let didMainUpdate = false;
+    // ---- Run main week-tab write and Lists sheet upsert in parallel ----
+    // Both are independent Sheets API round-trips; no reason to chain them.
 
-    // Write main week-tab changes if any
-    if (batchData.length > 0) {
+    const wantsMainUpdate = batchData.length > 0;
+    const wantsListsUpdate = !!(awayListStr || homeListStr);
+
+    const writeMain = async (): Promise<boolean> => {
+      if (!wantsMainUpdate) return false;
       await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
-        requestBody: {
-          valueInputOption: "RAW",
-          data: batchData,
-        },
+        requestBody: { valueInputOption: "RAW", data: batchData },
       });
-      didMainUpdate = true;
+      return true;
+    };
 
-      // Optional: enforce number formatting for scores (if we touched them)
-      if (hasScoreInputs) {
-        try {
-          const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-          const weekSheet = spreadsheet.data.sheets?.find(
-            (s) => s.properties?.title === weekTab
-          );
-          const sheetId = weekSheet?.properties?.sheetId;
-
-          if (sheetId != null) {
-            await sheets.spreadsheets.batchUpdate({
-              spreadsheetId,
-              requestBody: {
-                requests: [
-                  {
-                    repeatCell: {
-                      range: {
-                        sheetId,
-                        startRowIndex: rowNum - 1,
-                        endRowIndex: rowNum,
-                        startColumnIndex: 6,
-                        endColumnIndex: 7,
-                      },
-                      cell: {
-                        userEnteredFormat: {
-                          numberFormat: { type: "NUMBER", pattern: "0" },
-                        },
-                      },
-                      fields: "userEnteredFormat.numberFormat",
-                    },
-                  },
-                  {
-                    repeatCell: {
-                      range: {
-                        sheetId,
-                        startRowIndex: rowNum - 1,
-                        endRowIndex: rowNum,
-                        startColumnIndex: 14,
-                        endColumnIndex: 15,
-                      },
-                      cell: {
-                        userEnteredFormat: {
-                          numberFormat: { type: "NUMBER", pattern: "0" },
-                        },
-                      },
-                      fields: "userEnteredFormat.numberFormat",
-                    },
-                  },
-                ],
-              },
-            });
-          }
-        } catch (fmtErr) {
-          console.warn("⚠️ Formatting skipped/failed:", fmtErr);
-        }
-      }
-    }
-
-    // ---- Lists sheet upsert (optional) ----
-    let didListsUpdate = false;
-    if (awayListStr || homeListStr) {
+    const writeLists = async (): Promise<boolean> => {
+      if (!wantsListsUpdate) return false;
       try {
-        const listsRange = "Lists!A2:D";
         const listsRes = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: listsRange,
+          range: "Lists!A2:D",
           valueRenderOption: "FORMATTED_VALUE",
         });
         const listsRows = listsRes.data.values ?? [];
@@ -787,50 +727,95 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        const listsTitle = "Lists";
+        const values = [[weekTab, gameNo, awayListStr || "", homeListStr || ""]];
 
         if (matchIndex >= 0) {
-          // Update existing row
           const listRowNum = matchIndex + 2;
           await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: `${listsTitle}!A${listRowNum}:D${listRowNum}`,
+            range: `Lists!A${listRowNum}:D${listRowNum}`,
             valueInputOption: "RAW",
-            requestBody: {
-              values: [
-                [
-                  weekTab,
-                  gameNo,
-                  awayListStr || "",
-                  homeListStr || "",
-                ],
-              ],
-            },
+            requestBody: { values },
           });
         } else {
-          // Append new row
           await sheets.spreadsheets.values.append({
             spreadsheetId,
-            range: `${listsTitle}!A2:D2`,
+            range: "Lists!A2:D2",
             valueInputOption: "RAW",
             insertDataOption: "INSERT_ROWS",
+            requestBody: { values },
+          });
+        }
+        return true;
+      } catch (e) {
+        console.warn("⚠️ Lists sheet update/append failed:", e);
+        return false;
+      }
+    };
+
+    const [didMainUpdate, didListsUpdate] = await Promise.all([
+      writeMain(),
+      writeLists(),
+    ]);
+
+    // ---- Fire-and-forget: enforce score-cell number format ----
+    // Cosmetic only; the values themselves are already numeric. Don't block
+    // the response on this round-trip.
+    if (didMainUpdate && hasScoreInputs) {
+      void (async () => {
+        try {
+          const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+          const weekSheet = spreadsheet.data.sheets?.find(
+            (s) => s.properties?.title === weekTab
+          );
+          const sheetId = weekSheet?.properties?.sheetId;
+          if (sheetId == null) return;
+
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
             requestBody: {
-              values: [
-                [
-                  weekTab,
-                  gameNo,
-                  awayListStr || "",
-                  homeListStr || "",
-                ],
+              requests: [
+                {
+                  repeatCell: {
+                    range: {
+                      sheetId,
+                      startRowIndex: rowNum - 1,
+                      endRowIndex: rowNum,
+                      startColumnIndex: 6,
+                      endColumnIndex: 7,
+                    },
+                    cell: {
+                      userEnteredFormat: {
+                        numberFormat: { type: "NUMBER", pattern: "0" },
+                      },
+                    },
+                    fields: "userEnteredFormat.numberFormat",
+                  },
+                },
+                {
+                  repeatCell: {
+                    range: {
+                      sheetId,
+                      startRowIndex: rowNum - 1,
+                      endRowIndex: rowNum,
+                      startColumnIndex: 14,
+                      endColumnIndex: 15,
+                    },
+                    cell: {
+                      userEnteredFormat: {
+                        numberFormat: { type: "NUMBER", pattern: "0" },
+                      },
+                    },
+                    fields: "userEnteredFormat.numberFormat",
+                  },
+                },
               ],
             },
           });
+        } catch (fmtErr) {
+          console.warn("⚠️ Background formatting failed:", fmtErr);
         }
-
-        didListsUpdate = true;
-      } catch (e) {
-        console.warn("⚠️ Lists sheet update/append failed:", e);
-      }
+      })();
     }
 
     // If literally nothing changed anywhere, just say OK
