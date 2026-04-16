@@ -27,7 +27,6 @@ import MatchupBuilder from "../components/MatchupBuilder";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getSheets } from "@/lib/googleSheets";
 import {
   getDiscordMapCached,
   fetchMatchupsDataCached,
@@ -39,6 +38,7 @@ import {
   type MatchRow,
   type IndRow,
 } from "@/lib/googleSheets";
+import { getCaptainTeams } from "@/lib/captains";
 import { teamSlug } from "@/lib/slug";
 import Season9PrefsPanel from "../components/Season9PrefsPanel";
 import PodcastPanel from "../components/PodcastPanel";
@@ -189,27 +189,30 @@ export default async function HomePage({
   const session = await getServerSession(authOptions);
   let message = "Please log in with your Discord.";
 
-  if (session?.user) {
-    try {
-      const rawSessionId =
-        (session.user as any).discordId ?? (session.user as any).id;
-      const sessionId = normalizeDiscordId(rawSessionId);
+  // Fetch discord map once — reused for welcome message AND ncxToDiscord
+  // lookup below. Previously this was fetched twice per render.
+  let discordMap: Record<string, { ncxid: string; first: string; last: string }> = {};
+  try {
+    discordMap = await getDiscordMapCached();
+  } catch (err) {
+    console.error("Error fetching discord map:", err);
+  }
 
-      if (sessionId) {
-        const discordMap = await getDiscordMapCached();
-        const match = (discordMap as any)[sessionId];
-        if (match) {
-          const { ncxid, first, last } = match as any;
-          message = `Welcome ${first} ${last}! – ${ncxid}`;
-        } else {
-          message = `Welcome ${session.user.name ?? "Pilot"}! – No NCXID Found.`;
-        }
+  if (session?.user) {
+    const rawSessionId =
+      (session.user as any).discordId ?? (session.user as any).id;
+    const sessionId = normalizeDiscordId(rawSessionId);
+
+    if (sessionId) {
+      const match = (discordMap as any)[sessionId];
+      if (match) {
+        const { ncxid, first, last } = match as any;
+        message = `Welcome ${first} ${last}! – ${ncxid}`;
       } else {
-        message = `Welcome ${session.user.name ?? "Pilot"}! – No Discord ID found`;
+        message = `Welcome ${session.user.name ?? "Pilot"}! – No NCXID Found.`;
       }
-    } catch (err) {
-      console.error("Error fetching NCX info:", err);
-      message = `Welcome ${session.user.name ?? "Pilot"}! – (Error fetching NCXID)`;
+    } else {
+      message = `Welcome ${session.user.name ?? "Pilot"}! – No Discord ID found`;
     }
   }
 
@@ -222,16 +225,10 @@ export default async function HomePage({
       showBuilder = true;
     } else if (sid) {
       try {
-        const sheets = getSheets();
-        const res = await sheets.spreadsheets.values.get({
-          spreadsheetId: process.env.NCX_LEAGUE_SHEET_ID!,
-          range: "NCXID!K2:O25",
-          valueRenderOption: "FORMATTED_VALUE",
-        });
-        const captainRows = res.data.values ?? [];
-        showBuilder = captainRows.some((r) => normalizeDiscordId(r?.[4]) === sid);
+        const captainTeams = await getCaptainTeams(sid);
+        showBuilder = captainTeams.length > 0;
       } catch {
-        // If sheets call fails, hide builder
+        // If captain lookup fails, hide builder
       }
     }
   }
@@ -256,16 +253,21 @@ export default async function HomePage({
   const selectedWeek =
     reqNum && activeNum && reqNum <= activeNum ? requestedWeekRaw : undefined;
 
+  // Only re-fetch matchups if the selected week is actually different from
+  // the active week we already loaded. Previously this would re-fetch even
+  // when `?w=WEEK_N` matched the active week.
+  const needsDifferentWeek =
+    !!selectedWeek && parseWeekNum(selectedWeek) !== activeNum;
+
   const {
     matches: matchesToUse,
     weekTab: weekLabelForPanel,
-  }: { matches: MatchRow[]; weekTab: string } = selectedWeek
+  }: { matches: MatchRow[]; weekTab: string } = needsDifferentWeek
     ? await fetchMatchupsDataCached(selectedWeek)
     : { matches: activeMatches, weekTab: activeWeek };
 
   const { listsMap } = await fetchListsForWeekCached(weekLabelForPanel);
 
-  const discordMap = await getDiscordMapCached();
   const ncxToDiscord: Record<string, string> = {};
   for (const [discordId, payload] of Object.entries(discordMap ?? {})) {
     const ncxid = (payload as any)?.ncxid?.trim?.() ?? "";

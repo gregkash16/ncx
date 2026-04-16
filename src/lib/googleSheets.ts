@@ -118,6 +118,12 @@ export async function fetchSignupsAutoCached() {
 
 export type MatchRow = {
   game: string;
+  /**
+   * Actual Google Sheet row number for this game (1-indexed). Populated by
+   * seed-mysql. Write-back paths (report-game, matchup-builder) use this to
+   * address cells directly without re-reading the sheet. 0 if unseeded.
+   */
+  rowIndex: number;
   awayId: string;
   awayName: string;
   awayTeam: string;
@@ -145,6 +151,7 @@ function mapDbRowToMatchRow(r: any): MatchRow {
 
   return {
     game,
+    rowIndex: Number(r.row_index ?? 0) || 0,
     awayId: norm(r.awayId),
     awayName: norm(r.awayName),
     awayTeam: norm(r.awayTeam),
@@ -379,25 +386,13 @@ export async function fetchFactionMapCached(): Promise<FactionMap> {
    =========================================================================== */
 
 export async function fetchAdvStatsCached() {
-  const t1Rows = await dbQuery<any>(`
-    SELECT * FROM adv_stats_t1
-  `);
-
-  const t2Rows = await dbQuery<any>(`
-    SELECT * FROM adv_stats_t2
-  `);
-
-  const t3Rows = await dbQuery<any>(`
-    SELECT * FROM adv_stats_t3
-  `);
-
-  const t4Rows = await dbQuery<any>(`
-    SELECT * FROM adv_stats_t4
-  `);
-
-  const t5Rows = await dbQuery<any>(`
-    SELECT * FROM adv_stats_t5
-  `);
+  const [t1Rows, t2Rows, t3Rows, t4Rows, t5Rows] = await Promise.all([
+    dbQuery<any>(`SELECT * FROM adv_stats_t1`),
+    dbQuery<any>(`SELECT * FROM adv_stats_t2`),
+    dbQuery<any>(`SELECT * FROM adv_stats_t3`),
+    dbQuery<any>(`SELECT * FROM adv_stats_t4`),
+    dbQuery<any>(`SELECT * FROM adv_stats_t5`),
+  ]);
 
   return {
     t1: t1Rows.map((r) => Object.values(r).map(norm)),

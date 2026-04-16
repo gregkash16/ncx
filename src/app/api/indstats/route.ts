@@ -1,6 +1,6 @@
 // src/app/api/indstats/route.ts
 import { NextResponse } from "next/server";
-import { fetchIndStatsDataCached } from "@/lib/googleSheets";
+import { pool } from "@/lib/db";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -9,43 +9,52 @@ export async function GET(req: Request) {
 
   if (!q) return NextResponse.json({ items: [] });
 
-  const all = (await fetchIndStatsDataCached()) ?? [];
+  const like = `%${q}%`;
 
-  const matches = all.filter((r: any) => {
-    const name = `${r.first ?? ""} ${r.last ?? ""}`.toLowerCase();
-    const ncxid = String(r.ncxid ?? "").toLowerCase();
-    const team = String(r.team ?? "").toLowerCase();
-    const faction = String(r.faction ?? "").toLowerCase();
-    return (
-      name.includes(q) ||
-      ncxid.includes(q) ||
-      team.includes(q) ||
-      faction.includes(q)
-    );
-  });
+  const [rows] = await pool.query<any[]>(
+    `
+    SELECT
+      \`rank\`,
+      ncxid,
+      first_name,
+      last_name,
+      pick_no,
+      team,
+      faction,
+      wins,
+      losses,
+      points,
+      plms,
+      games,
+      winper,
+      ppg,
+      efficiency,
+      war,
+      h2h,
+      potato,
+      sos
+    FROM individual_stats
+    WHERE
+         LOWER(CONCAT(first_name, ' ', last_name)) LIKE ?
+      OR LOWER(ncxid) LIKE ?
+      OR LOWER(team) LIKE ?
+      OR LOWER(faction) LIKE ?
+    ORDER BY
+      CAST(games AS UNSIGNED) DESC,
+      CAST(\`rank\` AS UNSIGNED) ASC,
+      first_name ASC,
+      last_name ASC
+    LIMIT ?
+    `,
+    [like, like, like, like, limit]
+  );
 
-  // sort: GP desc, then rank asc (numeric), then name
-  matches.sort((a: any, b: any) => {
-    const agp = Number(a.games ?? 0);
-    const bgp = Number(b.games ?? 0);
-    if (bgp !== agp) return bgp - agp;
-
-    const ar = Number(a.rank ?? 1e9);
-    const br = Number(b.rank ?? 1e9);
-    if (!Number.isNaN(ar) && !Number.isNaN(br) && ar !== br) return ar - br;
-
-    const an = `${a.first ?? ""} ${a.last ?? ""}`.trim();
-    const bn = `${b.first ?? ""} ${b.last ?? ""}`.trim();
-    return an.localeCompare(bn);
-  });
-
-  // project only fields we care about for cards; preserve numeric types where helpful
-  const items = matches.slice(0, limit).map((r: any) => ({
+  const items = (rows ?? []).map((r: any) => ({
     rank: Number(r.rank ?? 0),
     ncxid: String(r.ncxid ?? ""),
-    first: String(r.first ?? ""),
-    last: String(r.last ?? ""),
-    pick: Number(r.pick ?? 0),
+    first: String(r.first_name ?? ""),
+    last: String(r.last_name ?? ""),
+    pick: Number(r.pick_no ?? 0),
     team: String(r.team ?? ""),
     faction: String(r.faction ?? ""),
     wins: Number(r.wins ?? 0),
@@ -53,7 +62,7 @@ export async function GET(req: Request) {
     points: Number(r.points ?? 0),
     plms: Number(r.plms ?? 0),
     games: Number(r.games ?? 0),
-    winPct: Number(r.winPct ?? 0),
+    winPct: Number(r.winper ?? 0),
     ppg: Number(r.ppg ?? 0),
     efficiency: Number(r.efficiency ?? 0),
     war: Number(r.war ?? 0),

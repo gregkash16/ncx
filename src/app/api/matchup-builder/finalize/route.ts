@@ -79,57 +79,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not all slots are locked" }, { status: 400 });
     }
 
-    // Find the 7 game numbers in weekly_matchups for this series
+    // Find the 7 games + their actual sheet row numbers for this series.
+    // row_index is populated by seed-mysql; sheet has 3-row gaps between
+    // series so we can't compute it from the game number alone.
     const [gameRows] = await conn.query(
-      `SELECT game FROM S9.weekly_matchups
+      `SELECT game, row_index FROM S9.weekly_matchups
        WHERE week_label = ? AND awayTeam = ? AND homeTeam = ?
        ORDER BY CAST(game AS UNSIGNED) ASC`,
       [week, awayTeam, homeTeam]
     );
-    const games = (gameRows as any[]).map((r: any) => parseInt(r.game, 10));
+    const gameList = (gameRows as any[]).map((r: any) => ({
+      game: parseInt(r.game, 10),
+      rowIndex: Number(r.row_index) || 0,
+    }));
 
-    if (games.length !== 7) {
+    if (gameList.length !== 7) {
       await conn.rollback();
       return NextResponse.json(
-        { error: `Expected 7 games in weekly_matchups, found ${games.length}` },
+        { error: `Expected 7 games in weekly_matchups, found ${gameList.length}` },
         { status: 500 }
       );
     }
 
-    // Write to Google Sheet
-    // Read the sheet to find actual row numbers by matching game number in column A
+    const missingRowIndex = gameList.find((g) => !g.rowIndex);
+    if (missingRowIndex) {
+      await conn.rollback();
+      return NextResponse.json(
+        {
+          error: `Game ${missingRowIndex.game} has no row_index — run /api/seed-mysql before finalizing`,
+        },
+        { status: 500 }
+      );
+    }
+
+    // Write to Google Sheet. Use the row_index from MySQL (source: the
+    // actual sheet row captured at seed time).
     const weekTab = week; // e.g. "WEEK 7"
 
     const sheets = getSheets();
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
 
-    const sheetRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${weekTab}!A2:A120`,
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const sheetRows = sheetRes.data.values ?? [];
-
-    // Build a map: game number string -> sheet row number (1-indexed, A2 = row 2)
-    const gameToRow: Record<string, number> = {};
-    for (let i = 0; i < sheetRows.length; i++) {
-      const cellVal = String(sheetRows[i]?.[0] ?? "").trim();
-      if (cellVal) {
-        gameToRow[cellVal] = i + 2; // i=0 is row 2 (A2)
-      }
-    }
-
     const batchData: { range: string; values: any[][] }[] = [];
 
     for (let i = 0; i < 7; i++) {
       const slot = slots[i];
-      const gameNum = games[i];
-      const rowNum = gameToRow[String(gameNum)];
-
-      if (!rowNum) {
-        console.error(`[finalize] Game ${gameNum} not found in sheet column A`);
-        continue;
-      }
+      const { rowIndex: rowNum } = gameList[i];
 
       batchData.push(
         { range: `${weekTab}!B${rowNum}`, values: [[slot.away_ncxid]] },

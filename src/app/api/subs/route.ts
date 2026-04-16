@@ -1,38 +1,14 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getSheets } from "@/lib/googleSheets";
 import { pool } from "@/lib/db";
+import { getCaptainTeams } from "@/lib/captains";
 
 /* ------------------------- helpers ------------------------- */
 const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"] as const;
 
 function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
-}
-function norm(v: unknown) {
-  return String(v ?? "").trim();
-}
-
-async function getCaptainTeamsForDiscord(
-  sheets: any,
-  spreadsheetId: string,
-  discordId: string
-): Promise<string[]> {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "NCXID!K2:O25",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = res.data.values ?? [];
-  const teams: string[] = [];
-
-  for (const r of rows) {
-    const team = norm(r?.[0]); // K
-    const disc = normalizeDiscordId(r?.[4]); // O
-    if (team && disc === discordId) teams.push(team);
-  }
-  return teams;
 }
 
 /* ------------------------- GET /api/subs ------------------------- */
@@ -49,11 +25,8 @@ export async function GET() {
       return NextResponse.json({ ok: false, reason: "NO_DISCORD_ID" }, { status: 400 });
     }
 
-    const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-    const sheets = getSheets();
-
-    const captainTeams = await getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId);
-    const isAdmin = ADMIN_DISCORD_IDS.includes(discordId);
+    const captainTeams = await getCaptainTeams(discordId);
+    const isAdmin = (ADMIN_DISCORD_IDS as readonly string[]).includes(discordId);
     const isCaptain = captainTeams.length > 0;
 
     if (!isAdmin && !isCaptain) {

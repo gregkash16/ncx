@@ -18,8 +18,28 @@ function isAdmin(discordId: string): boolean {
   return ADMIN_DISCORD_IDS.includes(discordId);
 }
 
-/** Read the setup week from Google Sheets SETUP!J3 */
+/**
+ * Read the setup week from Google Sheets SCHEDULE!J3.
+ *
+ * Cached in-memory for 60s because this cell is independent from current_week
+ * (it's the *signup* week, which can be ahead of the active match week) and
+ * isn't synced by seed-mysql — so we have to keep the Sheets read, but we
+ * don't need to do it on every GET.
+ */
+type SetupWeekCache = { value: string; ts: number };
+const SETUP_WEEK_TTL_MS = 60_000;
+const globalForSetupWeek = globalThis as unknown as {
+  __ncxSetupWeekCache?: SetupWeekCache;
+};
+
 async function getSetupWeek(): Promise<string> {
+  const now = Date.now();
+  const cached = globalForSetupWeek.__ncxSetupWeekCache;
+  if (cached && now - cached.ts < SETUP_WEEK_TTL_MS) {
+    return cached.value;
+  }
+
+  let value: string;
   try {
     const sheets = getSheets();
     const res = await sheets.spreadsheets.values.get({
@@ -28,17 +48,19 @@ async function getSetupWeek(): Promise<string> {
       valueRenderOption: "FORMATTED_VALUE",
     });
     const raw = String(res.data.values?.[0]?.[0] ?? "").trim();
-    if (!raw) return "WEEK 1";
-    // Normalize: if it's just a number like "2", turn it into "WEEK 2"
-    if (/^\d+$/.test(raw)) return `WEEK ${raw}`;
-    return raw.toUpperCase();
+    if (!raw) value = "WEEK 1";
+    else if (/^\d+$/.test(raw)) value = `WEEK ${raw}`;
+    else value = raw.toUpperCase();
   } catch (err) {
     console.error("Failed to read setup week from sheet, falling back to DB:", err);
     const [weekRows] = await pool.query<any[]>(
       `SELECT week_label FROM S9.current_week LIMIT 1`
     );
-    return weekRows?.[0]?.week_label || "WEEK 1";
+    value = weekRows?.[0]?.week_label || "WEEK 1";
   }
+
+  globalForSetupWeek.__ncxSetupWeekCache = { value, ts: now };
+  return value;
 }
 
 /* ─── GET: fetch signups for current (or specified) week ─── */

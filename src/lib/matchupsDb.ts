@@ -74,6 +74,7 @@ export async function getMatchupsForWeek(
       SELECT
         week_label,
         game,
+        row_index,
         awayId,
         awayName,
         awayTeam,
@@ -98,6 +99,7 @@ export async function getMatchupsForWeek(
 
     const row: MatchRow = {
       game: String(r.game ?? ""),
+      rowIndex: Number((r as any).row_index ?? 0) || 0,
       seriesNo,
 
       awayId: String(r.awayId ?? ""),

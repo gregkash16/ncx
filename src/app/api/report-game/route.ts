@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getSheets } from "@/lib/googleSheets";
+import {
+  getSheets,
+  fetchMatchupsDataCached,
+  fetchListsForWeekCached,
+} from "@/lib/googleSheets";
 import { getCaptainTeams } from "@/lib/captains";
 import { pool } from "@/lib/db";
 import { sql } from "@vercel/postgres";
@@ -289,9 +293,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-    const sheets = getSheets();
-
     const [who, captainTeams] = await Promise.all([
       getNcxIdForDiscord(discordId || ""),
       getCaptainTeams(discordId || ""),
@@ -315,59 +316,42 @@ export async function GET(request: NextRequest) {
     );
     const weekTab = norm(cwRows?.[0]?.week_label) || "WEEK 1";
 
-    // 2) Week rows
-    const dataRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${weekTab}!A2:Q120`,
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const rows = dataRes.data.values ?? [];
+    // 2) Week rows + Lists both from MySQL (previously two Sheets reads).
+    // seed-mysql keeps these in sync with the spreadsheet.
+    const [matchupsData, listsData] = await Promise.all([
+      fetchMatchupsDataCached(weekTab),
+      fetchListsForWeekCached(weekTab),
+    ]);
 
-    // 3) Lists sheet: WEEK, GAME, AWAY LIST, HOME LIST (fail-soft)
+    const dbRows = matchupsData.matches;
     const listMap = new Map<string, { awayList: string; homeList: string }>();
-    try {
-      const listsRes = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: "Lists!A2:D",
-        valueRenderOption: "FORMATTED_VALUE",
+    for (const [game, entry] of Object.entries(listsData.listsMap ?? {})) {
+      listMap.set(`${weekTab}#${game}`, {
+        awayList: entry.awayList ?? "",
+        homeList: entry.homeList ?? "",
       });
-      const listRows = listsRes.data.values ?? [];
-      for (const r of listRows) {
-        const wk = norm(r?.[0]); // WEEK
-        const gm = norm(r?.[1]); // GAME
-        const awayList = norm(r?.[2]); // AWAY LIST
-        const homeList = norm(r?.[3]); // HOME LIST
-        if (!wk || !gm) continue;
-        listMap.set(`${wk}#${gm}`, { awayList, homeList });
-      }
-    } catch (e) {
-      console.warn("Lists sheet missing or unreadable; continuing without lists:", e);
     }
 
     const games: GameRow[] = [];
 
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      const rowIndex = i + 2; // header consumed
+    for (const dbRow of dbRows) {
+      const gameCell = norm(dbRow.game);
+      const awayId = norm(dbRow.awayId);
+      const awayName = norm(dbRow.awayName);
+      const awayTeam = norm(dbRow.awayTeam);
+      const awayW = norm(dbRow.awayW);
+      const awayL = norm(dbRow.awayL);
+      const awayPts = norm(dbRow.awayPts);
+      const awayPlms = norm(dbRow.awayPLMS);
+      const homeId = norm(dbRow.homeId);
+      const homeName = norm(dbRow.homeName);
+      const homeTeam = norm(dbRow.homeTeam);
+      const homeW = norm(dbRow.homeW);
+      const homeL = norm(dbRow.homeL);
+      const homePts = norm(dbRow.homePts);
+      const homePlms = norm(dbRow.homePLMS);
+      const scenario = norm(dbRow.scenario);
 
-      const gameCell = norm(r?.[0]); // A
-      const awayId = norm(r?.[1]); // B
-      const awayName = norm(r?.[2]); // C
-      const awayTeam = norm(r?.[3]); // D
-      const awayW = norm(r?.[4]); // E
-      const awayL = norm(r?.[5]); // F
-      const awayPts = norm(r?.[6]); // G
-      const awayPlms = norm(r?.[7]); // H
-      const homeId = norm(r?.[9]); // J
-      const homeName = norm(r?.[10]); // K
-      const homeTeam = norm(r?.[11]); // L
-      const homeW = norm(r?.[12]); // M
-      const homeL = norm(r?.[13]); // N
-      const homePts = norm(r?.[14]); // O
-      const homePlms = norm(r?.[15]); // P
-      const scenario = norm(r?.[16]); // Q
-
-      // Only keep rows where Game is a real number
       const gameNumber = parseInt(gameCell, 10);
       const hasNumericGame =
         Number.isFinite(gameNumber) && gameCell.trim() !== "";
@@ -375,8 +359,11 @@ export async function GET(request: NextRequest) {
       if (!hasNumericGame || (!awayTeam && !homeTeam)) continue;
 
       const game = String(gameNumber);
-
-      if (!game || (!awayTeam && !homeTeam)) continue;
+      // rowIndex is the actual Google Sheet row number, stored by seed-mysql.
+      // The sheet has 3-row gaps between series, so game N != row N+1.
+      // Skip if unseeded (shouldn't happen post-deploy; seed populates it).
+      const rowIndex = Number(dbRow.rowIndex) || 0;
+      if (!rowIndex) continue;
 
       const alreadyFilled = !(awayPts === "" && homePts === "" && scenario === "");
 

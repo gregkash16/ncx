@@ -457,7 +457,28 @@ async function loadCurrentWeek(sheets: any, pool: mysql.Pool) {
   return { weekLabel };
 }
 
+async function ensureWeeklyMatchupsRowIndexColumn(pool: mysql.Pool): Promise<void> {
+  // Idempotent: adds row_index column on first run, no-ops afterwards.
+  // row_index is the actual Google Sheet row number for each game, so
+  // report-game / matchup-builder can write back without reading the
+  // sheet. The sheet has gaps between series (7 games per series + 3
+  // separator rows), so row != game + 1.
+  const [cols] = await pool.query<any[]>(
+    `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'weekly_matchups'
+       AND COLUMN_NAME = 'row_index'`
+  );
+  if (!cols || cols.length === 0) {
+    await pool.query(
+      `ALTER TABLE weekly_matchups ADD COLUMN row_index INT NULL AFTER game`
+    );
+  }
+}
+
 async function loadWeeklyMatchups(sheets: any, pool: mysql.Pool): Promise<number> {
+  await ensureWeeklyMatchupsRowIndexColumn(pool);
+
   // Fetch all 14 week tabs in a single batchGet — one HTTP round-trip
   // instead of 14, and tabs that don't exist come back as empty arrays.
   const ranges = WEEK_TABS.map((w) => `${w}!A2:Q120`);
@@ -477,7 +498,12 @@ async function loadWeeklyMatchups(sheets: any, pool: mysql.Pool): Promise<number
   for (let i = 0; i < WEEK_TABS.length; i++) {
     const weekLabel = normalizeWeekLabel(WEEK_TABS[i]);
     const rows = weekRowSets[i] ?? [];
-    for (const r0 of rows) {
+    for (let j = 0; j < rows.length; j++) {
+      const r0 = rows[j];
+      // rows[0] corresponds to sheet row 2 (range starts at A2), so the
+      // actual sheet row number is j + 2. Blank/separator rows get skipped
+      // by the validation below but don't affect this offset.
+      const rowIndex = j + 2;
       const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(
         0,
         17
@@ -495,6 +521,7 @@ async function loadWeeklyMatchups(sheets: any, pool: mysql.Pool): Promise<number
       values.push([
         weekLabel,
         game,
+        rowIndex,
         norm(r[1]),
         norm(r[2]),
         awayTeam,
@@ -518,7 +545,7 @@ async function loadWeeklyMatchups(sheets: any, pool: mysql.Pool): Promise<number
   return await bulkInsert(
     pool,
     `INSERT INTO weekly_matchups (
-       week_label, game, awayId, awayName, awayTeam, awayW, awayL, awayPts, awayPLMS,
+       week_label, game, row_index, awayId, awayName, awayTeam, awayW, awayL, awayPts, awayPLMS,
        homeId, homeName, homeTeam, homeW, homeL, homePts, homePLMS, scenario
      ) VALUES ?`,
     values
