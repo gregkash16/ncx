@@ -120,8 +120,13 @@ export default function MatchupBuilder() {
     if (selectedWeek) params.set("week", selectedWeek);
     if (selectedAway) params.set("away", selectedAway);
     if (selectedHome) params.set("home", selectedHome);
+    // When the user explicitly clicked "Change", tell the server not to
+    // auto-detect the captain's series — otherwise it just snaps back.
+    if (forceSelection && (!selectedAway || !selectedHome)) {
+      params.set("selection", "true");
+    }
     return `/api/matchup-builder?${params.toString()}`;
-  }, [selectedWeek, selectedAway, selectedHome]);
+  }, [selectedWeek, selectedAway, selectedHome, forceSelection]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -231,18 +236,10 @@ export default function MatchupBuilder() {
     const mySeries: { awayTeam: string; homeTeam: string }[] =
       data.needsSelection ? (data as SelectionState).mySeries : [];
 
-    // If forced back but we don't have mySeries, trigger a clean fetch
-    if (forceSelection && !data.needsSelection && mySeries.length === 0) {
-      // Fetch with just the week to get mySeries
-      const fetchSelection = async () => {
-        const wk = selectedWeek ?? currentWeekLabel;
-        const res = await fetch(`/api/matchup-builder?week=${encodeURIComponent(wk)}`, { cache: "no-store" });
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
-        }
-      };
-      fetchSelection();
+    // The polling effect refetches with selection=true (see buildUrl) when
+    // forceSelection flips on; show a spinner until that response lands and
+    // the response carries needsSelection: true with mySeries populated.
+    if (forceSelection && !data.needsSelection) {
       return (
         <div className="flex items-center justify-center py-20 text-zinc-400">
           <div className="animate-spin mr-3 h-5 w-5 rounded-full border-2 border-cyan-400 border-t-transparent" />

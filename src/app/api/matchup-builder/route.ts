@@ -67,6 +67,10 @@ export async function GET(req: NextRequest) {
     // Admin can specify away/home via query params
     const awayParam = req.nextUrl.searchParams.get("away");
     const homeParam = req.nextUrl.searchParams.get("home");
+    // `selection=true` forces the needsSelection branch — used by the client
+    // "Change" button so auto-detect doesn't snap the captain back to the
+    // series they just left.
+    const forceSelection = req.nextUrl.searchParams.get("selection") === "true";
 
     let awayTeam: string | null = null;
     let homeTeam: string | null = null;
@@ -75,7 +79,7 @@ export async function GET(req: NextRequest) {
       // Explicit params (admin or direct link)
       awayTeam = awayParam;
       homeTeam = homeParam;
-    } else {
+    } else if (!forceSelection) {
       // Auto-detect from captain's team
       for (const s of schedList) {
         const away = norm(s.away_team);
