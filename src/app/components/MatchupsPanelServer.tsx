@@ -53,9 +53,6 @@ export default async function MatchupsPanelServer({
   const lists = await fetchListsForWeekCached(selectedWeek).catch(() => null);
   const listsForWeek = lists?.listsMap;
 
-  // 7) Kill-switch for capsules
-  const enableCapsules = process.env.NEXT_PUBLIC_MATCH_CAPSULES === "1";
-
   return (
     <MatchupsPanel
       data={matchData}
@@ -66,7 +63,6 @@ export default async function MatchupsPanelServer({
       indStats={indStats}
       factionMap={factionMap}
       listsForWeek={listsForWeek}
-      enableCapsules={enableCapsules}
       mobile={mobile}
     />
   );

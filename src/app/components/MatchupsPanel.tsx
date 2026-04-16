@@ -55,6 +55,38 @@ type ScoutPayload = {
   }>;
 };
 
+// Live matchup entry (from S9.live_matchups)
+type LiveEntry = {
+  weekLabel: string;
+  game: string;
+  provider: string;
+  streamName: string | null;
+  streamUrl: string;
+  startedAt: string; // ISO
+};
+
+const LIVE_MAX_MS = 2 * 60 * 60 * 1000; // 2 hours
+const NCX_TWITCH_URL = "http://www.twitch.tv/nickelcityxwing";
+
+function parseStartedAtMs(s?: string | null): number {
+  if (!s) return 0;
+  const t = Date.parse(s);
+  if (Number.isFinite(t)) return t;
+  // fallback for "YYYY-MM-DD HH:MM:SS" MySQL strings without TZ: treat as UTC
+  const m = String(s).match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/
+  );
+  if (!m) return 0;
+  return Date.UTC(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    Number(m[4]),
+    Number(m[5]),
+    Number(m[6])
+  );
+}
+
 // Lists map for a given week (from MySQL S9.lists)
 type ListsForWeek = Record<
   string,
@@ -79,11 +111,6 @@ type Props = {
   indStats?: IndRow[];
   factionMap?: FactionMap;
   listsForWeek?: ListsForWeek;
-
-  // Feature flags
-  enableCapsules?: boolean;
-  enableCapsulesAI?: boolean;
-  capsuleTone?: "neutral" | "buster";
 
   /** When true, renders compact mobile layouts and adjusts links */
   mobile?: boolean;
@@ -649,15 +676,6 @@ const ListIcons: React.FC<ListIconsProps> = ({
 };
 
 /************************************************************
- *  AI capsule client state
- ************************************************************/
-type CapsuleState = {
-  text?: string;
-  loading?: boolean;
-  error?: string;
-};
-
-/************************************************************
  *  Component
  ************************************************************/
 export default function MatchupsPanel({
@@ -669,9 +687,6 @@ export default function MatchupsPanel({
   indStats,
   factionMap,
   listsForWeek,
-  enableCapsules = false,
-  enableCapsulesAI = false,
-  capsuleTone = "neutral",
   mobile = false,
 }: Props) {
   const searchParams = useSearchParams();
@@ -711,11 +726,127 @@ export default function MatchupsPanel({
 
   const [generatingGame, setGeneratingGame] = useState<string | null>(null);
 
-  // Capsule open/close per game
-  const [openCapsule, setOpenCapsule] = useState<Record<string, boolean>>({});
+  // --- Live matchups state ------------------------------------------------
+  const [liveGames, setLiveGames] = useState<Record<string, LiveEntry>>({});
+  const [openLivePopover, setOpenLivePopover] = useState<string | null>(null);
+  const [liveProvider, setLiveProvider] = useState<Record<string, "NCX" | "Other">>(
+    {}
+  );
+  const [liveOtherName, setLiveOtherName] = useState<Record<string, string>>({});
+  const [liveOtherUrl, setLiveOtherUrl] = useState<Record<string, string>>({});
+  const [liveSubmitting, setLiveSubmitting] = useState<string | null>(null);
+  const [liveError, setLiveError] = useState<Record<string, string>>({});
+  // Bump "now" every 30s so the 2h auto-expire takes effect client-side
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
-  // AI capsule state per game
-  const [aiCapsules, setAiCapsules] = useState<Record<string, CapsuleState>>({});
+  async function refreshLive() {
+    if (!weekLabel) return;
+    try {
+      const res = await fetch(
+        `/api/live-matchups?week=${encodeURIComponent(weekLabel)}`,
+        { cache: "no-store" }
+      );
+      const json = await res.json();
+      if (!res.ok) return;
+      const list: LiveEntry[] = Array.isArray(json?.live) ? json.live : [];
+      const map: Record<string, LiveEntry> = {};
+      for (const e of list) map[e.game] = e;
+      setLiveGames(map);
+    } catch {
+      // ignore transient errors
+    }
+  }
+
+  useEffect(() => {
+    refreshLive();
+    const poll = setInterval(refreshLive, 30_000);
+    const tick = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => {
+      clearInterval(poll);
+      clearInterval(tick);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekLabel]);
+
+  // Effective live map after client-side 2h expiry
+  const liveGamesEffective = useMemo(() => {
+    const out: Record<string, LiveEntry> = {};
+    for (const [k, v] of Object.entries(liveGames)) {
+      const started = parseStartedAtMs(v.startedAt);
+      if (started && nowMs - started < LIVE_MAX_MS) out[k] = v;
+    }
+    return out;
+  }, [liveGames, nowMs]);
+
+  async function handleGoLive(game: string) {
+    const provider = liveProvider[game] ?? "NCX";
+    let streamUrl = "";
+    let streamName: string | null = null;
+
+    if (provider === "NCX") {
+      streamUrl = NCX_TWITCH_URL;
+      streamName = "Nickel City X-Wing";
+    } else {
+      streamUrl = (liveOtherUrl[game] ?? "").trim();
+      streamName = (liveOtherName[game] ?? "").trim() || null;
+      if (!/^https?:\/\//i.test(streamUrl)) {
+        setLiveError((p) => ({
+          ...p,
+          [game]: "Link must start with http(s)://",
+        }));
+        return;
+      }
+    }
+
+    setLiveSubmitting(game);
+    setLiveError((p) => ({ ...p, [game]: "" }));
+
+    try {
+      const res = await fetch("/api/live-matchups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weekLabel,
+          game,
+          provider,
+          streamName,
+          streamUrl,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Failed");
+      setOpenLivePopover(null);
+      await refreshLive();
+    } catch (e: any) {
+      setLiveError((p) => ({ ...p, [game]: e?.message || "Failed" }));
+    } finally {
+      setLiveSubmitting(null);
+    }
+  }
+
+  async function handleEndLive(game: string) {
+    if (!weekLabel) return;
+    setLiveSubmitting(game);
+    try {
+      const res = await fetch(
+        `/api/live-matchups?weekLabel=${encodeURIComponent(
+          weekLabel
+        )}&game=${encodeURIComponent(game)}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        setLiveGames((prev) => {
+          const next = { ...prev };
+          delete next[game];
+          return next;
+        });
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLiveSubmitting(null);
+    }
+  }
 
   async function loadScout(ncxid: string) {
     setScoutById((p) => ({
@@ -778,8 +909,12 @@ export default function MatchupsPanel({
             .some((v) => String(v).toLowerCase().includes(q));
         });
 
-    // same sort behavior as main list
+    // same sort behavior as main list: LIVE first, then selected team, then game #
     rows = [...rows].sort((a, b) => {
+      const aLive = liveGamesEffective[a.game] ? 1 : 0;
+      const bLive = liveGamesEffective[b.game] ? 1 : 0;
+      if (aLive !== bLive) return bLive - aLive;
+
       const aInSel =
         selectedTeam &&
         (a.awayTeam === selectedTeam || a.homeTeam === selectedTeam)
@@ -796,7 +931,7 @@ export default function MatchupsPanel({
     });
 
     return rows;
-  }, [cleaned, query, selectedTeam, factionMap]);
+  }, [cleaned, query, selectedTeam, factionMap, liveGamesEffective]);
 
   const completedCount = useMemo(() => {
     return baseFiltered.filter((m) => Boolean((m.scenario || "").trim())).length;
@@ -831,59 +966,6 @@ export default function MatchupsPanel({
   const GREEN = "34,197,94";
   const RED = "239,68,68";
   const TIE = "99,102,241";
-
-  async function handleGenerateAICapsule(args: {
-    row: MatchRowWithDiscord;
-    awaySeason?: IndRow;
-    homeSeason?: IndRow;
-    listMeta?: {
-      awayCount?: number | null;
-      homeCount?: number | null;
-      awayAverageInit?: number | null;
-      homeAverageInit?: number | null;
-      awayListSubmitted?: boolean | null;
-      homeListSubmitted?: boolean | null;
-    } | null;
-  }) {
-    const game = args.row.game;
-
-    setAiCapsules((prev) => ({
-      ...prev,
-      [game]: { ...(prev[game] ?? {}), loading: true, error: undefined },
-    }));
-
-    try {
-      const res = await fetch("/api/match-capsule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          weekLabel,
-          row: args.row,
-          awaySeason: args.awaySeason ?? null,
-          homeSeason: args.homeSeason ?? null,
-          listMeta: args.listMeta ?? null,
-          tone: capsuleTone,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Request failed");
-
-      setAiCapsules((prev) => ({
-        ...prev,
-        [game]: { text: String(json?.text ?? "").trim(), loading: false },
-      }));
-    } catch (e: any) {
-      setAiCapsules((prev) => ({
-        ...prev,
-        [game]: {
-          ...(prev[game] ?? {}),
-          loading: false,
-          error: e?.message || "Failed",
-        },
-      }));
-    }
-  }
 
   return (
     <div className="p-3 md:p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
@@ -1020,9 +1102,6 @@ export default function MatchupsPanel({
             const awayLetters = weekList?.awayLetters || null;
             const homeLetters = weekList?.homeLetters || null;
 
-            const isOpen = Boolean(openCapsule[row.game]);
-            const aiState = aiCapsules[row.game] || {};
-
             const handleClickThumbnail = async () => {
               try {
                 setGeneratingGame(row.game);
@@ -1041,10 +1120,30 @@ export default function MatchupsPanel({
               }
             };
 
+            const live = liveGamesEffective[row.game];
+            const isLive = Boolean(live);
+            const popoverOpen = openLivePopover === row.game;
+            const provider = liveProvider[row.game] ?? "NCX";
+            const otherName = liveOtherName[row.game] ?? "";
+            const otherUrl = liveOtherUrl[row.game] ?? "";
+            const submittingLive = liveSubmitting === row.game;
+            const liveErrMsg = liveError[row.game] || "";
+            const watchLabel =
+              live?.streamName && live.streamName.trim().length > 0
+                ? live.streamName
+                : live?.provider === "NCX"
+                ? "Nickel City X-Wing"
+                : "stream";
+
             return (
               <div
                 key={`${row.game}-${i}`}
-                className="relative p-3 md:p-5 rounded-xl bg-zinc-950/50 border border-zinc-800 hover:border-purple-500/40 transition"
+                className={[
+                  "relative p-3 md:p-5 rounded-xl bg-zinc-950/50 border transition",
+                  isLive
+                    ? "ncx-live-fire border-red-500"
+                    : "border-zinc-800 hover:border-purple-500/40",
+                ].join(" ")}
                 style={gradientStyle}
               >
                 {/* Game # badge (+ stream schedule info if available) */}
@@ -1062,21 +1161,117 @@ export default function MatchupsPanel({
                   </span>
                 </div>
 
-                {/* Buttons (Capsule + Create thumbnail) — desktop only */}
+                {/* LIVE / END LIVE pill + Create thumbnail button — desktop only */}
                 <div className="absolute -top-3 -right-3 hidden md:flex items-center gap-2">
-                  {enableCapsules && (
+                  {isLive ? (
                     <button
                       type="button"
-                      onClick={() =>
-                        setOpenCapsule((p) => ({
-                          ...p,
-                          [row.game]: !p[row.game],
-                        }))
-                      }
-                      className="inline-flex items-center rounded-lg bg-zinc-800 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md hover:bg-zinc-700"
+                      onClick={() => handleEndLive(row.game)}
+                      disabled={submittingLive}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-md shadow-red-600/50 hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      {isOpen ? "Hide capsule" : "Capsule"}
+                      <span className="ncx-live-dot" />
+                      {submittingLive ? "Ending…" : "End Live"}
                     </button>
+                  ) : (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenLivePopover((cur) =>
+                            cur === row.game ? null : row.game
+                          )
+                        }
+                        className="inline-flex items-center rounded-lg bg-yellow-400 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-900 shadow-md shadow-yellow-500/40 hover:bg-yellow-300"
+                      >
+                        Live
+                      </button>
+
+                      {popoverOpen && (
+                        <div className="absolute right-0 top-full mt-2 z-30 w-72 rounded-xl border border-zinc-700 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur-sm">
+                          <div className="text-[11px] uppercase tracking-wide text-zinc-400 mb-2">
+                            Go Live — Game {row.game}
+                          </div>
+
+                          <label className="block text-[11px] text-zinc-300 mb-1">
+                            Stream source
+                          </label>
+                          <select
+                            value={provider}
+                            onChange={(e) =>
+                              setLiveProvider((p) => ({
+                                ...p,
+                                [row.game]: e.target.value as "NCX" | "Other",
+                              }))
+                            }
+                            className="w-full rounded-md bg-zinc-900 border border-zinc-700 text-sm px-2 py-1.5 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 mb-2"
+                          >
+                            <option value="NCX">NCX</option>
+                            <option value="Other">Other</option>
+                          </select>
+
+                          {provider === "Other" && (
+                            <>
+                              <label className="block text-[11px] text-zinc-300 mb-1">
+                                Name
+                              </label>
+                              <input
+                                type="text"
+                                value={otherName}
+                                onChange={(e) =>
+                                  setLiveOtherName((p) => ({
+                                    ...p,
+                                    [row.game]: e.target.value,
+                                  }))
+                                }
+                                placeholder="e.g. Streamer Name"
+                                className="w-full rounded-md bg-zinc-900 border border-zinc-700 text-sm px-2 py-1.5 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 mb-2"
+                              />
+
+                              <label className="block text-[11px] text-zinc-300 mb-1">
+                                Link
+                              </label>
+                              <input
+                                type="url"
+                                value={otherUrl}
+                                onChange={(e) =>
+                                  setLiveOtherUrl((p) => ({
+                                    ...p,
+                                    [row.game]: e.target.value,
+                                  }))
+                                }
+                                placeholder="https://…"
+                                className="w-full rounded-md bg-zinc-900 border border-zinc-700 text-sm px-2 py-1.5 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 mb-2"
+                              />
+                            </>
+                          )}
+
+                          {liveErrMsg && (
+                            <div className="text-[11px] text-red-300 mb-2">
+                              {liveErrMsg}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-end gap-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setOpenLivePopover(null)}
+                              className="rounded-md bg-zinc-800 px-2.5 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-zinc-700"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={submittingLive}
+                              onClick={() => handleGoLive(row.game)}
+                              className="rounded-md bg-yellow-400 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-zinc-900 hover:bg-yellow-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              {submittingLive ? "Starting…" : "Go Live"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   <button
@@ -1088,6 +1283,45 @@ export default function MatchupsPanel({
                     {generatingGame === row.game ? "Generating…" : "Create thumbnail"}
                   </button>
                 </div>
+
+                {/* LIVE banner with watch link (desktop + mobile) */}
+                {isLive && live && (
+                  <div className="ncx-live-banner relative z-10 mb-4 overflow-hidden rounded-xl border-2 border-red-400 px-4 py-3 md:px-5 md:py-4 shadow-[0_0_30px_rgba(239,68,68,0.55)]">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="ncx-live-dot-lg shrink-0" />
+                        <div className="min-w-0">
+                          <div className="ncx-live-text text-xl md:text-2xl font-black uppercase tracking-[0.2em] text-white leading-none">
+                            LIVE NOW
+                          </div>
+                          <div className="mt-1 truncate text-sm md:text-base text-yellow-100/95">
+                            on{" "}
+                            <span className="font-extrabold text-white">
+                              {watchLabel}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <a
+                        href={live.streamUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ncx-watch-btn shrink-0 self-stretch sm:self-auto inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 md:px-6 md:py-3 text-sm md:text-base font-black uppercase tracking-wider text-red-700 hover:text-red-600 hover:bg-yellow-100 transition-colors"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          className="w-5 h-5 md:w-6 md:h-6 fill-current"
+                          aria-hidden="true"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        Watch Now
+                      </a>
+                    </div>
+                  </div>
+                )}
 
                 {/* Teams row — desktop */}
                 <div className="relative z-10 hidden md:flex items-center justify-between font-semibold text-lg">
@@ -1453,63 +1687,6 @@ export default function MatchupsPanel({
                   </div>
                 )}
 
-                {/* Capsule block */}
-                {enableCapsules && isOpen && (
-                  <div className="relative z-10 mt-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-                    {!isDone ? (
-                      <div className="text-sm text-zinc-400 italic">
-                        Capsule unavailable — this game has not been reported yet.
-                      </div>
-                    ) : (
-                      <>
-                        {enableCapsulesAI && (
-                          <div className="mt-4 pt-3 border-t border-zinc-800">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-[11px] uppercase tracking-wide text-zinc-400">
-                                AI Capsule (beta)
-                              </div>
-
-                              <button
-                                type="button"
-                                disabled={aiState.loading}
-                                onClick={() =>
-                                  handleGenerateAICapsule({
-                                    row,
-                                    awaySeason,
-                                    homeSeason,
-                                    listMeta: weekList
-                                      ? {
-                                          awayCount: weekList.awayCount ?? null,
-                                          homeCount: weekList.homeCount ?? null,
-                                          awayAverageInit: weekList.awayAverageInit ?? null,
-                                          homeAverageInit: weekList.homeAverageInit ?? null,
-                                          awayListSubmitted: Boolean(weekList.awayList),
-                                          homeListSubmitted: Boolean(weekList.homeList),
-                                        }
-                                      : null,
-                                  })
-                                }
-                                className="inline-flex items-center rounded-lg bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                              >
-                                {aiState.loading ? "Generating…" : aiState.text ? "Regenerate" : "Generate"}
-                              </button>
-                            </div>
-
-                            {aiState.error && <div className="mt-2 text-xs text-red-300">{aiState.error}</div>}
-
-                            {aiState.text && <div className="mt-2 text-sm text-zinc-200">{aiState.text}</div>}
-
-                            {!aiState.text && !aiState.loading && !aiState.error && (
-                              <div className="mt-2 text-xs text-zinc-500 italic">
-                                Click Generate to create a 2–3 sentence recap from the data shown here.
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
               </div>
             );
           })}

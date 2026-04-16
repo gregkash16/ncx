@@ -58,9 +58,6 @@ function normalizeDiscordId(v: unknown): string {
     .replace(/\D/g, "");
 }
 
-const enableCapsules = process.env.NEXT_PUBLIC_MATCH_CAPSULES === "1";
-const enableCapsulesAI = process.env.NEXT_PUBLIC_MATCH_CAPSULES_AI === "1";
-
 const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"];
 
 const preSeasonEnabled = process.env.PRE_SEASON === "true";
@@ -353,9 +350,6 @@ export default async function HomePage({
                 indStats={indStats ?? []}
                 factionMap={factionMap}
                 listsForWeek={listsMap}
-                enableCapsules={enableCapsules}
-                enableCapsulesAI={enableCapsulesAI}
-                capsuleTone="neutral"
               />
             }
             standingsPanel={<StandingsPanel key="standings" />}
