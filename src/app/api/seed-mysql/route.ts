@@ -354,9 +354,32 @@ async function getSheetValues(
   return (res.data.values ?? []) as string[][];
 }
 
-// =============== MYSQL CLIENT ===============
+// Fetch multiple ranges in a single API call.
+async function getSheetValuesBatch(
+  sheets: any,
+  spreadsheetId: string,
+  ranges: string[]
+): Promise<string[][][]> {
+  const res = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId,
+    ranges,
+  });
+  const valueRanges: any[] = res.data.valueRanges ?? [];
+  return ranges.map((_, i) => (valueRanges[i]?.values ?? []) as string[][]);
+}
 
-async function getMySqlConn() {
+// =============== MYSQL CLIENT ===============
+//
+// Dedicated pool for the seed route — sized larger than the main app pool
+// (`@/lib/db`) so parallel load functions don't starve normal traffic.
+// Module-scoped singleton; survives across hot reloads via globalThis.
+
+const SEED_POOL_KEY = "__ncxSeedPool";
+
+function getSeedPool(): mysql.Pool {
+  const g = globalThis as any;
+  if (g[SEED_POOL_KEY]) return g[SEED_POOL_KEY];
+
   const host = process.env.DB_HOST ?? "localhost";
   const port = Number(process.env.DB_PORT ?? "3306");
   const user = process.env.DB_USER ?? "root";
@@ -367,97 +390,93 @@ async function getMySqlConn() {
     throw new Error("Missing DB_PASSWORD / MYSQLPASSWORD");
   }
 
-  const conn = await mysql.createConnection({
+  const pool = mysql.createPool({
     host,
     port,
     user,
     password,
     database,
     multipleStatements: false,
+    waitForConnections: true,
+    connectionLimit: Number(process.env.SEED_POOL_LIMIT ?? 5),
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
   });
 
-  return conn;
+  g[SEED_POOL_KEY] = pool;
+  return pool;
+}
+
+// Bulk insert helper. mysql2's `INSERT ... VALUES ?` placeholder accepts an
+// array-of-arrays and emits one statement instead of N. Must use `query`,
+// not `execute` (the prepared-statement path doesn't expand the array).
+async function bulkInsert(
+  pool: mysql.Pool,
+  sql: string,
+  rows: any[][]
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  await pool.query(sql, [rows]);
+  return rows.length;
 }
 
 // =============== LOADERS ===============
 
 const SUBS_GID = 1218415702;
 
-async function loadSubs(sheets: any, conn: mysql.Connection) {
+async function loadSubs(sheets: any, pool: mysql.Pool) {
   const tabName = await getSheetTitleByGid(sheets, NCX_LEAGUE_SHEET_ID, SUBS_GID);
-
-  // A2:A (variable length)
   const rows = await getSheetValues(sheets, NCX_LEAGUE_SHEET_ID, `${tabName}!A2:A`);
 
-  // wipe + insert
-  await conn.execute("DELETE FROM `Subs`");
-
-  const sql = "INSERT INTO `Subs` (`NCXID`) VALUES (?)";
-
-  let inserted = 0;
+  const values: any[][] = [];
   for (const r0 of rows) {
     const ncxid = norm(r0?.[0]);
     if (!ncxid) continue;
-    await conn.execute(sql, [ncxid]);
-    inserted++;
+    values.push([ncxid]);
   }
+
+  await pool.query("DELETE FROM `Subs`");
+  const inserted = await bulkInsert(
+    pool,
+    "INSERT INTO `Subs` (`NCXID`) VALUES ?",
+    values
+  );
 
   return { tabName, inserted };
 }
 
-async function loadCurrentWeek(sheets: any, conn: mysql.Connection) {
+async function loadCurrentWeek(sheets: any, pool: mysql.Pool) {
   const rows = await getSheetValues(sheets, NCX_LEAGUE_SHEET_ID, "SCHEDULE!U2:U2");
   const value = rows[0]?.[0] ?? "WEEK 1";
   const weekLabel = normalizeWeekLabel(value);
 
-  await conn.execute("DELETE FROM current_week");
-  await conn.execute("INSERT INTO current_week (week_label) VALUES (?)", [weekLabel]);
+  await pool.query("DELETE FROM current_week");
+  await pool.query("INSERT INTO current_week (week_label) VALUES (?)", [weekLabel]);
 
   return { weekLabel };
 }
 
-async function loadWeeklyMatchups(sheets: any, conn: mysql.Connection) {
-  await conn.execute("DELETE FROM weekly_matchups");
+async function loadWeeklyMatchups(sheets: any, pool: mysql.Pool): Promise<number> {
+  // Fetch all 14 week tabs in a single batchGet — one HTTP round-trip
+  // instead of 14, and tabs that don't exist come back as empty arrays.
+  const ranges = WEEK_TABS.map((w) => `${w}!A2:Q120`);
+  let weekRowSets: string[][][];
+  try {
+    weekRowSets = await getSheetValuesBatch(sheets, NCX_LEAGUE_SHEET_ID, ranges);
+  } catch (err) {
+    console.warn("loadWeeklyMatchups batchGet failed, falling back per-week", err);
+    weekRowSets = await Promise.all(
+      ranges.map((r) =>
+        getSheetValues(sheets, NCX_LEAGUE_SHEET_ID, r).catch(() => [] as string[][])
+      )
+    );
+  }
 
-  const sql = `
-    INSERT INTO weekly_matchups (
-      week_label,
-      game,
-      awayId,
-      awayName,
-      awayTeam,
-      awayW,
-      awayL,
-      awayPts,
-      awayPLMS,
-      homeId,
-      homeName,
-      homeTeam,
-      homeW,
-      homeL,
-      homePts,
-      homePLMS,
-      scenario
-    ) VALUES (
-      ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-    )
-  `;
-
-  for (const week of WEEK_TABS) {
-    let rows: string[][];
-    try {
-      rows = await getSheetValues(
-        sheets,
-        NCX_LEAGUE_SHEET_ID,
-        `${week}!A2:Q120`
-      );
-    } catch (err) {
-      console.warn(`Skipping ${week}: worksheet not found or error`, err);
-      continue;
-    }
-
-    const weekLabel = normalizeWeekLabel(week);
-
+  const values: any[][] = [];
+  for (let i = 0; i < WEEK_TABS.length; i++) {
+    const weekLabel = normalizeWeekLabel(WEEK_TABS[i]);
+    const rows = weekRowSets[i] ?? [];
     for (const r0 of rows) {
       const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(
         0,
@@ -465,76 +484,53 @@ async function loadWeeklyMatchups(sheets: any, conn: mysql.Connection) {
       );
 
       const gameRaw = norm(r[0]);
-      let gameNum: number;
-      try {
-        gameNum = parseInt(gameRaw, 10);
-        if (!Number.isFinite(gameNum) || gameNum <= 0) continue;
-      } catch {
-        continue;
-      }
+      const gameNum = parseInt(gameRaw, 10);
+      if (!Number.isFinite(gameNum) || gameNum <= 0) continue;
       const game = String(gameNum);
 
-      const awayId = norm(r[1]);
-      const awayName = norm(r[2]);
       const awayTeam = norm(r[3]);
-      const awayW = norm(r[4]);
-      const awayL = norm(r[5]);
-      const awayPts = norm(r[6]);
-      const awayPLMS = norm(r[7]);
-      const homeId = norm(r[9]);
-      const homeName = norm(r[10]);
       const homeTeam = norm(r[11]);
-      const homeW = norm(r[12]);
-      const homeL = norm(r[13]);
-      const homePts = norm(r[14]);
-      const homePLMS = norm(r[15]);
-      const scenario = norm(r[16]);
-
       if (!awayTeam && !homeTeam) continue;
 
-      await conn.execute(sql, [
+      values.push([
         weekLabel,
         game,
-        awayId,
-        awayName,
+        norm(r[1]),
+        norm(r[2]),
         awayTeam,
-        parseWinCell(awayW),
-        parseLossCell(awayL),
-        toIntOrZero(awayPts),
-        toIntOrZero(awayPLMS),
-        homeId,
-        homeName,
+        parseWinCell(r[4]),
+        parseLossCell(r[5]),
+        toIntOrZero(r[6]),
+        toIntOrZero(r[7]),
+        norm(r[9]),
+        norm(r[10]),
         homeTeam,
-        parseWinCell(homeW),
-        parseLossCell(homeL),
-        toIntOrZero(homePts),
-        toIntOrZero(homePLMS),
-        scenario,
+        parseWinCell(r[12]),
+        parseLossCell(r[13]),
+        toIntOrZero(r[14]),
+        toIntOrZero(r[15]),
+        norm(r[16]),
       ]);
     }
   }
+
+  await pool.query("DELETE FROM weekly_matchups");
+  return await bulkInsert(
+    pool,
+    `INSERT INTO weekly_matchups (
+       week_label, game, awayId, awayName, awayTeam, awayW, awayL, awayPts, awayPLMS,
+       homeId, homeName, homeTeam, homeW, homeL, homePts, homePLMS, scenario
+     ) VALUES ?`,
+    values
+  );
 }
 
-async function loadIndividualStats(sheets: any, conn: mysql.Connection) {
+async function loadIndividualStats(sheets: any, pool: mysql.Pool): Promise<number> {
   const rows = await getSheetValues(sheets, NCX_LEAGUE_SHEET_ID, "INDIVIDUAL!A2:V");
 
-  await conn.execute("DELETE FROM individual_stats");
-
-  const sql = `
-  INSERT INTO individual_stats (
-    \`rank\`, ncxid, first_name, last_name, discord,
-    pick_no, team, faction, wins, losses, points,
-    plms, games, winper, ppg, efficiency, war,
-    h2h, potato, sos
-  ) VALUES (
-    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-  )
-`;
-
-
+  const values: any[][] = [];
   for (const r0 of rows) {
     if (!r0 || r0.length === 0) continue;
-
     const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(
       0,
       22
@@ -545,74 +541,61 @@ async function loadIndividualStats(sheets: any, conn: mysql.Connection) {
     const rank = parseInt(rankStr, 10);
     if (!Number.isFinite(rank)) continue;
 
-    const ncxid = norm(r[1]);
-    const first = norm(r[2]);
-    const last = norm(r[3]);
-    const discord = norm(r[4]);
     const pick = norm(r[5]);
-    const team = norm(r[6]);
-    const faction = norm(r[7]);
-    const wins = toIntOrZero(r[8]);
-    const losses = toIntOrZero(r[9]);
-    const points = toIntOrZero(r[10]);
-    const plms = toIntOrZero(r[11]);
-    const games = toIntOrZero(r[12]);
-    const winper = norm(r[13]) || null;
-    const ppg = norm(r[14]) || null;
-    const efficiency = toIntOrZero(r[15]);
-    const war = norm(r[16]) || null;
-    const h2h = norm(r[17]) || null;
-    const potato = norm(r[18]) || null;
-    const sos = norm(r[19]) || null;
-
-    await conn.execute(sql, [
+    values.push([
       rank,
-      ncxid,
-      first,
-      last,
-      discord,
+      norm(r[1]),
+      norm(r[2]),
+      norm(r[3]),
+      norm(r[4]),
       pick ? parseInt(pick, 10) : null,
-      team,
-      faction,
-      wins,
-      losses,
-      points,
-      plms,
-      games,
-      winper,
-      ppg,
-      efficiency,
-      war,
-      h2h,
-      potato,
-      sos,
+      norm(r[6]),
+      norm(r[7]),
+      toIntOrZero(r[8]),
+      toIntOrZero(r[9]),
+      toIntOrZero(r[10]),
+      toIntOrZero(r[11]),
+      toIntOrZero(r[12]),
+      norm(r[13]) || null,
+      norm(r[14]) || null,
+      toIntOrZero(r[15]),
+      norm(r[16]) || null,
+      norm(r[17]) || null,
+      norm(r[18]) || null,
+      norm(r[19]) || null,
     ]);
   }
+
+  await pool.query("DELETE FROM individual_stats");
+  return await bulkInsert(
+    pool,
+    `INSERT INTO individual_stats (
+      \`rank\`, ncxid, first_name, last_name, discord,
+      pick_no, team, faction, wins, losses, points,
+      plms, games, winper, ppg, efficiency, war,
+      h2h, potato, sos
+    ) VALUES ?`,
+    values
+  );
 }
 
-async function loadStreamSchedule(sheets: any, conn: mysql.Connection) {
-  const m3 = await getSheetValues(sheets, STREAM_SCHEDULE_SHEET_ID, "Sheet1!M3:M3").catch(
-    () => [[]]
-  );
-  const m3Val = m3[0]?.[0] ?? "";
-  const scheduleWeek = m3Val.trim()
-    ? normalizeWeekLabel(m3Val)
-    : "SCHEDULE";
+async function loadStreamSchedule(sheets: any, pool: mysql.Pool): Promise<number> {
+  // Both ranges live on the same sheet — fetch in one batchGet.
+  let batched: string[][][];
+  try {
+    batched = await getSheetValuesBatch(
+      sheets,
+      STREAM_SCHEDULE_SHEET_ID,
+      ["Sheet1!M3:M3", "Sheet1!A2:C8"]
+    );
+  } catch {
+    batched = [[], []];
+  }
+  const m3Val = batched[0]?.[0]?.[0] ?? "";
+  const scheduleWeek = m3Val.trim() ? normalizeWeekLabel(m3Val) : "SCHEDULE";
+  const rows = batched[1] ?? [];
 
-  const rows = await getSheetValues(
-    sheets,
-    STREAM_SCHEDULE_SHEET_ID,
-    "Sheet1!A2:C8"
-  );
-
-  await conn.execute("DELETE FROM stream_schedule");
-
-  const sql = `
-    INSERT INTO stream_schedule (
-      schedule_week, game, day, slot
-    ) VALUES (?,?,?,?)
-  `;
-
+  const values: any[][] = [];
   for (const r0 of rows) {
     const r = [...r0, "", "", ""].slice(0, 3);
     const dateRaw = norm(r[0]);
@@ -627,28 +610,23 @@ async function loadStreamSchedule(sheets: any, conn: mysql.Connection) {
       continue;
     }
 
-    const day = dateRaw.toUpperCase();
-    const slot = gameType.toUpperCase();
-    const game = gameNumRaw;
-
-    await conn.execute(sql, [scheduleWeek, game, day, slot]);
+    values.push([scheduleWeek, gameNumRaw, dateRaw.toUpperCase(), gameType.toUpperCase()]);
   }
+
+  await pool.query("DELETE FROM stream_schedule");
+  return await bulkInsert(
+    pool,
+    "INSERT INTO stream_schedule (schedule_week, game, day, slot) VALUES ?",
+    values
+  );
 }
 
-async function loadDiscordMap(sheets: any, conn: mysql.Connection) {
+async function loadDiscordMap(sheets: any, pool: mysql.Pool): Promise<number> {
   const rows = await getSheetValues(sheets, NCX_LEAGUE_SHEET_ID, "Discord_ID!A:D");
 
-  await conn.execute("DELETE FROM discord_map");
-
-  const sql = `
-    INSERT INTO discord_map (
-      discord_id, ncxid, first_name, last_name, raw_discord
-    ) VALUES (?,?,?,?,?)
-  `;
-
-  // IMPORTANT: dedupe as STRING, not number
+  // dedupe as STRING, not number (Discord IDs overflow JS number)
   const seen = new Set<string>();
-
+  const values: any[][] = [];
   for (const r0 of rows) {
     const r = [...r0, "", "", "", ""].slice(0, 4);
     const ncxid = norm(r[0]);
@@ -656,350 +634,297 @@ async function loadDiscordMap(sheets: any, conn: mysql.Connection) {
     const last = norm(r[2]);
     const raw = norm(r[3]);
 
-    // Extract digits only, keep as string
     const discIdStr = raw.replace(/[^\d]/g, "");
     if (!discIdStr) continue;
-
-    // basic sanity: Discord IDs are usually 17–20 digits
-    if (discIdStr.length < 15) continue;
-
+    if (discIdStr.length < 15) continue; // Discord IDs are usually 17–20 digits
     if (seen.has(discIdStr)) continue;
     seen.add(discIdStr);
 
-    // Write as string (MySQL can store as VARCHAR or BIGINT, but pass string)
-    await conn.execute(sql, [discIdStr, ncxid, first, last, raw]);
+    values.push([discIdStr, ncxid, first, last, raw]);
   }
+
+  await pool.query("DELETE FROM discord_map");
+  return await bulkInsert(
+    pool,
+    `INSERT INTO discord_map (discord_id, ncxid, first_name, last_name, raw_discord) VALUES ?`,
+    values
+  );
 }
 
-async function loadCaptains(sheets: any, conn: mysql.Connection) {
-  const rows = await getSheetValues(
-    sheets,
-    NCX_LEAGUE_SHEET_ID,
-    "NCXID!K2:O25"
-  );
+// loadCaptains and loadNcxid both pull from the NCXID tab. The orchestrator
+// fetches `NCXID!A2:O215` once via getSheetValuesBatch and passes the rows in.
+//
+// Captains: cols K-O (indices 10-14), only first 24 rows used.
+// Ncxid:    cols A-I (indices 0-8).
 
-  await conn.execute(`
+async function loadCaptains(pool: mysql.Pool, ncxidRows: string[][]) {
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS S9.captains (
       team_name VARCHAR(255) NOT NULL,
       discord_id VARCHAR(32) NOT NULL,
       PRIMARY KEY (team_name, discord_id)
     )
   `);
-  await conn.execute("DELETE FROM S9.captains");
 
-  const sql = "INSERT IGNORE INTO S9.captains (team_name, discord_id) VALUES (?, ?)";
-  let written = 0;
-  for (const r0 of rows) {
-    const r = [...r0, "", "", "", "", ""].slice(0, 5);
-    const team = norm(r[0]);
-    const disc = String(r[4] ?? "")
+  const values: any[][] = [];
+  const seen = new Set<string>();
+  // Only the first 24 rows have captain data (K2:O25).
+  for (let i = 0; i < Math.min(24, ncxidRows.length); i++) {
+    const r0 = ncxidRows[i] ?? [];
+    const team = norm(r0[10]);
+    const disc = String(r0[14] ?? "")
       .trim()
       .replace(/[<@!>]/g, "")
       .replace(/\D/g, "");
     if (!team || !disc) continue;
-    await conn.execute(sql, [team, disc]);
-    written++;
+    const key = `${team}\u0000${disc}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    values.push([team, disc]);
   }
-  return written;
+
+  await pool.query("DELETE FROM S9.captains");
+  return await bulkInsert(
+    pool,
+    "INSERT IGNORE INTO S9.captains (team_name, discord_id) VALUES ?",
+    values
+  );
 }
 
-async function loadNcxid(sheets: any, conn: mysql.Connection) {
-  const rows = await getSheetValues(
-    sheets,
-    NCX_LEAGUE_SHEET_ID,
-    "NCXID!A2:I215"
-  );
-
-  await conn.execute("DELETE FROM ncxid");
-
-  const sql = `
-    INSERT INTO ncxid (
-      ncxid, faction_h, faction_i
-    ) VALUES (?,?,?)
-  `;
-
-  for (const r0 of rows) {
-    const r = [...r0, "", "", "", "", "", "", "", ""].slice(0, 9);
+async function loadNcxid(pool: mysql.Pool, ncxidRows: string[][]): Promise<number> {
+  const values: any[][] = [];
+  for (const r0 of ncxidRows) {
+    const r = [...r0, "", "", "", "", "", "", "", "", ""].slice(0, 9);
     const ncxidVal = norm(r[0]);
     if (!ncxidVal) continue;
-    const factionH = norm(r[7]);
-    const factionI = norm(r[8]);
-
-    await conn.execute(sql, [ncxidVal, factionH, factionI]);
+    values.push([ncxidVal, norm(r[7]), norm(r[8])]);
   }
+
+  await pool.query("DELETE FROM ncxid");
+  return await bulkInsert(
+    pool,
+    "INSERT INTO ncxid (ncxid, faction_h, faction_i) VALUES ?",
+    values
+  );
 }
 
-async function loadAdvStats(sheets: any, conn: mysql.Connection) {
-  // ADV STATS!A2:N25 -> adv_stats_t1
-  await conn.execute("DELETE FROM adv_stats_t1");
-  {
-    const rows = await getSheetValues(
-      sheets,
-      NCX_LEAGUE_SHEET_ID,
-      "ADV STATS!A2:N25"
-    );
-    const sql = `
-      INSERT INTO adv_stats_t1 (
-        team, total_games, avg_wins, avg_loss, avg_points,
-        avg_plms, avg_games, avg_win_pct, avg_ppg,
-        avg_efficiency, avg_war, avg_h2h, avg_potato, avg_sos
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(0, 14);
-      const team = norm(r[0]);
-      if (!team) continue;
-      await conn.execute(sql, r.map(norm));
-    }
+async function loadAdvStats(sheets: any, pool: mysql.Pool): Promise<Record<string, number>> {
+  // All 5 sub-tables live on the ADV STATS tab — fetch in one batchGet.
+  const ranges = [
+    "ADV STATS!A2:N25",
+    "ADV STATS!A28:I32",
+    "ADV STATS!A36:H40",
+    "ADV STATS!A43:H49",
+    "ADV STATS!J36:P42",
+  ];
+  const [t1Rows, t2Rows, t3Rows, t4Rows, t5Rows] = await getSheetValuesBatch(
+    sheets,
+    NCX_LEAGUE_SHEET_ID,
+    ranges
+  );
+
+  const t1Values: any[][] = [];
+  for (const r0 of t1Rows) {
+    const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(0, 14);
+    if (!norm(r[0])) continue;
+    t1Values.push(r.map(norm));
+  }
+  const t2Values: any[][] = [];
+  for (const r0 of t2Rows) {
+    const r = [...r0, "", "", "", "", "", "", "", ""].slice(0, 9);
+    if (!norm(r[0])) continue;
+    t2Values.push(r.map(norm));
+  }
+  const t3Values: any[][] = [];
+  for (const r0 of t3Rows) {
+    const r = [...r0, "", "", "", "", "", "", ""].slice(0, 8);
+    if (!norm(r[0])) continue;
+    t3Values.push(r.map(norm));
+  }
+  const t4Values: any[][] = [];
+  for (const r0 of t4Rows) {
+    const r = [...r0, "", "", "", "", "", "", ""].slice(0, 8);
+    if (!norm(r[0])) continue;
+    t4Values.push(r.map(norm));
+  }
+  const t5Values: any[][] = [];
+  for (const r0 of t5Rows) {
+    const r = [...r0, "", "", "", "", "", "", ""].slice(0, 7);
+    if (!norm(r[0])) continue;
+    t5Values.push(r.map(norm));
   }
 
-  // ADV STATS!A28:I32 -> adv_stats_t2
-  await conn.execute("DELETE FROM adv_stats_t2");
-  {
-    const rows = await getSheetValues(
-      sheets,
-      NCX_LEAGUE_SHEET_ID,
-      "ADV STATS!A28:I32"
-    );
-    const sql = `
-      INSERT INTO adv_stats_t2 (
-        scenario, avg_home_pts, avg_away_pts, avg_total_pts,
-        avg_wpts, avg_lpts, lt20, gte20, total_games
-      ) VALUES (?,?,?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [...r0, "", "", "", "", "", "", "", ""].slice(0, 9);
-      const scenario = norm(r[0]);
-      if (!scenario) continue;
-      await conn.execute(sql, r.map(norm));
-    }
-  }
+  // 5 sub-tables are independent — wipe + bulk-insert in parallel.
+  const [t1, t2, t3, t4, t5] = await Promise.all([
+    (async () => {
+      await pool.query("DELETE FROM adv_stats_t1");
+      return await bulkInsert(
+        pool,
+        `INSERT INTO adv_stats_t1 (
+          team, total_games, avg_wins, avg_loss, avg_points,
+          avg_plms, avg_games, avg_win_pct, avg_ppg,
+          avg_efficiency, avg_war, avg_h2h, avg_potato, avg_sos
+        ) VALUES ?`,
+        t1Values
+      );
+    })(),
+    (async () => {
+      await pool.query("DELETE FROM adv_stats_t2");
+      return await bulkInsert(
+        pool,
+        `INSERT INTO adv_stats_t2 (
+          scenario, avg_home_pts, avg_away_pts, avg_total_pts,
+          avg_wpts, avg_lpts, lt20, gte20, total_games
+        ) VALUES ?`,
+        t2Values
+      );
+    })(),
+    (async () => {
+      await pool.query("DELETE FROM adv_stats_t3");
+      return await bulkInsert(
+        pool,
+        `INSERT INTO adv_stats_t3 (
+          scenario, republic, cis, rebels, empire,
+          resistance, first_order, scum
+        ) VALUES ?`,
+        t3Values
+      );
+    })(),
+    (async () => {
+      await pool.query("DELETE FROM adv_stats_t4");
+      return await bulkInsert(
+        pool,
+        `INSERT INTO adv_stats_t4 (
+          faction_vs, republic, cis, rebels, empire,
+          resistance, first_order, scum
+        ) VALUES ?`,
+        t4Values
+      );
+    })(),
+    (async () => {
+      await pool.query("DELETE FROM adv_stats_t5");
+      return await bulkInsert(
+        pool,
+        `INSERT INTO adv_stats_t5 (
+          faction, wins, losses, win_pct,
+          avg_draft, expected_win_pct, perf_plus_minus
+        ) VALUES ?`,
+        t5Values
+      );
+    })(),
+  ]);
 
-  // ADV STATS!A36:H40 -> adv_stats_t3
-  await conn.execute("DELETE FROM adv_stats_t3");
-  {
-    const rows = await getSheetValues(
-      sheets,
-      NCX_LEAGUE_SHEET_ID,
-      "ADV STATS!A36:H40"
-    );
-    const sql = `
-      INSERT INTO adv_stats_t3 (
-        scenario, republic, cis, rebels, empire,
-        resistance, first_order, scum
-      ) VALUES (?,?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [...r0, "", "", "", "", "", "", ""].slice(0, 8);
-      const scenario = norm(r[0]);
-      if (!scenario) continue;
-      await conn.execute(sql, r.map(norm));
-    }
-  }
-
-  // ADV STATS!A43:H49 -> adv_stats_t4
-  await conn.execute("DELETE FROM adv_stats_t4");
-  {
-    const rows = await getSheetValues(
-      sheets,
-      NCX_LEAGUE_SHEET_ID,
-      "ADV STATS!A43:H49"
-    );
-    const sql = `
-      INSERT INTO adv_stats_t4 (
-        faction_vs, republic, cis, rebels, empire,
-        resistance, first_order, scum
-      ) VALUES (?,?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [...r0, "", "", "", "", "", "", ""].slice(0, 8);
-      const factionVs = norm(r[0]);
-      if (!factionVs) continue;
-      await conn.execute(sql, r.map(norm));
-    }
-  }
-
-  // ADV STATS!J36:P42 -> adv_stats_t5
-  await conn.execute("DELETE FROM adv_stats_t5");
-  {
-    const rows = await getSheetValues(
-      sheets,
-      NCX_LEAGUE_SHEET_ID,
-      "ADV STATS!J36:P42"
-    );
-    const sql = `
-      INSERT INTO adv_stats_t5 (
-        faction, wins, losses, win_pct,
-        avg_draft, expected_win_pct, perf_plus_minus
-      ) VALUES (?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [...r0, "", "", "", "", "", "", ""].slice(0, 7);
-      const faction = norm(r[0]);
-      if (!faction) continue;
-      await conn.execute(sql, r.map(norm));
-    }
-  }
+  return { t1, t2, t3, t4, t5 };
 }
 
-async function loadAllTimeStats(sheets: any, conn: mysql.Connection) {
+async function loadAllTimeStats(sheets: any, pool: mysql.Pool): Promise<number> {
   const sheetId = NCX_STATS_SHEET_ID || NCX_LEAGUE_SHEET_ID;
   const rows = await getSheetValues(sheets, sheetId, "ALL TIME STATS!A2:V500");
 
-  await conn.execute("DELETE FROM all_time_stats");
-
-  // FIX: you are missing ONE placeholder in VALUES (need 22)
-
-  const sql = `
-    INSERT INTO all_time_stats (
-      ncxid,
-      first_name,
-      last_name,
-      discord,
-      wins,
-      losses,
-      points,
-      plms,
-      games,
-      win_pct,
-      ppg,
-      adj_ppg,
-      s1,
-      s2,
-      s3,
-      s4,
-      s5,
-      s6,
-      s7,
-      s8,
-      s9,
-      championships
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `;
-
-
+  const values: any[][] = [];
   for (const r0 of rows) {
     const r = [...r0, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].slice(
       0,
       22
     );
-
     const [
-      ncxid,
-      first_name,
-      last_name,
-      discord,
-      wins,
-      losses,
-      points,
-      plms,
-      games,
-      win_pct,
-      ppg,
-      adj_ppg,
-      s1,
-      s2,
-      s3,
-      s4,
-      s5,
-      s6,
-      s7,
-      s8,
-      s9,
+      ncxid, first_name, last_name, discord,
+      wins, losses, points, plms, games,
+      win_pct, ppg, adj_ppg,
+      s1, s2, s3, s4, s5, s6, s7, s8, s9,
       championships,
     ] = r.map(norm);
 
     if (!ncxid && !first_name && !last_name) continue;
 
-    await conn.execute(sql, [
-      ncxid,
-      first_name,
-      last_name,
-      discord,
-      wins,
-      losses,
-      points,
-      plms,
-      games,
+    values.push([
+      ncxid, first_name, last_name, discord,
+      wins, losses, points, plms, games,
       toDecimalOrNone(win_pct),
       toDecimalOrNone(ppg),
       toDecimalOrNone(adj_ppg),
-      s1,
-      s2,
-      s3,
-      s4,
-      s5,
-      s6,
-      s7,
-      s8,
-      s9,
+      s1, s2, s3, s4, s5, s6, s7, s8, s9,
       toIntOrNone(championships),
     ]);
   }
+
+  await pool.query("DELETE FROM all_time_stats");
+  return await bulkInsert(
+    pool,
+    `INSERT INTO all_time_stats (
+      ncxid, first_name, last_name, discord,
+      wins, losses, points, plms, games,
+      win_pct, ppg, adj_ppg,
+      s1, s2, s3, s4, s5, s6, s7, s8, s9,
+      championships
+    ) VALUES ?`,
+    values
+  );
 }
 
-async function loadTeamSchedule(sheets: any, conn: mysql.Connection) {
+async function loadTeamSchedule(sheets: any, pool: mysql.Pool): Promise<number> {
   const rows = await getSheetValues(
     sheets,
     NCX_LEAGUE_SHEET_ID,
     "SCHEDULE!A2:D121"
   );
 
-  await conn.execute("DELETE FROM team_schedule");
-
-  const sql = `
-    INSERT INTO team_schedule (
-      week_label, away_team, home_team
-    ) VALUES (?,?,?)
-  `;
-
+  const values: any[][] = [];
   for (const r0 of rows) {
     const r = [...r0, "", "", "", ""].slice(0, 4);
     const weekRaw = norm(r[0]);
     const away = norm(r[1]);
     const home = norm(r[3]);
     if (!weekRaw || (!away && !home)) continue;
-
-    const weekLabel = normalizeWeekLabel(weekRaw);
-    await conn.execute(sql, [weekLabel, away, home]);
+    values.push([normalizeWeekLabel(weekRaw), away, home]);
   }
+
+  await pool.query("DELETE FROM team_schedule");
+  return await bulkInsert(
+    pool,
+    "INSERT INTO team_schedule (week_label, away_team, home_team) VALUES ?",
+    values
+  );
 }
 
-async function loadOverallStandings(sheets: any, conn: mysql.Connection) {
+async function loadOverallStandings(sheets: any, pool: mysql.Pool): Promise<number> {
   const rows = await getSheetValues(
     sheets,
     NCX_LEAGUE_SHEET_ID,
     "OVERALL RECORD!A2:F25"
   );
 
-  await conn.execute("DELETE FROM overall_standings");
-
-    const sql = `
-    INSERT INTO overall_standings (
-        team, \`rank\`, wins, losses, game_wins, points
-    ) VALUES (?,?,?,?,?,?)
-    `;
-
-
+  const values: any[][] = [];
   for (const r0 of rows) {
     const r = [...r0, "", "", "", "", "", ""].slice(0, 6);
     const rankStr = norm(r[0]);
     const team = norm(r[1]);
     if (!rankStr || !team) continue;
 
-    const rank = parseInt(rankStr, 10);
-    const wins = toIntOrZero(r[2]);
-    const losses = toIntOrZero(r[3]);
-    const gameWins = toIntOrZero(r[4]);
-    const points = toIntOrZero(r[5]);
-
-    await conn.execute(sql, [team, rank, wins, losses, gameWins, points]);
+    values.push([
+      team,
+      parseInt(rankStr, 10),
+      toIntOrZero(r[2]),
+      toIntOrZero(r[3]),
+      toIntOrZero(r[4]),
+      toIntOrZero(r[5]),
+    ]);
   }
+
+  await pool.query("DELETE FROM overall_standings");
+  return await bulkInsert(
+    pool,
+    "INSERT INTO overall_standings (team, `rank`, wins, losses, game_wins, points) VALUES ?",
+    values
+  );
 }
 
-async function syncListsIncremental(sheets: any, conn: mysql.Connection) {
+async function syncListsIncremental(
+  sheets: any,
+  pool: mysql.Pool
+): Promise<{ upserted: number; refreshed: number }> {
   // 0) preload xws->init once
-  const [idRows] = await conn.query<any[]>(
+  const [idRows] = await pool.query<any[]>(
     "SELECT xws, init FROM railway.IDs WHERE id >= '0001' AND id <= '0726'"
   );
   const initByXws: InitLookup = new Map();
@@ -1033,6 +958,7 @@ async function syncListsIncremental(sheets: any, conn: mysql.Connection) {
       home_average_init = IF(COALESCE(home_list,'') <> COALESCE(VALUES(home_list),''), NULL, home_average_init)
   `;
 
+  let upserted = 0;
   for (const r0 of rows) {
     const r = [...r0, "", "", "", ""].slice(0, 4);
     const weekRaw = norm(r[0]);
@@ -1042,12 +968,13 @@ async function syncListsIncremental(sheets: any, conn: mysql.Connection) {
     if (!weekRaw || !game) continue;
 
     const weekLabel = normalizeWeekLabel(weekRaw);
-    await conn.execute(upsertSql, [weekLabel, game, awayList, homeList]);
+    await pool.query(upsertSql, [weekLabel, game, awayList, homeList]);
+    upserted++;
   }
 
   // 3) Refresh only dirty sides
   // (treat "dirty" as missing xws/letters/count/avg for a side)
-  const [dirtyRows] = await conn.query<any[]>(
+  const [dirtyRows] = await pool.query<any[]>(
     `
     SELECT
       week_label, game,
@@ -1093,7 +1020,7 @@ async function syncListsIncremental(sheets: any, conn: mysql.Connection) {
         const { xwsJson, letters, count, avgInit } =
           await resolveDerivedForUrl(url, initByXws, xwsCache);
 
-        await conn.execute(
+        await pool.query(
           `
           UPDATE lists
           SET
@@ -1122,7 +1049,7 @@ async function syncListsIncremental(sheets: any, conn: mysql.Connection) {
         const { xwsJson, letters, count, avgInit } =
           await resolveDerivedForUrl(url, initByXws, xwsCache);
 
-        await conn.execute(
+        await pool.query(
           `
           UPDATE lists
           SET
@@ -1137,6 +1064,8 @@ async function syncListsIncremental(sheets: any, conn: mysql.Connection) {
       }
     }
   }
+
+  return { upserted, refreshed: dirtyRows.length };
 }
 
 function isValidListLinkSeed(url: string): boolean {
@@ -1186,49 +1115,30 @@ async function resolveDerivedForUrl(
 }
 
 
-async function loadS9Signups(sheets: any, conn: mysql.Connection) {
-  // Read from the S9 signup sheet (first tab), starting at row 2 to skip headers.
-  // We only care about columns:
-  // NCXID = F (index 5)
-  // first_name = C (index 2)
-  // last_name = D (index 3)
-  // pref_one = J (index 9)
-  // pref_two = K (index 10)
-  // pref_three = L (index 11)
-
+async function loadS9Signups(sheets: any, pool: mysql.Pool) {
+  // Columns of interest: C=first, D=last, F=ncxid, J/K/L=prefs
   const tabName = await getFirstSheetTitle(sheets, S9_SIGN_UP_SHEET_ID);
-
-  // Pull enough columns to reach L; A2:L is perfect.
   const rows = await getSheetValues(sheets, S9_SIGN_UP_SHEET_ID, `${tabName}!A2:L`);
 
-  // Wipe + insert into fully-qualified schema/table
-  await conn.execute("DELETE FROM S9.signups");
-
-  const sql = `
-    INSERT INTO S9.signups
-      (NCXID, first_name, last_name, pref_one, pref_two, pref_three)
-    VALUES (?,?,?,?,?,?)
-  `;
-
-  let inserted = 0;
-
+  const values: any[][] = [];
   for (const r0 of rows) {
-    // pad to length 12
     const r = [...(r0 ?? []), "", "", "", "", "", "", "", "", "", "", "", ""].slice(0, 12);
-
-    const ncxid = norm(r[5]);      // F
-    const first = norm(r[2]);      // C
-    const last = norm(r[3]);       // D
-    const pref1 = norm(r[9]);      // J
-    const pref2 = norm(r[10]);     // K
-    const pref3 = norm(r[11]);     // L
-
-    // Skip empty rows
+    const ncxid = norm(r[5]);
+    const first = norm(r[2]);
+    const last = norm(r[3]);
+    const pref1 = norm(r[9]);
+    const pref2 = norm(r[10]);
+    const pref3 = norm(r[11]);
     if (!ncxid && !first && !last && !pref1 && !pref2 && !pref3) continue;
-
-    await conn.execute(sql, [ncxid, first, last, pref1, pref2, pref3]);
-    inserted++;
+    values.push([ncxid, first, last, pref1, pref2, pref3]);
   }
+
+  await pool.query("DELETE FROM S9.signups");
+  const inserted = await bulkInsert(
+    pool,
+    "INSERT INTO S9.signups (NCXID, first_name, last_name, pref_one, pref_two, pref_three) VALUES ?",
+    values
+  );
 
   return { tabName, inserted };
 }
@@ -1236,6 +1146,7 @@ async function loadS9Signups(sheets: any, conn: mysql.Connection) {
 // =============== ROUTE HANDLER ===============
 
 export async function GET(req: NextRequest) {
+  const startedAt = Date.now();
   try {
     // simple auth
     const key = req.nextUrl.searchParams.get("key");
@@ -1244,45 +1155,83 @@ export async function GET(req: NextRequest) {
     }
 
     const sheets = await getSheetsClient();
-    const conn = await getMySqlConn();
+    const pool = getSeedPool();
 
-    const results: any = {};
+    // Read NCXID!A2:O215 once; loadNcxid + loadCaptains both work off these rows.
+    const [ncxidRows] = await getSheetValuesBatch(sheets, NCX_LEAGUE_SHEET_ID, [
+      "NCXID!A2:O215",
+    ]);
 
-    try {
-      results.current_week = await loadCurrentWeek(sheets, conn);
-      results.subs = await loadSubs(sheets, conn);
+    const [
+      currentWeek,
+      subs,
+      signupsResult,
+      weeklyMatchups,
+      individualStats,
+      streamSchedule,
+      discordMap,
+      ncxid,
+      captains,
+      advStats,
+      allTimeStats,
+      teamSchedule,
+      overallStandings,
+      lists,
+    ] = await Promise.all([
+      loadCurrentWeek(sheets, pool),
+      loadSubs(sheets, pool),
+      PRE_SEASON ? loadS9Signups(sheets, pool) : Promise.resolve(null),
+      loadWeeklyMatchups(sheets, pool),
+      loadIndividualStats(sheets, pool),
+      loadStreamSchedule(sheets, pool),
+      loadDiscordMap(sheets, pool),
+      loadNcxid(pool, ncxidRows),
+      loadCaptains(pool, ncxidRows),
+      loadAdvStats(sheets, pool),
+      loadAllTimeStats(sheets, pool),
+      loadTeamSchedule(sheets, pool),
+      loadOverallStandings(sheets, pool),
+      syncListsIncremental(sheets, pool),
+    ]);
 
-      if (PRE_SEASON) {
-        results.s9_signups = await loadS9Signups(sheets, conn);
-      }
+    const elapsedMs = Date.now() - startedAt;
 
-      await loadWeeklyMatchups(sheets, conn);
-      await loadIndividualStats(sheets, conn);
-      await loadStreamSchedule(sheets, conn);
-      await loadDiscordMap(sheets, conn);
-      await loadNcxid(sheets, conn);
-      results.captains = await loadCaptains(sheets, conn);
-      await loadAdvStats(sheets, conn);
-      await loadAllTimeStats(sheets, conn);
-      await loadTeamSchedule(sheets, conn);
-      await loadOverallStandings(sheets, conn);
+    const tables: Record<string, number | Record<string, number>> = {
+      Subs: subs.inserted,
+      weekly_matchups: weeklyMatchups,
+      individual_stats: individualStats,
+      stream_schedule: streamSchedule,
+      discord_map: discordMap,
+      ncxid: ncxid,
+      "S9.captains": captains,
+      adv_stats: advStats,
+      all_time_stats: allTimeStats,
+      team_schedule: teamSchedule,
+      overall_standings: overallStandings,
+      lists,
+    };
+    if (signupsResult) tables["S9.signups"] = signupsResult.inserted;
 
-      // ✅ incremental + cache-friendly list sync
-      await syncListsIncremental(sheets, conn);
-
-    } finally {
-      await conn.end();
-    }
+    const totalRows =
+      Object.values(tables).reduce<number>((acc, v) => {
+        if (typeof v === "number") return acc + v;
+        if (v && typeof v === "object")
+          return acc + Object.values(v).reduce<number>((a, n) => a + (typeof n === "number" ? n : 0), 0);
+        return acc;
+      }, 0);
 
     return NextResponse.json({
       ok: true,
       message: "NCX Sheets → MySQL sync complete.",
-      results,
+      elapsed_ms: elapsedMs,
+      current_week: currentWeek.weekLabel,
+      total_rows_written: totalRows,
+      tables,
     });
   } catch (err: any) {
     console.error("Seed error:", err);
     return NextResponse.json(
-      { ok: false, error: err?.message ?? "Unknown error" },
+      { ok: false, error: err?.message ?? "Unknown error", elapsed_ms: Date.now() - startedAt },
       { status: 500 }
     );
   }
