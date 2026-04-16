@@ -118,10 +118,41 @@ export async function POST(request: Request) {
     if (isNew) {
       const webhook = process.env.DISCORD_LIVE_WEBHOOK_URL;
       if (webhook) {
+        const roleIds: Record<string, string> = {};
+        const wanted = [awayTeam, homeTeam].filter(Boolean);
+        if (wanted.length) {
+          try {
+            const [teamRows] = await pool.query<any[]>(
+              `SELECT team_name, CAST(team_id AS CHAR) AS team_id
+                 FROM S9.teams
+                WHERE UPPER(team_name) IN (?)`,
+              [wanted.map((t) => t.toUpperCase())]
+            );
+            for (const r of teamRows ?? []) {
+              roleIds[String(r.team_name).toUpperCase()] = String(r.team_id);
+            }
+          } catch (e) {
+            console.warn("⚠️ team_id lookup failed:", e);
+          }
+        }
+
+        const teamMention = (teamName: string) => {
+          const id = roleIds[teamName.toUpperCase()];
+          return id ? `<@&${id}>` : teamName;
+        };
+
         const awaySide =
-          awayTeam && awayName ? `${awayTeam} || ${awayName}` : awayTeam || awayName || "Away";
+          awayTeam && awayName
+            ? `${teamMention(awayTeam)} • ${awayName}`
+            : awayTeam
+              ? teamMention(awayTeam)
+              : awayName || "Away";
         const homeSide =
-          homeTeam && homeName ? `${homeName} || ${homeTeam}` : homeTeam || homeName || "Home";
+          homeTeam && homeName
+            ? `${homeName} • ${teamMention(homeTeam)}`
+            : homeTeam
+              ? teamMention(homeTeam)
+              : homeName || "Home";
         const content =
           `🔴 **LIVE NOW** — ${weekLabel} — GAME ${game} — ${awaySide} vs ${homeSide} — ${streamUrl}`;
         try {
