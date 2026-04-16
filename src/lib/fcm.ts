@@ -87,6 +87,7 @@ export async function sendFCMToDevices(
 
   let sent = 0;
   let failed = 0;
+  const staleTokens: string[] = [];
 
   await Promise.allSettled(
     deviceTokens.map(async (token) => {
@@ -134,6 +135,15 @@ export async function sendFCMToDevices(
           const errBody = await res.text();
           console.error(`FCM send failed for token ${token.slice(0, 20)}...: ${errBody}`);
           failed++;
+          let errorCode = '';
+          try {
+            errorCode = JSON.parse(errBody)?.error?.details?.find?.(
+              (d: any) => d?.errorCode
+            )?.errorCode ?? '';
+          } catch {}
+          if (errorCode === 'UNREGISTERED' || errorCode === 'INVALID_ARGUMENT') {
+            staleTokens.push(token);
+          }
         }
       } catch (e) {
         console.error('FCM send error:', e);
@@ -141,6 +151,19 @@ export async function sendFCMToDevices(
       }
     })
   );
+
+  if (staleTokens.length > 0) {
+    try {
+      const { sql } = await import('@vercel/postgres');
+      await sql`
+        DELETE FROM fcm_subscriptions
+        WHERE device_token = ANY(${staleTokens as any}::text[])
+      `;
+      console.log(`FCM: purged ${staleTokens.length} stale tokens from fcm_subscriptions`);
+    } catch (e) {
+      console.warn('FCM: failed to purge stale tokens:', e);
+    }
+  }
 
   if (meta) {
     const { logPushNotification } = await import('@/lib/pushLog');
