@@ -68,6 +68,21 @@ type LiveEntry = {
 const LIVE_MAX_MS = 2 * 60 * 60 * 1000; // 2 hours
 const NCX_TWITCH_URL = "http://www.twitch.tv/nickelcityxwing";
 
+// Preset stream providers. NCX is always first, Other is always last,
+// everything else is listed alphabetically by label in between.
+type StreamPreset = { key: string; label: string; url: string; streamName: string };
+const STREAM_PRESETS: StreamPreset[] = [
+  { key: "NCX", label: "NCX", url: NCX_TWITCH_URL, streamName: "Nickel City X-Wing" },
+  { key: "FIRECAST", label: "Firecast Focus", url: "http://www.twitch.tv/firecastfocus", streamName: "Firecast Focus" },
+];
+const STREAM_PRESET_OPTIONS: StreamPreset[] = [
+  STREAM_PRESETS[0],
+  ...STREAM_PRESETS.slice(1).sort((a, b) => a.label.localeCompare(b.label)),
+];
+const STREAM_PRESET_BY_KEY: Record<string, StreamPreset> = Object.fromEntries(
+  STREAM_PRESETS.map((p) => [p.key, p])
+);
+
 function parseStartedAtMs(s?: string | null): number {
   if (!s) return 0;
   const t = Date.parse(s);
@@ -735,9 +750,7 @@ export default function MatchupsPanel({
   // --- Live matchups state ------------------------------------------------
   const [liveGames, setLiveGames] = useState<Record<string, LiveEntry>>({});
   const [openLivePopover, setOpenLivePopover] = useState<string | null>(null);
-  const [liveProvider, setLiveProvider] = useState<Record<string, "NCX" | "Other">>(
-    {}
-  );
+  const [liveProvider, setLiveProvider] = useState<Record<string, string>>({});
   const [liveOtherName, setLiveOtherName] = useState<Record<string, string>>({});
   const [liveOtherUrl, setLiveOtherUrl] = useState<Record<string, string>>({});
   const [liveSubmitting, setLiveSubmitting] = useState<string | null>(null);
@@ -789,9 +802,10 @@ export default function MatchupsPanel({
     let streamUrl = "";
     let streamName: string | null = null;
 
-    if (provider === "NCX") {
-      streamUrl = NCX_TWITCH_URL;
-      streamName = "Nickel City X-Wing";
+    const preset = STREAM_PRESET_BY_KEY[provider];
+    if (preset) {
+      streamUrl = preset.url;
+      streamName = preset.streamName;
     } else {
       streamUrl = (liveOtherUrl[game] ?? "").trim();
       streamName = (liveOtherName[game] ?? "").trim() || null;
@@ -1137,9 +1151,8 @@ export default function MatchupsPanel({
             const watchLabel =
               live?.streamName && live.streamName.trim().length > 0
                 ? live.streamName
-                : live?.provider === "NCX"
-                ? "Nickel City X-Wing"
-                : "stream";
+                : (live?.provider && STREAM_PRESET_BY_KEY[live.provider]?.streamName) ||
+                  "stream";
 
             return (
               <div
@@ -1169,7 +1182,7 @@ export default function MatchupsPanel({
 
                 {/* LIVE / END LIVE pill + Create thumbnail button — desktop only */}
                 <div className="absolute -top-3 -right-3 hidden md:flex items-center gap-2">
-                  {isCurrentWeek && isLive ? (
+                  {isCurrentWeek && !isDone && isLive ? (
                     <button
                       type="button"
                       onClick={() => handleEndLive(row.game)}
@@ -1179,7 +1192,7 @@ export default function MatchupsPanel({
                       <span className="ncx-live-dot" />
                       {submittingLive ? "Ending…" : "End Live"}
                     </button>
-                  ) : isCurrentWeek && !isLive ? (
+                  ) : isCurrentWeek && !isDone && !isLive ? (
                     <div className="relative">
                       <button
                         type="button"
@@ -1207,12 +1220,16 @@ export default function MatchupsPanel({
                             onChange={(e) =>
                               setLiveProvider((p) => ({
                                 ...p,
-                                [row.game]: e.target.value as "NCX" | "Other",
+                                [row.game]: e.target.value,
                               }))
                             }
                             className="w-full rounded-md bg-zinc-900 border border-zinc-700 text-sm px-2 py-1.5 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 mb-2"
                           >
-                            <option value="NCX">NCX</option>
+                            {STREAM_PRESET_OPTIONS.map((p) => (
+                              <option key={p.key} value={p.key}>
+                                {p.label}
+                              </option>
+                            ))}
                             <option value="Other">Other</option>
                           </select>
 
