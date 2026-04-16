@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSheets } from "@/lib/googleSheets";
+import { getCaptainTeams } from "@/lib/captains";
 import { sql } from "@vercel/postgres";
 import mysql from "mysql2/promise";
 
@@ -24,46 +25,6 @@ function isValidListLink(url: string): boolean {
   return isYasb || isLbn;
 }
 
-// extra helpers for MySQL sync
-function toDecimalOrNone(s: string | null | undefined): number | null {
-  let raw = (s ?? "").trim();
-  if (!raw) return null;
-  const upper = raw.toUpperCase();
-  if (["#DIV/0!", "#VALUE!", "N/A", "NA"].includes(upper)) return null;
-  if (raw.endsWith("%")) raw = raw.slice(0, -1).trim();
-  const val = Number(raw);
-  return Number.isFinite(val) ? val : null;
-}
-
-function toIntOrNone(s: string | null | undefined): number | null {
-  const raw = (s ?? "").trim();
-  if (!raw) return null;
-  const val = Number(raw);
-  return Number.isInteger(val) ? val : null;
-}
-
-function toIntOrZero(v: any): number {
-  const s = String(v ?? "").trim();
-  if (!s) return 0;
-  const n = Number(s);
-  return Number.isFinite(n) ? Math.trunc(n) : 0;
-}
-
-function parseWinCell(v: any): number {
-  const s = String(v ?? "").trim().toUpperCase();
-  if (["WIN", "W", "1"].includes(s)) return 1;
-  if (["LOSS", "L", "", "-", "0"].includes(s)) return 0;
-  const n = Number(s);
-  return Number.isFinite(n) ? (n > 0 ? 1 : 0) : 0;
-}
-
-function parseLossCell(v: any): number {
-  const s = String(v ?? "").trim().toUpperCase();
-  if (["LOSS", "L", "1"].includes(s)) return 1;
-  if (["WIN", "W", "", "-", "0"].includes(s)) return 0;
-  const n = Number(s);
-  return Number.isFinite(n) ? (n > 0 ? 1 : 0) : 0;
-}
 
 function normalizeWeekLabel(label: string): string {
   const s = (label ?? "").trim();
@@ -208,31 +169,45 @@ async function getNcxIdForDiscord(
   return { ncxid: hit[0] ?? "", first: hit[1] ?? "", last: hit[2] ?? "" };
 }
 
-/**
- * Captain lookup from NCXID!K2:O25
- * K = team name, O = captain Discord ID
- */
-async function getCaptainTeamsForDiscord(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  discordId: string
-): Promise<string[]> {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "NCXID!K2:O25",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = res.data.values ?? [];
-  const teams: string[] = [];
+// Captain lookup moved to MySQL — see `src/lib/captains.ts`. The old
+// per-call NCXID!K2:O25 Sheets read is gone (S9.captains is refreshed
+// by /api/seed-mysql).
 
-  for (const r of rows) {
-    const team = norm(r?.[0]); // K
-    const disc = normalizeDiscordId(r?.[4]); // O (K..O => index 4)
-    if (team && disc === discordId) {
-      teams.push(team);
-    }
+// Fire-and-forget seed trigger. Used at the end of a successful report
+// to refresh MySQL from the Sheet in the background, so the response
+// returns immediately. Replaces the old inline 8-step sync block.
+//
+// The Railway Node runtime keeps the process alive after the response,
+// so the in-flight fetch completes. On serverless platforms this would
+// need `waitUntil`, but NCX runs on Railway.
+function triggerSeedInBackground(): void {
+  const baseUrl =
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+
+  const key = process.env.SEED_API_KEY;
+  if (!key) {
+    console.warn("⚠️ Skipping background seed — SEED_API_KEY not set");
+    return;
   }
-  return teams;
+
+  const url = `${baseUrl}/api/seed-mysql?key=${encodeURIComponent(key)}`;
+  void fetch(url, { method: "GET", cache: "no-store" })
+    .then(async (res) => {
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        console.log(
+          `[report-game] background seed ok in ${json?.elapsed_ms ?? "?"}ms (${json?.total_rows_written ?? "?"} rows)`
+        );
+      } else {
+        console.warn(`⚠️ Background seed returned ${res.status}`);
+      }
+    })
+    .catch((e) => {
+      console.warn("⚠️ Background seed trigger failed:", e);
+    });
 }
 
 function teamKey(s: string): string {
@@ -261,317 +236,6 @@ function resolveRole(
   return null;
 }
 
-/* --------------------------- XWS / glyph helpers ------------------------- */
-
-type XwsPilot = {
-  ship: string;
-  id?: string; // xws id, e.g. "anakinskywalker-delta7baethersprite"
-};
-
-type XwsResponse = {
-  pilots?: XwsPilot[];
-  [key: string]: any;
-};
-
-type InitLookup = Map<string, number>;
-
-function computeCountAndAverageInitFromXws(
-  xws: XwsResponse | null,
-  initByXws: InitLookup
-): { count: number | null; avgInit: number | null } {
-  if (!xws || !Array.isArray(xws.pilots)) {
-    return { count: null, avgInit: null };
-  }
-
-  const pilots = xws.pilots;
-  if (pilots.length === 0) {
-    return { count: 0, avgInit: null };
-  }
-
-  let sum = 0;
-  let matched = 0;
-
-  for (const p of pilots) {
-    const xwsId = p.id;
-    if (!xwsId) continue;
-    const init = initByXws.get(xwsId);
-    if (init == null) continue;
-    sum += Number(init);
-    matched++;
-  }
-
-  const avg =
-    matched > 0 ? Number((sum / matched).toFixed(1)) : null;
-
-  return {
-    count: pilots.length,
-    avgInit: avg,
-  };
-}
-
-const SHIP_ICON_MAP: Record<string, string> = {
-  aggressorassaultfighter: "i",
-  alphaclassstarwing: "&",
-  arc170starfighter: "c",
-  asf01bwing: "b",
-  attackshuttle: "g",
-  auzituckgunship: "@",
-  belbullab22starfighter: "[",
-  btanr2ywing: "{",
-  btanr2wywing: "{",
-  btla4ywing: "y",
-  btlbywing: ":",
-  btls8kwing: "k",
-  clonez95headhunter: "¡",
-  cr90corvette: "2",
-  croccruiser: "5",
-  customizedyt1300lightfreighter: "W",
-  droidtrifighter: "+",
-  delta7aethersprite: "\\",
-  delta7baethersprite: "\\",
-  escapecraft: "X",
-  eta2actis: "-",
-  ewing: "e",
-  fangfighter: "M",
-  fireball: "0",
-  firesprayclasspatrolcraft: "f",
-  g1astarfighter: "n",
-  gauntletfighter: "|",
-  gozanticlasscruiser: "4",
-  gr75mediumtransport: "1",
-  hmpdroidgunship: ".",
-  hwk290lightfreighter: "h",
-  hyenaclassdroidbomber: "=",
-  jumpmaster5000: "p",
-  kihraxzfighter: "r",
-  laatigunship: "/",
-  lambdaclasst4ashuttle: "l",
-  lancerclasspursuitcraft: "L",
-  m12lkimogilafighter: "K",
-  m3ainterceptor: "s",
-  mg100starfortress: "Z",
-  modifiedtielnfighter: "C",
-  modifiedyt1300lightfreighter: "m",
-  nabooroyaln1starfighter: "<",
-  nantexclassstarfighter: ";",
-  nimbusclassvwing: ",",
-  quadrijettransferspacetug: "q",
-  raiderclasscorvette: "3",
-  resistancetransport: ">",
-  resistancetransportpod: "?",
-  rogueclassstarfighter: "~",
-  rz1awing: "a",
-  rz2awing: "E",
-  scavengedyt1300: "Y",
-  scurrgh6bomber: "H",
-  sheathipedeclassshuttle: "%",
-  sithinfiltrator: "]",
-  st70assaultship: "}",
-  starviperclassattackplatform: "v",
-  syliureclasshyperspacering: "*",
-  t65xwing: "x",
-  t70xwing: "w",
-  tieadvancedv1: "R",
-  tieadvancedx1: "A",
-  tieagaggressor: "`",
-  tiebainterceptor: "j",
-  tiecapunisher: "N",
-  tieddefender: "D",
-  tiefofighter: "O",
-  tieininterceptor: "I",
-  tielnfighter: "F",
-  tiephphantom: "P",
-  tierbheavy: "J",
-  tiereaper: "V",
-  tiesabomber: "B",
-  tiesebomber: "!",
-  tiesffighter: "S",
-  tieskstriker: "T",
-  tievnsilencer: "$",
-  tiewiwhispermodifiedinterceptor: "#",
-  tridentclassassaultship: "6",
-  upsilonclasscommandshuttle: "U",
-  ut60duwing: "u",
-  v19torrentstarfighter: "^",
-  vcx100lightfreighter: "G",
-  vt49decimator: "d",
-  vultureclassdroidfighter: "_",
-  xiclasslightshuttle: "Q",
-  yt2400lightfreighter: "o",
-  yv666lightfreighter: "t",
-  z95af4headhunter: "z",
-};
-
-function shipsToGlyphs(pilots?: XwsPilot[] | null): string | null {
-  if (!pilots || !pilots.length) return null;
-  const s = pilots.map((p) => SHIP_ICON_MAP[p.ship] ?? "·").join("");
-  return s || null;
-}
-
-async function fetchXwsFromListUrlServer(listUrl: string): Promise<XwsResponse | null> {
-  try {
-    let upstreamUrl: string | null = null;
-
-    // YASB: proxy via local XWS parser
-    if (listUrl.startsWith("https://yasb.app")) {
-      const parts = listUrl.split("yasb.app/");
-      if (parts.length >= 2) {
-        const dataLink = parts[1]; // "?f=...&d=..."
-        upstreamUrl = `http://5.161.202.51:3001/api/yasb/xws${dataLink}`;
-      }
-    } else if (listUrl.startsWith("https://launchbaynext.app")) {
-      // LaunchBayNext: pull lbx=... piece
-      const idx = listUrl.indexOf("lbx=");
-      if (idx !== -1) {
-        let value = listUrl.slice(idx + "lbx=".length);
-        const ampIdx = value.indexOf("&");
-        if (ampIdx !== -1) {
-          value = value.slice(0, ampIdx);
-        }
-        upstreamUrl = `https://launchbaynext.app/api/xws?lbx=${value}`;
-      }
-    }
-
-    if (!upstreamUrl) return null;
-
-    const res = await fetch(upstreamUrl, { cache: "no-store" });
-    if (!res.ok) return null;
-
-    const data = (await res.json()) as XwsResponse;
-    return data;
-  } catch (err) {
-    console.warn("fetchXwsFromListUrlServer error:", err);
-    return null;
-  }
-}
-
-async function syncSingleListXwsAndLetters(
-  conn: mysql.Connection,
-  weekLabel: string,
-  game: string
-) {
-  // Read current row from lists table
-  const [rows] = (await conn.execute(
-    "SELECT away_list, home_list, away_xws, home_xws FROM lists WHERE week_label = ? AND game = ?",
-    [weekLabel, game]
-  )) as any;
-
-  if (!rows || rows.length === 0) {
-    console.log(`[XWS] No row found for ${weekLabel} / ${game}`);
-    return;
-  }
-
-  const row = rows[0];
-  const awayListUrl = String(row.away_list ?? "").trim();
-  const homeListUrl = String(row.home_list ?? "").trim();
-  const currentAwayXws = row.away_xws;
-  const currentHomeXws = row.home_xws;
-
-  console.log(`[XWS] Processing ${weekLabel}/${game}: away="${awayListUrl}" home="${homeListUrl}"`);
-
-  // Skip if both sides are already complete (have XWS data)
-  const awayComplete = awayListUrl && currentAwayXws;
-  const homeComplete = homeListUrl && currentHomeXws;
-
-  if (awayComplete && homeComplete) {
-    console.log(`[XWS] Both sides complete, skipping`);
-    return; // Both sides already have XWS, nothing to do
-  }
-
-  // Build xws -> init map from railway.IDs (0001–0726)
-  const [idRows] = (await conn.execute(
-    "SELECT xws, init FROM railway.IDs WHERE id >= '0001' AND id <= '0726'"
-  )) as any;
-
-  const initByXws: InitLookup = new Map();
-  for (const r of idRows) {
-    const key = r.xws as string | null;
-    const initVal = r.init;
-    if (!key || initVal == null) continue;
-    initByXws.set(String(key), Number(initVal));
-  }
-
-  let awayXwsJson: string | null = currentAwayXws || null;
-  let awayLetters: string | null = null;
-  let homeXwsJson: string | null = currentHomeXws || null;
-  let homeLetters: string | null = null;
-
-  let awayCount: number | null = null;
-  let awayAvgInit: number | null = null;
-  let homeCount: number | null = null;
-  let homeAvgInit: number | null = null;
-
-  // Only fetch away XWS if missing or URL provided
-  if (!awayComplete && awayListUrl && isValidListLink(awayListUrl)) {
-    console.log(`[XWS] Fetching away XWS from: ${awayListUrl}`);
-    const xws = await fetchXwsFromListUrlServer(awayListUrl);
-    if (xws) {
-      console.log(`[XWS] Away XWS fetched, ${xws.pilots?.length ?? 0} pilots`);
-      awayXwsJson = JSON.stringify(xws);
-      awayLetters = shipsToGlyphs(xws.pilots ?? []) ?? null;
-
-      const res = computeCountAndAverageInitFromXws(xws, initByXws);
-      awayCount = res.count;
-      awayAvgInit = res.avgInit;
-    } else {
-      console.log(`[XWS] Away XWS fetch failed or returned null`);
-    }
-  }
-
-  // Only fetch home XWS if missing or URL provided
-  if (!homeComplete && homeListUrl && isValidListLink(homeListUrl)) {
-    console.log(`[XWS] Fetching home XWS from: ${homeListUrl}`);
-    const xws = await fetchXwsFromListUrlServer(homeListUrl);
-    if (xws) {
-      console.log(`[XWS] Home XWS fetched, ${xws.pilots?.length ?? 0} pilots`);
-      homeXwsJson = JSON.stringify(xws);
-      homeLetters = shipsToGlyphs(xws.pilots ?? []) ?? null;
-
-      const res = computeCountAndAverageInitFromXws(xws, initByXws);
-      homeCount = res.count;
-      homeAvgInit = res.avgInit;
-    } else {
-      console.log(`[XWS] Home XWS fetch failed or returned null`);
-    }
-  }
-
-  // If no valid list/XWS, leave count/avg as null (your requirement)
-  console.log(`[XWS] Updating ${weekLabel}/${game}: away_xws=${!!awayXwsJson} home_xws=${!!homeXwsJson}`);
-  try {
-    await conn.execute(
-      `
-      UPDATE lists
-      SET
-        away_xws = ?,
-        away_letters = ?,
-        home_xws = ?,
-        home_letters = ?,
-        away_count = ?,
-        home_count = ?,
-        away_average_init = ?,
-        home_average_init = ?
-      WHERE week_label = ? AND game = ?
-    `,
-      [
-        awayXwsJson,
-        awayLetters,
-        homeXwsJson,
-        homeLetters,
-        awayCount,
-        homeCount,
-        awayAvgInit,
-        homeAvgInit,
-        weekLabel,
-        game,
-      ]
-    );
-    console.log(`[XWS] Update successful`);
-  } catch (updateErr) {
-    console.error(`[XWS] Update failed:`, updateErr);
-  }
-}
-
-/* --------------------------- MySQL sync helpers ------------------------- */
 
 async function getMySqlConn() {
   const host = process.env.DB_HOST ?? "localhost";
@@ -596,637 +260,6 @@ async function getMySqlConn() {
   return conn;
 }
 
-async function syncCurrentWeek(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  conn: mysql.Connection
-) {
-  const weekRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "SCHEDULE!U2",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const raw = weekRes.data.values?.[0]?.[0] ?? "WEEK 1";
-  const weekLabel = normalizeWeekLabel(String(raw));
-
-  await conn.execute("DELETE FROM current_week");
-  await conn.execute("INSERT INTO current_week (week_label) VALUES (?)", [
-    weekLabel,
-  ]);
-
-  return weekLabel;
-}
-
-// Only update one row in weekly_matchups for this week/game
-async function syncSingleWeeklyMatchup(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  weekTab: string,
-  rowNum: number,
-  conn: mysql.Connection
-) {
-  const range = `${weekTab}!A${rowNum}:Q${rowNum}`;
-  const rowRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range,
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const r0 = rowRes.data.values?.[0];
-  if (!r0) return;
-
-  const r = [
-    ...r0,
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-  ].slice(0, 17);
-
-  const gameRaw = norm(r[0]);
-  const gameNum = parseInt(gameRaw, 10);
-  if (!Number.isFinite(gameNum) || gameNum <= 0) return;
-  const game = String(gameNum);
-  const weekLabel = normalizeWeekLabel(weekTab);
-
-  const awayId = norm(r[1]);
-  const awayName = norm(r[2]);
-  const awayTeam = norm(r[3]);
-  const awayW = norm(r[4]);
-  const awayL = norm(r[5]);
-  const awayPts = norm(r[6]);
-  const awayPLMS = norm(r[7]);
-  const homeId = norm(r[9]);
-  const homeName = norm(r[10]);
-  const homeTeam = norm(r[11]);
-  const homeW = norm(r[12]);
-  const homeL = norm(r[13]);
-  const homePts = norm(r[14]);
-  const homePLMS = norm(r[15]);
-  const scenario = norm(r[16]);
-
-  if (!awayTeam && !homeTeam) return;
-
-  await conn.execute(
-    "DELETE FROM weekly_matchups WHERE week_label = ? AND game = ?",
-    [weekLabel, game]
-  );
-
-  const sql = `
-    INSERT INTO weekly_matchups (
-      week_label,
-      game,
-      awayId,
-      awayName,
-      awayTeam,
-      awayW,
-      awayL,
-      awayPts,
-      awayPLMS,
-      homeId,
-      homeName,
-      homeTeam,
-      homeW,
-      homeL,
-      homePts,
-      homePLMS,
-      scenario
-    ) VALUES (
-      ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-    )
-  `;
-
-  await conn.execute(sql, [
-    weekLabel,
-    game,
-    awayId,
-    awayName,
-    awayTeam,
-    parseWinCell(awayW),
-    parseLossCell(awayL),
-    toIntOrZero(awayPts),
-    toIntOrZero(awayPLMS),
-    homeId,
-    homeName,
-    homeTeam,
-    parseWinCell(homeW),
-    parseLossCell(homeL),
-    toIntOrZero(homePts),
-    toIntOrZero(homePLMS),
-    scenario,
-  ]);
-}
-
-async function syncIndividualStats(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  conn: mysql.Connection
-) {
-  const rowsRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "INDIVIDUAL!A2:V",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = (rowsRes.data.values ?? []) as string[][];
-
-  await conn.execute("DELETE FROM individual_stats");
-
-  const sql = `
-    INSERT INTO individual_stats (
-      \`rank\`, ncxid, first_name, last_name, discord,
-      pick_no, team, faction, wins, losses, points,
-      plms, games, winper, ppg, efficiency, war,
-      h2h, potato, sos
-    ) VALUES (
-      ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-    )
-  `;
-
-  for (const r0 of rows) {
-    if (!r0 || r0.length === 0) continue;
-    const r = [
-      ...r0,
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-    ].slice(0, 22);
-
-    const rankStr = norm(r[0]);
-    if (!rankStr) continue;
-    const rank = parseInt(rankStr, 10);
-    if (!Number.isFinite(rank)) continue;
-
-    const ncxid = norm(r[1]);
-    const first = norm(r[2]);
-    const last = norm(r[3]);
-    const discord = norm(r[4]);
-    const pick = norm(r[5]);
-    const team = norm(r[6]);
-    const faction = norm(r[7]);
-    const wins = toIntOrZero(r[8]);
-    const losses = toIntOrZero(r[9]);
-    const points = toIntOrZero(r[10]);
-    const plms = toIntOrZero(r[11]);
-    const games = toIntOrZero(r[12]);
-    const winper = norm(r[13]) || null;
-    const ppg = norm(r[14]) || null;
-    const efficiency = toIntOrZero(r[15]);
-    const war = norm(r[16]) || null;
-    const h2h = norm(r[17]) || null;
-    const potato = norm(r[18]) || null;
-    const sos = norm(r[19]) || null;
-
-    await conn.execute(sql, [
-      rank,
-      ncxid,
-      first,
-      last,
-      discord,
-      pick ? parseInt(pick, 10) : null,
-      team,
-      faction,
-      wins,
-      losses,
-      points,
-      plms,
-      games,
-      winper,
-      ppg,
-      efficiency,
-      war,
-      h2h,
-      potato,
-      sos,
-    ]);
-  }
-}
-
-async function syncAdvStats(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  conn: mysql.Connection
-) {
-  // t1
-  await conn.execute("DELETE FROM adv_stats_t1");
-  {
-    const rowsRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "ADV STATS!A2:N25",
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const rows = (rowsRes.data.values ?? []) as string[][];
-    const sql = `
-      INSERT INTO adv_stats_t1 (
-        team, total_games, avg_wins, avg_loss, avg_points,
-        avg_plms, avg_games, avg_win_pct, avg_ppg,
-        avg_efficiency, avg_war, avg_h2h, avg_potato, avg_sos
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [
-        ...r0,
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-      ].slice(0, 14);
-      const team = norm(r[0]);
-      if (!team) continue;
-      await conn.execute(sql, r.map(norm));
-    }
-  }
-  // t2
-  await conn.execute("DELETE FROM adv_stats_t2");
-  {
-    const rowsRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "ADV STATS!A28:I32",
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const rows = (rowsRes.data.values ?? []) as string[][];
-    const sql = `
-      INSERT INTO adv_stats_t2 (
-        scenario, avg_home_pts, avg_away_pts, avg_total_pts,
-        avg_wpts, avg_lpts, lt20, gte20, total_games
-      ) VALUES (?,?,?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [
-        ...r0,
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-      ].slice(0, 9);
-      const scenario = norm(r[0]);
-      if (!scenario) continue;
-      await conn.execute(sql, r.map(norm));
-    }
-  }
-  // t3
-  await conn.execute("DELETE FROM adv_stats_t3");
-  {
-    const rowsRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "ADV STATS!A36:H40",
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const rows = (rowsRes.data.values ?? []) as string[][];
-    const sql = `
-      INSERT INTO adv_stats_t3 (
-        scenario, republic, cis, rebels, empire,
-        resistance, first_order, scum
-      ) VALUES (?,?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [
-        ...r0,
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-      ].slice(0, 8);
-      const scenario = norm(r[0]);
-      if (!scenario) continue;
-      await conn.execute(sql, r.map(norm));
-    }
-  }
-  // t4
-  await conn.execute("DELETE FROM adv_stats_t4");
-  {
-    const rowsRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "ADV STATS!A43:H49",
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const rows = (rowsRes.data.values ?? []) as string[][];
-    const sql = `
-      INSERT INTO adv_stats_t4 (
-        faction_vs, republic, cis, rebels, empire,
-        resistance, first_order, scum
-      ) VALUES (?,?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [
-        ...r0,
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-      ].slice(0, 8);
-      const factionVs = norm(r[0]);
-      if (!factionVs) continue;
-      await conn.execute(sql, r.map(norm));
-    }
-  }
-  // t5
-  await conn.execute("DELETE FROM adv_stats_t5");
-  {
-    const rowsRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "ADV STATS!J36:P42",
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const rows = (rowsRes.data.values ?? []) as string[][];
-    const sql = `
-      INSERT INTO adv_stats_t5 (
-        faction, wins, losses, win_pct,
-        avg_draft, expected_win_pct, perf_plus_minus
-      ) VALUES (?,?,?,?,?,?,?)
-    `;
-    for (const r0 of rows) {
-      const r = [
-        ...r0,
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-      ].slice(0, 7);
-      const faction = norm(r[0]);
-      if (!faction) continue;
-      await conn.execute(sql, r.map(norm));
-    }
-  }
-}
-
-async function syncAllTimeStats(
-  sheets: SheetsClient,
-  statsSheetId: string,
-  conn: mysql.Connection
-) {
-  const rowsRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: statsSheetId,
-    range: "ALL TIME STATS!A2:V500",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = (rowsRes.data.values ?? []) as string[][];
-
-  await conn.execute("DELETE FROM all_time_stats");
-
-  const sql = `
-    INSERT INTO all_time_stats (
-      ncxid,
-      first_name,
-      last_name,
-      discord,
-      wins,
-      losses,
-      points,
-      plms,
-      games,
-      win_pct,
-      ppg,
-      adj_ppg,
-      s1,
-      s2,
-      s3,
-      s4,
-      s5,
-      s6,
-      s7,
-      s8,
-      s9,
-      championships
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `;
-
-  for (const r0 of rows) {
-    const r = [
-      ...r0,
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-    ].slice(0, 22);
-
-    const [
-      ncxid,
-      first_name,
-      last_name,
-      discord,
-      wins,
-      losses,
-      points,
-      plms,
-      games,
-      win_pct,
-      ppg,
-      adj_ppg,
-      s1,
-      s2,
-      s3,
-      s4,
-      s5,
-      s6,
-      s7,
-      s8,
-      s9,
-      championships,
-    ] = r.map(norm);
-
-    if (!ncxid && !first_name && !last_name) continue;
-
-    await conn.execute(sql, [
-      ncxid,
-      first_name,
-      last_name,
-      discord,
-      wins,
-      losses,
-      points,
-      plms,
-      games,
-      toDecimalOrNone(win_pct),
-      toDecimalOrNone(ppg),
-      toDecimalOrNone(adj_ppg),
-      s1,
-      s2,
-      s3,
-      s4,
-      s5,
-      s6,
-      s7,
-      s8,
-      s9,
-      toIntOrNone(championships),
-    ]);
-  }
-}
-
-async function syncTeamSchedule(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  conn: mysql.Connection
-) {
-  const rowsRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "SCHEDULE!A2:D121",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = (rowsRes.data.values ?? []) as string[][];
-
-  await conn.execute("DELETE FROM team_schedule");
-
-  const sql = `
-    INSERT INTO team_schedule (
-      week_label, away_team, home_team
-    ) VALUES (?,?,?)
-  `;
-
-  for (const r0 of rows) {
-    const r = [...r0, "", "", "", ""].slice(0, 4);
-    const weekRaw = norm(r[0]);
-    const away = norm(r[1]);
-    const home = norm(r[3]);
-    if (!weekRaw || (!away && !home)) continue;
-
-    const weekLabel = normalizeWeekLabel(weekRaw);
-    await conn.execute(sql, [weekLabel, away, home]);
-  }
-}
-
-async function syncOverallStandings(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  conn: mysql.Connection
-) {
-  const rowsRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "OVERALL RECORD!A2:F25",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = (rowsRes.data.values ?? []) as string[][];
-
-  await conn.execute("DELETE FROM overall_standings");
-
-  const sql = `
-    INSERT INTO overall_standings (
-      team, \`rank\`, wins, losses, game_wins, points
-    ) VALUES (?,?,?,?,?,?)
-  `;
-
-  for (const r0 of rows) {
-    const r = [...r0, "", "", "", "", "", ""].slice(0, 6);
-    const rankStr = norm(r[0]);
-    const team = norm(r[1]);
-    if (!rankStr || !team) continue;
-
-    const rank = parseInt(rankStr, 10);
-    const wins = toIntOrZero(r[2]);
-    const losses = toIntOrZero(r[3]);
-    const gameWins = toIntOrZero(r[4]);
-    const points = toIntOrZero(r[5]);
-
-    await conn.execute(sql, [team, rank, wins, losses, gameWins, points]);
-  }
-}
-
-async function syncLists(
-  sheets: SheetsClient,
-  spreadsheetId: string,
-  conn: mysql.Connection
-) {
-  const rowsRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "Lists!A2:D",
-    valueRenderOption: "FORMATTED_VALUE",
-  });
-  const rows = (rowsRes.data.values ?? []) as string[][];
-
-  // ⛔️ NO MORE: await conn.execute("DELETE FROM lists");
-
-  const sql = `
-    INSERT INTO lists (
-      week_label,
-      game,
-      away_list,
-      home_list
-    ) VALUES (?,?,?,?)
-    ON DUPLICATE KEY UPDATE
-      away_list = VALUES(away_list),
-      home_list = VALUES(home_list)
-  `;
-
-  for (const r0 of rows) {
-    const r = [...r0, "", "", "", ""].slice(0, 4);
-    const weekRaw = norm(r[0]);
-    const game = norm(r[1]);
-    const awayList = norm(r[2]) || null;
-    const homeList = norm(r[3]) || null;
-
-    if (!weekRaw || !game) continue;
-
-    const weekLabel = normalizeWeekLabel(weekRaw);
-
-    await conn.execute(sql, [weekLabel, game, awayList, homeList]);
-  }
-}
 
 
 /* --------------------------- GET /report-game ------------------------- */
@@ -1260,7 +293,7 @@ export async function GET(request: NextRequest) {
 
     const [who, captainTeams] = await Promise.all([
       getNcxIdForDiscord(sheets, spreadsheetId, discordId || ""),
-      getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId || ""),
+      getCaptainTeams(discordId || ""),
     ]);
 
     const role = resolveRole(discordId || "", who, captainTeams, isAppleAuth);
@@ -1527,7 +560,6 @@ export async function POST(req: NextRequest) {
     }
 
     const spreadsheetId = process.env.NCX_LEAGUE_SHEET_ID!;
-    const statsSheetId = process.env.NCX_STATS_SHEET_ID || spreadsheetId;
     const sheets = getSheets();
 
     const raw = nativeDiscordId ?? (session?.user as any)?.discordId ?? (session?.user as any)?.id;
@@ -1535,7 +567,7 @@ export async function POST(req: NextRequest) {
 
     const [who, captainTeams] = await Promise.all([
       getNcxIdForDiscord(sheets, spreadsheetId, discordId || ""),
-      getCaptainTeamsForDiscord(sheets, spreadsheetId, discordId || ""),
+      getCaptainTeams(discordId || ""),
     ]);
 
     const role = resolveRole(discordId || "", who, captainTeams, isAppleAuth);
@@ -1881,53 +913,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ---- MySQL sync from Sheets (incremental) + XWS glyphs for this game ----
-    try {
-      const conn = await getMySqlConn();
-      try {
-        // 1) current_week (single row)
-        await syncCurrentWeek(sheets, spreadsheetId, conn);
-
-        // 2) weekly_matchups -> only this one game (weekTab + rowNum)
-        await syncSingleWeeklyMatchup(
-          sheets,
-          spreadsheetId,
-          weekTab,
-          rowNum,
-          conn
-        );
-
-        // 3) individual_stats (full refresh)
-        await syncIndividualStats(sheets, spreadsheetId, conn);
-
-        // 4) advanced stats (t1..t5, full refresh)
-        await syncAdvStats(sheets, spreadsheetId, conn);
-
-        // 5) all_time_stats (full refresh from stats sheet)
-        await syncAllTimeStats(sheets, statsSheetId, conn);
-
-        // 6) team_schedule (full refresh)
-        await syncTeamSchedule(sheets, spreadsheetId, conn);
-
-        // 7) overall_standings (full refresh)
-        await syncOverallStandings(sheets, spreadsheetId, conn);
-
-        // 8) lists (full refresh of URLs)
-        await syncLists(sheets, spreadsheetId, conn);
-
-        // 9) For this specific game, resolve XWS + glyph letters into S8.lists
-        if (gameNo) {
-          await syncSingleListXwsAndLetters(conn, canonicalWeekLabel, gameNo);
-        }
-      } finally {
-        await conn.end();
-      }
-    } catch (syncErr) {
-      console.error("⚠️ MySQL sync after report failed:", syncErr);
-      // Don't fail the report if DB sync fails; Sheets is canonical.
-    }
-
     // ---- Series clinch push notification ----
+    // (Runs BEFORE the background seed so it reads consistent pre-seed
+    //  weekly_matchups data — the seed's DELETE+INSERT could otherwise
+    //  race with this SELECT.)
     if (hasScoreInputs && a !== undefined && h !== undefined && Number(a) > 0 && Number(h) > 0 && gameNo) {
       try {
         const conn = await getMySqlConn();
@@ -2005,6 +994,10 @@ export async function POST(req: NextRequest) {
         console.warn("⚠️ Series clinch check failed:", clinchErr);
       }
     }
+
+    // ---- Background seed: refresh MySQL from the Sheet without blocking
+    //      the response. UI polls, so it'll catch up within a few seconds.
+    triggerSeedInBackground();
 
     return NextResponse.json({ ok: true, pushed });
   } catch (e) {
