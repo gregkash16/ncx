@@ -19,43 +19,6 @@ interface MatchRowWithDiscord extends MatchRow {
   homeDiscordTag?: string | null;
 }
 
-// Scouting Pill Stuff
-type ScenarioRow = {
-  scenario: string;
-  games: number;
-  wins: number;
-  losses: number;
-  winPct: number;
-  avgMov: number;
-};
-
-type ScoutPayload = {
-  ncxid: string;
-  minGames: number;
-  totals: { games: number };
-  bestScenario: {
-    scenario: string;
-    games: number;
-    wins: number;
-    winPct: number;
-    avgMov: number;
-  } | null;
-  worstScenario: {
-    scenario: string;
-    games: number;
-    wins: number;
-    winPct: number;
-    avgMov: number;
-  } | null;
-  scenarios: ScenarioRow[];
-  topPilots: Array<{
-    pilotId: string;
-    pilotName: string;
-    uses: number;
-    shipGlyph: string;
-  }>;
-};
-
 // Live matchup entry (from S9.live_matchups)
 type LiveEntry = {
   weekLabel: string;
@@ -143,12 +106,6 @@ function parseIntSafe(v: string | number | undefined | null): number {
 function gameNum(g: string): number {
   const m = (g || "").match(/^\d+/);
   return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
-}
-
-function normalizeNcxId(v?: string | null): string | null {
-  if (!v) return null;
-  const s = v.trim().toUpperCase().replace(/\s+/g, "");
-  return s.startsWith("NCX") ? s : null;
 }
 
 /** Choose ONE team from q by checking against actual team names. */
@@ -718,12 +675,6 @@ export default function MatchupsPanel({
     ((authSession?.user as any)?.discordId as string | undefined) ?? "";
   const isDiscordSignedIn = Boolean(myDiscordId);
 
-  const [openScout, setOpenScout] = useState<string | null>(null);
-  const [scoutById, setScoutById] = useState<
-    Record<string, { loading?: boolean; error?: string; data?: ScoutPayload }>
-  >({});
-  const [openScoutName, setOpenScoutName] = useState<string>("");
-
   const activeNum = useMemo(() => parseWeekNum(activeWeek ?? null), [activeWeek]);
   const selectedNum = useMemo(
     () => parseWeekNum(selectedWeekRaw || null),
@@ -899,28 +850,6 @@ export default function MatchupsPanel({
     }
   }
 
-  async function loadScout(ncxid: string) {
-    setScoutById((p) => ({
-      ...p,
-      [ncxid]: { ...(p[ncxid] ?? {}), loading: true, error: undefined },
-    }));
-
-    try {
-      const res = await fetch(
-        `/api/scout?ncxid=${encodeURIComponent(ncxid)}&minGames=2`
-      );
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Failed");
-
-      setScoutById((p) => ({ ...p, [ncxid]: { loading: false, data: json } }));
-    } catch (e: any) {
-      setScoutById((p) => ({
-        ...p,
-        [ncxid]: { loading: false, error: e?.message || "Failed" },
-      }));
-    }
-  }
-
   useEffect(() => {
     setQuery(urlSelectedTeam);
   }, [urlSelectedTeam]);
@@ -1014,9 +943,18 @@ export default function MatchupsPanel({
   const gradient =
     "pointer-events-none absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100";
 
-  const GREEN = "34,197,94";
-  const RED = "239,68,68";
-  const TIE = "99,102,241";
+  const FALLBACK_RGB = "99,102,241";
+
+  function hexToRgb(hex?: string | null): string {
+    if (!hex) return FALLBACK_RGB;
+    const m = hex.trim().replace(/^#/, "");
+    if (m.length !== 6) return FALLBACK_RGB;
+    const r = parseInt(m.slice(0, 2), 16);
+    const g = parseInt(m.slice(2, 4), 16);
+    const b = parseInt(m.slice(4, 6), 16);
+    if ([r, g, b].some((n) => Number.isNaN(n))) return FALLBACK_RGB;
+    return `${r},${g},${b}`;
+  }
 
   return (
     <div className="p-3 md:p-6 rounded-2xl bg-zinc-900/70 border border-zinc-800">
@@ -1119,8 +1057,8 @@ export default function MatchupsPanel({
             const awayLogo = `/logos/${teamSlug(row.awayTeam)}.webp`;
             const homeLogo = `/logos/${teamSlug(row.homeTeam)}.webp`;
 
-            const leftColor = winner === "away" ? GREEN : winner === "home" ? RED : TIE;
-            const rightColor = winner === "home" ? GREEN : winner === "away" ? RED : TIE;
+            const leftColor = hexToRgb(TEAM_COLOR_MAP[(row.awayTeam || "").trim().toUpperCase()]);
+            const rightColor = hexToRgb(TEAM_COLOR_MAP[(row.homeTeam || "").trim().toUpperCase()]);
 
             const gradientStyle: React.CSSProperties = {
               backgroundImage: `
@@ -1429,9 +1367,19 @@ export default function MatchupsPanel({
                       {row.scenario || "No Scenario"}
                     </span>
                     <div className="text-3xl md:text-4xl font-mono leading-none">
+                      {isDone && winner !== "tie" && (
+                        <span className={`mr-2 font-bold ${winner === "away" ? "text-green-400" : "text-red-400"}`}>
+                          {winner === "away" ? "W" : "L"}
+                        </span>
+                      )}
                       <span>{awayScore}</span>
                       <span className="mx-3">:</span>
                       <span>{homeScore}</span>
+                      {isDone && winner !== "tie" && (
+                        <span className={`ml-2 font-bold ${winner === "home" ? "text-green-400" : "text-red-400"}`}>
+                          {winner === "home" ? "W" : "L"}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1465,9 +1413,19 @@ export default function MatchupsPanel({
                       {row.scenario || "No Scenario"}
                     </span>
                     <div className="text-3xl font-mono leading-none">
+                      {isDone && winner !== "tie" && (
+                        <span className={`mr-2 font-bold ${winner === "away" ? "text-green-400" : "text-red-400"}`}>
+                          {winner === "away" ? "W" : "L"}
+                        </span>
+                      )}
                       <span>{awayScore}</span>
                       <span className="mx-2">:</span>
                       <span>{homeScore}</span>
+                      {isDone && winner !== "tie" && (
+                        <span className={`ml-2 font-bold ${winner === "home" ? "text-green-400" : "text-red-400"}`}>
+                          {winner === "home" ? "W" : "L"}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1572,47 +1530,18 @@ export default function MatchupsPanel({
                       className="text-pink-400 font-semibold"
                     />
                     {row.awayId ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const id = normalizeNcxId(row.awayId);
-                          if (!id) return;
-
-                          const name = (row.awayName || "").trim();
-                          setOpenScout((cur) => (cur === id ? null : id));
-                          setOpenScoutName(name);
-
-                          if (!scoutById[id]?.data && !scoutById[id]?.loading) loadScout(id);
-                        }}
-                        className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono hover:border-pink-500/60 hover:bg-zinc-800 transition"
-                        title="Open scouting report"
-                      >
+                      <span className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono">
                         {row.awayId}
-                      </button>
+                      </span>
                     ) : null}
                   </div>
 
                   <div className="flex items-center gap-3 justify-end">
                     {row.homeId ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const id = normalizeNcxId(row.homeId);
-                          if (!id) return;
-
-                          const name = (row.homeName || "").trim();
-                          setOpenScout((cur) => (cur === id ? null : id));
-                          setOpenScoutName(name);
-
-                          if (!scoutById[id]?.data && !scoutById[id]?.loading) loadScout(id);
-                        }}
-                        className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono hover:border-cyan-500/60 hover:bg-zinc-800 transition"
-                        title="Open scouting report"
-                      >
+                      <span className="rounded-full bg-zinc-800/80 border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 font-mono">
                         {row.homeId}
-                      </button>
+                      </span>
                     ) : null}
-
                     <PlayerDMLink
                       name={row.homeName || "—"}
                       discordId={row.homeDiscordId}
@@ -1682,87 +1611,6 @@ export default function MatchupsPanel({
                     </div>
                   </div>
                 </div>
-
-                {openScout && (openScout === row.awayId || openScout === row.homeId) && (
-                  <div className="relative z-10 mt-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-                    {(() => {
-                      const id = openScout;
-                      const st = scoutById[id] ?? {};
-                      if (st.loading)
-                        return <div className="text-sm text-zinc-400 italic">Loading scouting…</div>;
-                      if (st.error) return <div className="text-sm text-red-300">{st.error}</div>;
-                      if (!st.data) return null;
-
-                      const d = st.data;
-
-                      return (
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-[11px] uppercase tracking-wide text-zinc-400">
-                              SCOUTING - {openScoutName || "Unknown"} {d.ncxid}
-                            </div>
-
-                            <div className="text-xs text-zinc-500">min games for best/weakest: {d.minGames}</div>
-                          </div>
-
-                          <div className="grid sm:grid-cols-2 gap-3 text-sm">
-                            <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-3">
-                              <div className="text-zinc-400 text-xs uppercase">Best Scenario</div>
-                              {d.bestScenario ? (
-                                <div className="mt-1">
-                                  <div className="font-semibold text-zinc-100">{d.bestScenario.scenario}</div>
-                                  <div className="text-zinc-300 text-xs">
-                                    {d.bestScenario.wins}-{d.bestScenario.games - d.bestScenario.wins} •{" "}
-                                    {d.bestScenario.winPct}% • avg MOV {d.bestScenario.avgMov}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="mt-1 text-zinc-500 italic">Not enough data</div>
-                              )}
-                            </div>
-
-                            <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-3">
-                              <div className="text-zinc-400 text-xs uppercase">Weakest Scenario</div>
-                              {d.worstScenario ? (
-                                <div className="mt-1">
-                                  <div className="font-semibold text-zinc-100">{d.worstScenario.scenario}</div>
-                                  <div className="text-zinc-300 text-xs">
-                                    {d.worstScenario.wins}-{d.worstScenario.games - d.worstScenario.wins} •{" "}
-                                    {d.worstScenario.winPct}% • avg MOV {d.worstScenario.avgMov}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="mt-1 text-zinc-500 italic">Not enough data</div>
-                              )}
-                            </div>
-                          </div>
-
-                          {d.topPilots?.length > 0 && (
-                            <div className="rounded-lg bg-zinc-900/40 border border-zinc-800 p-3">
-                              <div className="text-zinc-400 text-xs uppercase mb-2">
-                                Top 3 most used pilots (from submitted lists)
-                              </div>
-
-                              <div className="flex flex-wrap gap-2">
-                                {(d.topPilots ?? []).slice(0, 3).map((p) => (
-                                  <div
-                                    key={p.pilotId}
-                                    className="inline-flex items-center gap-2 rounded-full bg-zinc-800/70 border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200"
-                                    title={p.pilotName}
-                                  >
-                                    <span className="text-lg leading-none">{p.shipGlyph}</span>
-                                    <span className="max-w-[220px] truncate">{p.pilotName}</span>
-                                    <span className="text-zinc-400">×{p.uses}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
 
               </div>
             );
