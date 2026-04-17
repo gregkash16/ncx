@@ -365,7 +365,12 @@ export async function GET(request: NextRequest) {
       const rowIndex = Number(dbRow.rowIndex) || 0;
       if (!rowIndex) continue;
 
-      const alreadyFilled = !(awayPts === "" && homePts === "" && scenario === "");
+      // A game is reported iff scenario is set. Pts columns are INT with 0
+      // for empty sheet cells (post seed-mysql bulk-insert refactor), so pts
+      // alone no longer distinguish unreported from a genuine 0-0 tie.
+      const alreadyFilled = scenario !== "";
+      const displayAwayPts = alreadyFilled ? awayPts : "";
+      const displayHomePts = alreadyFilled ? homePts : "";
 
       const awayIdU = awayId.toUpperCase();
       const homeIdU = homeId.toUpperCase();
@@ -410,7 +415,7 @@ export async function GET(request: NextRequest) {
           team: awayTeam,
           wins: awayW,
           losses: awayL,
-          pts: awayPts,
+          pts: displayAwayPts,
           plms: awayPlms,
         },
         home: {
@@ -419,7 +424,7 @@ export async function GET(request: NextRequest) {
           team: homeTeam,
           wins: homeW,
           losses: homeL,
-          pts: homePts,
+          pts: displayHomePts,
           plms: homePlms,
         },
         scenario,
