@@ -8,36 +8,19 @@
  */
 
 import { NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
-import { sendFCMToDevices } from '@/lib/fcm';
+import { sendPushToCategory } from '@/lib/fcm';
 
 async function sendTest() {
-  const { rows } = await sql<{ device_token: string }>`
-    SELECT device_token
-    FROM fcm_subscriptions
-    WHERE all_teams = TRUE
-       OR (teams IS NOT NULL AND array_length(teams, 1) > 0)
-  `;
-
-  const tokens = rows.map((r) => r.device_token).filter(Boolean);
-
-  if (tokens.length === 0) {
-    return NextResponse.json({ sent: 0, failed: 0, total: 0, note: 'No subscribers' });
-  }
-
-  const result = await sendFCMToDevices(
-    tokens,
+  const result = await sendPushToCategory(
+    'test',
+    [],
     {
       title: 'Development',
       body: 'This is a Test Push notification',
     },
-    {
-      category: 'test',
-      trigger: 'manual: /api/push/test',
-    }
+    'manual: /api/push/test'
   );
-
-  return NextResponse.json({ ...result, total: tokens.length });
+  return NextResponse.json(result);
 }
 
 export async function GET() {

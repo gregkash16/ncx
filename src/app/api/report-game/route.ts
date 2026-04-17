@@ -91,68 +91,23 @@ type SheetsClient = ReturnType<typeof getSheets>;
 
 /* ------------------------- Push helpers ------------------------- */
 
-// Filtered push sender — sends FCM notifications to matching devices
 async function sendPushForTeams(
+  category: "game" | "series",
   teams: string[],
   payload: { title: string; body: string; url: string },
-  meta?: { category: string; trigger: string }
+  trigger: string
 ) {
-  // FCM device tokens (Android/iOS)
-  let fcmCount = 0;
   try {
-    const teamsJson = JSON.stringify(
-      teams.map((t) => (t ?? "").trim()).filter(Boolean)
+    const { sendPushToCategory } = await import("@/lib/fcm");
+    const result = await sendPushToCategory(category, teams, payload, trigger);
+    console.log(
+      `[report-game] FCM category=${category} sent=${result.sent}, failed=${result.failed}`
     );
-
-    // Ensure table exists (may not have been created yet)
-    await sql`
-      CREATE TABLE IF NOT EXISTS fcm_subscriptions (
-        device_token TEXT PRIMARY KEY,
-        all_teams BOOLEAN DEFAULT TRUE,
-        teams TEXT[] DEFAULT '{}'
-      )
-    `;
-
-    const { rows: fcmRows } = await sql`
-      SELECT device_token
-      FROM fcm_subscriptions
-      WHERE
-        all_teams = TRUE
-        OR EXISTS (
-          SELECT 1
-          FROM json_array_elements_text(${teamsJson}::json) j
-          WHERE j = ANY(fcm_subscriptions.teams)
-        )
-    `;
-
-    console.log(`FCM: found ${fcmRows.length} matching subscriptions`);
-
-    if (fcmRows.length > 0) {
-      const { sendFCMToDevices } = await import("@/lib/fcm");
-      const result = await sendFCMToDevices(
-        fcmRows.map((r) => r.device_token),
-        payload,
-        meta
-      );
-      console.log(`FCM: sent=${result.sent}, failed=${result.failed}`);
-      fcmCount = fcmRows.length;
-    } else if (meta) {
-      const { logPushNotification } = await import("@/lib/pushLog");
-      await logPushNotification({
-        category: meta.category,
-        title: payload.title,
-        body: payload.body,
-        trigger: meta.trigger,
-        recipientCount: 0,
-        sent: 0,
-        failed: 0,
-      });
-    }
+    return result.sent + result.failed;
   } catch (e) {
     console.error("Failed to send FCM notifications:", e);
+    return 0;
   }
-
-  return fcmCount;
 }
 
 /* ------------------------- Role helpers ------------------------- */
@@ -878,12 +833,10 @@ export async function POST(req: NextRequest) {
         const url = "/m/current"
 
         pushed = await sendPushForTeams(
+          "game",
           [awayTeam, homeTeam],
           { title, body: bodyText, url },
-          {
-            category: "game_report",
-            trigger: `report-game: ${canonicalWeekLabel} G${gameNo} ${awayTeam} v ${homeTeam}`,
-          }
+          `report-game: ${canonicalWeekLabel} G${gameNo} ${awayTeam} v ${homeTeam}`
         );
       } catch (pushErr) {
         console.warn("⚠️ Push send failed:", pushErr);
@@ -932,16 +885,14 @@ export async function POST(req: NextRequest) {
 
             try {
               await sendPushForTeams(
+                "series",
                 [awayTeam, homeTeam],
                 {
                   title: "Series Complete",
                   body: `${winner} has defeated ${loser} in WEEK ${weekNum}`,
                   url: "/m/current",
                 },
-                {
-                  category: "series_clinch",
-                  trigger: `report-game: WEEK ${weekNum} ${winner} def ${loser}`,
-                }
+                `report-game: WEEK ${weekNum} ${winner} def ${loser}`
               );
             } catch (clinchPushErr) {
               console.warn("⚠️ Series clinch push failed:", clinchPushErr);
@@ -949,16 +900,14 @@ export async function POST(req: NextRequest) {
           } else if (newAwayWins === 3 && newHomeWins === 3) {
             try {
               await sendPushForTeams(
+                "series",
                 [awayTeam, homeTeam],
                 {
                   title: "GAME 7 ALERT",
                   body: `${awayTeam} v ${homeTeam} is going to GAME 7`,
                   url: "/m/current",
                 },
-                {
-                  category: "game_7_alert",
-                  trigger: `report-game: ${canonicalWeekLabel} ${awayTeam} v ${homeTeam}`,
-                }
+                `report-game: ${canonicalWeekLabel} ${awayTeam} v ${homeTeam}`
               );
             } catch (game7PushErr) {
               console.warn("⚠️ Game 7 alert push failed:", game7PushErr);

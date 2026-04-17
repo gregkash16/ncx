@@ -60,6 +60,100 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
+/**
+ * Send a category-filtered FCM push.
+ *
+ * Categories:
+ *   'game' | 'matchups' | 'series' | 'live' — filtered by {cat}_enabled and
+ *       (all_teams OR any of the subscriber's {cat}_teams overlaps `teams`).
+ *   'test' — single boolean `test_enabled`; `teams` is ignored.
+ *
+ * Also loads @vercel/postgres and @/app/api/push/fcm-save lazily to avoid
+ * importing server-only modules in client bundles that transitively reach
+ * this file.
+ */
+export type PushCategory = 'game' | 'matchups' | 'series' | 'live' | 'test';
+
+export async function sendPushToCategory(
+  category: PushCategory,
+  teams: string[],
+  payload: { title: string; body: string; url?: string },
+  trigger: string
+): Promise<{ sent: number; failed: number }> {
+  const { sql } = await import('@vercel/postgres');
+  const { ensureSubscriptionsTable } = await import('@/lib/fcmSubscriptions');
+  await ensureSubscriptionsTable();
+
+  const cleanTeams = (teams ?? [])
+    .map((t) => (t ?? '').trim())
+    .filter((t) => t.length > 0);
+
+  let rows: { device_token: string }[] = [];
+
+  if (category === 'test') {
+    const r = await sql<{ device_token: string }>`
+      SELECT device_token FROM fcm_subscriptions WHERE test_enabled = TRUE
+    `;
+    rows = r.rows;
+  } else {
+    const teamsJson = JSON.stringify(cleanTeams);
+    // One explicit branch per category — the column names can't be
+    // parameterized in tagged template SQL.
+    if (category === 'game') {
+      const r = await sql<{ device_token: string }>`
+        SELECT device_token FROM fcm_subscriptions
+         WHERE game_enabled = TRUE
+           AND (game_all_teams = TRUE
+             OR EXISTS (
+               SELECT 1 FROM json_array_elements_text(${teamsJson}::json) j
+                WHERE j = ANY(game_teams)
+             ))
+      `;
+      rows = r.rows;
+    } else if (category === 'matchups') {
+      const r = await sql<{ device_token: string }>`
+        SELECT device_token FROM fcm_subscriptions
+         WHERE matchups_enabled = TRUE
+           AND (matchups_all_teams = TRUE
+             OR EXISTS (
+               SELECT 1 FROM json_array_elements_text(${teamsJson}::json) j
+                WHERE j = ANY(matchups_teams)
+             ))
+      `;
+      rows = r.rows;
+    } else if (category === 'series') {
+      const r = await sql<{ device_token: string }>`
+        SELECT device_token FROM fcm_subscriptions
+         WHERE series_enabled = TRUE
+           AND (series_all_teams = TRUE
+             OR EXISTS (
+               SELECT 1 FROM json_array_elements_text(${teamsJson}::json) j
+                WHERE j = ANY(series_teams)
+             ))
+      `;
+      rows = r.rows;
+    } else if (category === 'live') {
+      const r = await sql<{ device_token: string }>`
+        SELECT device_token FROM fcm_subscriptions
+         WHERE live_enabled = TRUE
+           AND (live_all_teams = TRUE
+             OR EXISTS (
+               SELECT 1 FROM json_array_elements_text(${teamsJson}::json) j
+                WHERE j = ANY(live_teams)
+             ))
+      `;
+      rows = r.rows;
+    }
+  }
+
+  const tokens = rows.map((r) => r.device_token).filter(Boolean);
+  if (tokens.length === 0) {
+    return { sent: 0, failed: 0 };
+  }
+
+  return sendFCMToDevices(tokens, payload, { category, trigger });
+}
+
 export async function sendFCMToDevices(
   deviceTokens: string[],
   payload: { title: string; body: string; url?: string },

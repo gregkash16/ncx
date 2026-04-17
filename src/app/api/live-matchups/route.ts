@@ -278,6 +278,29 @@ export async function POST(request: Request) {
           console.warn("⚠️ Live webhook post failed:", e);
         }
       }
+
+      // FCM: notify subscribers to either team's "Live" category.
+      try {
+        const { sendPushToCategory } = await import("@/lib/fcm");
+        const awayLabel = [awayTeam, awayName].filter(Boolean).join(" — ");
+        const homeLabel = [homeTeam, homeName].filter(Boolean).join(" — ");
+        const onName = streamName?.trim() ? streamName : provider;
+        const result = await sendPushToCategory(
+          "live",
+          [awayTeam, homeTeam].filter(Boolean),
+          {
+            title: "🔴 LIVE NOW",
+            body: `${awayLabel} vs ${homeLabel} — on ${onName}`,
+            url: "/m/current",
+          },
+          `live-matchups: ${weekLabel} G${game} ${awayTeam} v ${homeTeam}`
+        );
+        console.log(
+          `[live-matchups] FCM sent=${result.sent}, failed=${result.failed}`
+        );
+      } catch (pushErr) {
+        console.warn("⚠️ Live FCM push failed:", pushErr);
+      }
     }
 
     return NextResponse.json({ ok: true });
