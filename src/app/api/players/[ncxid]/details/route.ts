@@ -47,6 +47,19 @@ type Nemesis = {
   losses: number;
 };
 
+type AllTimeStats = {
+  wins: number;
+  losses: number;
+  points: number;
+  plms: number;
+  games: number;
+  winPct: number;
+  ppg: number;
+  adjPpg: string;
+  championships: string;
+  seasons: (string | null)[];
+};
+
 type PlayerDetails = {
   ncxid: string;
   playerFaction: string;
@@ -57,6 +70,7 @@ type PlayerDetails = {
   currentWinStreak: number;
   currentLossStreak: number;
   nemesis: Nemesis | null;
+  allTimeStats: AllTimeStats | null;
 };
 
 export async function GET(
@@ -405,6 +419,41 @@ export async function GET(
       }
     }
 
+    // 8. All-time career summary (matches desktop Players panel stats grid)
+    const [allTimeRows] = await pool.query<any[]>(
+      `SELECT wins, losses, points, plms, games, win_pct, ppg, adj_ppg,
+              s1, s2, s3, s4, s5, s6, s7, s8, s9, championships
+         FROM S9.all_time_stats
+        WHERE ncxid = ?
+        LIMIT 1`,
+      [ncxid]
+    );
+    const at = allTimeRows?.[0];
+    const allTimeStats: AllTimeStats | null = at
+      ? {
+          wins: Number(at.wins ?? 0),
+          losses: Number(at.losses ?? 0),
+          points: Number(at.points ?? 0),
+          plms: Number(at.plms ?? 0),
+          games: Number(at.games ?? 0),
+          winPct: Number(at.win_pct ?? 0),
+          ppg: Number(at.ppg ?? 0),
+          adjPpg: norm(at.adj_ppg),
+          championships: norm(at.championships),
+          seasons: [
+            at.s1 || null,
+            at.s2 || null,
+            at.s3 || null,
+            at.s4 || null,
+            at.s5 || null,
+            at.s6 || null,
+            at.s7 || null,
+            at.s8 || null,
+            at.s9 || null,
+          ],
+        }
+      : null;
+
     const details: PlayerDetails = {
       ncxid,
       playerFaction,
@@ -415,6 +464,7 @@ export async function GET(
       currentWinStreak,
       currentLossStreak,
       nemesis,
+      allTimeStats,
     };
 
     return NextResponse.json(details);

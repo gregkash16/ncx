@@ -22,9 +22,9 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get("q") || "").trim().toLowerCase();
-    const limit = Math.min(50, Math.max(5, Number(searchParams.get("limit") || 25)));
-
-    if (!q) return NextResponse.json({ items: [] });
+    // Default cap is generous so the Android Players tab can show the full
+    // roster without a search (desktop already loads all rows SSR).
+    const limit = Math.min(500, Math.max(5, Number(searchParams.get("limit") || 500)));
 
     // Mirror the SELECT used in PlayersPanelServer
     const [rows] = await pool.query<any[]>(
@@ -86,16 +86,18 @@ export async function GET(req: Request) {
       })
       .filter(Boolean) as Player[];
 
-    // search by ncxid / name / discord
-    const matches = all.filter((p) => {
-      const name = `${p.first} ${p.last}`.toLowerCase();
-      const discord = (p.discord || "").toLowerCase();
-      return (
-        p.ncxid.toLowerCase().includes(q) ||
-        name.includes(q) ||
-        discord.includes(q)
-      );
-    });
+    // search by ncxid / name / discord (empty q matches everything)
+    const matches = q
+      ? all.filter((p) => {
+          const name = `${p.first} ${p.last}`.toLowerCase();
+          const discord = (p.discord || "").toLowerCase();
+          return (
+            p.ncxid.toLowerCase().includes(q) ||
+            name.includes(q) ||
+            discord.includes(q)
+          );
+        })
+      : all;
 
     // sort: games desc, then wins desc, then ncxid
     matches.sort((a, b) => {
