@@ -99,10 +99,15 @@ export async function GET(req: Request) {
         })
       : all;
 
-    // sort: games desc, then wins desc, then ncxid
+    // sort: NCXID numeric ascending (NCX01, NCX02, NCX03, …) — matches desktop
+    const ncxNumber = (id: string): number => {
+      const m = (id || "").match(/\d+/);
+      return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
+    };
     matches.sort((a, b) => {
-      if (b.games !== a.games) return b.games - a.games;
-      if (b.wins !== a.wins) return b.wins - a.wins;
+      const na = ncxNumber(a.ncxid);
+      const nb = ncxNumber(b.ncxid);
+      if (na !== nb) return na - nb;
       return a.ncxid.localeCompare(b.ncxid, undefined, { numeric: true });
     });
 
