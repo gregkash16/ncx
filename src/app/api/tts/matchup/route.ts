@@ -3,8 +3,8 @@
 // Given a game number (and optional week), returns the away/home NCXID/name/team
 // plus the sheet rowIndex so the Lua can later call /api/tts/report.
 //
-// Auth: shared-secret header `x-tts-secret` must match TTS_REPORTER_SECRET.
-// We don't advertise this endpoint; the secret is modest obfuscation only.
+// No auth — TTS scripts are visible to anyone with the mod so a shared secret
+// buys nothing. Endpoint is unadvertised; we trust players to report honestly.
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
@@ -28,20 +28,6 @@ function normalizeWeekLabel(label: string): string {
 
 export async function GET(request: NextRequest) {
   try {
-    const secret = process.env.TTS_REPORTER_SECRET;
-    if (!secret) {
-      return NextResponse.json(
-        { ok: false, reason: "NOT_CONFIGURED" },
-        { status: 500 }
-      );
-    }
-    if (request.headers.get("x-tts-secret") !== secret) {
-      return NextResponse.json(
-        { ok: false, reason: "UNAUTHORIZED" },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const gameRaw = norm(searchParams.get("game"));
     const weekRaw = norm(searchParams.get("week"));

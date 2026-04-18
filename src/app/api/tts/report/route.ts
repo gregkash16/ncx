@@ -1,10 +1,13 @@
 // src/app/api/tts/report/route.ts
 // Unadvertised report endpoint used by the TTS Reporter object.
-// Accepts { game, awayPts, homePts, scenario, week? } keyed by shared secret,
-// looks up the sheet rowIndex from MySQL, then internally invokes the existing
-// /api/report-game POST handler so all downstream side effects (Google Sheet
-// write, FCM push, Discord webhook, series-clinch, live-matchups auto-clear)
-// still fire exactly as if a captain reported from the website.
+// Accepts { game, awayPts, homePts, scenario, week? }, looks up the sheet
+// rowIndex from MySQL, then internally invokes the existing /api/report-game
+// POST handler so all downstream side effects (Google Sheet write, FCM push,
+// Discord webhook, series-clinch, live-matchups auto-clear) still fire as if
+// a captain reported from the website.
+//
+// No auth — TTS scripts are visible to anyone with the mod so a shared secret
+// buys nothing. Endpoint is unadvertised; we trust players to report honestly.
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
@@ -31,20 +34,6 @@ function normalizeWeekLabel(label: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const secret = process.env.TTS_REPORTER_SECRET;
-    if (!secret) {
-      return NextResponse.json(
-        { ok: false, reason: "NOT_CONFIGURED" },
-        { status: 500 }
-      );
-    }
-    if (request.headers.get("x-tts-secret") !== secret) {
-      return NextResponse.json(
-        { ok: false, reason: "UNAUTHORIZED" },
-        { status: 401 }
-      );
-    }
-
     const body = await request.json().catch(() => ({}));
     const gameRaw = norm(body?.game);
     const awayPts = Number(body?.awayPts);
