@@ -32,9 +32,47 @@ function normalizeWeekLabel(label: string): string {
   return s.toUpperCase();
 }
 
+async function readBody(
+  request: NextRequest
+): Promise<Record<string, string>> {
+  // Accept JSON, url-encoded form, or multipart form — TTS's WebRequest.post
+  // sends a url-encoded form by default.
+  const ctype = (request.headers.get("content-type") || "").toLowerCase();
+  try {
+    if (ctype.includes("application/json")) {
+      const j = await request.json();
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(j ?? {})) out[k] = String(v ?? "");
+      return out;
+    }
+    // formData() handles both application/x-www-form-urlencoded and multipart.
+    const fd = await request.formData();
+    const out: Record<string, string> = {};
+    fd.forEach((v, k) => {
+      out[k] = typeof v === "string" ? v : "";
+    });
+    return out;
+  } catch {
+    // Last-ditch: read body text and try JSON.parse (some TTS builds send
+    // the JSON string with no Content-Type header).
+    try {
+      const text = await request.text();
+      if (text) {
+        const j = JSON.parse(text);
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(j ?? {})) out[k] = String(v ?? "");
+        return out;
+      }
+    } catch {
+      /* ignore */
+    }
+    return {};
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await readBody(request);
     const gameRaw = norm(body?.game);
     const awayPts = Number(body?.awayPts);
     const homePts = Number(body?.homePts);
