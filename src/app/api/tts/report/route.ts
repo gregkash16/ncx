@@ -1,10 +1,10 @@
 // src/app/api/tts/report/route.ts
 // Unadvertised report endpoint used by the TTS Reporter object.
-// Accepts { game, awayPts, homePts, scenario, week? }, looks up the sheet
-// rowIndex from MySQL, then internally invokes the existing /api/report-game
-// POST handler so all downstream side effects (Google Sheet write, FCM push,
-// Discord webhook, series-clinch, live-matchups auto-clear) still fire as if
-// a captain reported from the website.
+// Accepts { game, awayPts, homePts, scenario, week?, awayList?, homeList? },
+// looks up the sheet rowIndex from MySQL, then internally invokes the existing
+// /api/report-game POST handler so all downstream side effects (Google Sheet
+// write, FCM push, Discord webhook, series-clinch, live-matchups auto-clear)
+// still fire as if a captain reported from the website.
 //
 // No auth — TTS scripts are visible to anyone with the mod so a shared secret
 // buys nothing. Endpoint is unadvertised; we trust players to report honestly.
@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
     const homePts = Number(body?.homePts);
     const scenario = norm(body?.scenario).toUpperCase();
     const weekRaw = norm(body?.week);
+    const awayList = norm(body?.awayList);
+    const homeList = norm(body?.homeList);
 
     if (!gameRaw) {
       return NextResponse.json(
@@ -138,6 +140,8 @@ export async function POST(request: NextRequest) {
         awayPts,
         homePts,
         scenario,
+        awayList,
+        homeList,
         force: true,
       }),
     });
