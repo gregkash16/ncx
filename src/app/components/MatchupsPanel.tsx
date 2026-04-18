@@ -1152,7 +1152,6 @@ export default function MatchupsPanel({
                 {/* LIVE / END LIVE pill + Create thumbnail button — desktop only */}
                 <div className="absolute -top-3 -right-3 hidden md:flex items-center gap-2">
                   {isCurrentWeek &&
-                  !isDone &&
                   isLive &&
                   isDiscordSignedIn &&
                   (!live?.startedByDiscordId ||

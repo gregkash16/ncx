@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
+import {
+  endLiveMatchupRow,
+  purgeExpiredLiveMatchups,
+} from "@/lib/liveMatchups";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,16 +25,20 @@ async function ensureTable() {
       stream_url TEXT NOT NULL,
       started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       started_by_discord_id VARCHAR(32),
+      discord_message_id VARCHAR(32),
       PRIMARY KEY (week_label, game)
     )
   `);
-  // Add column to existing tables created before started_by was tracked.
-  try {
-    await pool.query(
-      `ALTER TABLE S9.live_matchups ADD COLUMN started_by_discord_id VARCHAR(32)`
-    );
-  } catch {
-    // Column already exists — expected on all runs after the first.
+  // Add columns to existing tables created before these fields were tracked.
+  for (const sql of [
+    `ALTER TABLE S9.live_matchups ADD COLUMN started_by_discord_id VARCHAR(32)`,
+    `ALTER TABLE S9.live_matchups ADD COLUMN discord_message_id VARCHAR(32)`,
+  ]) {
+    try {
+      await pool.query(sql);
+    } catch {
+      // Column already exists — expected on all runs after the first.
+    }
   }
   ensured = true;
 }
@@ -60,16 +68,10 @@ function normalizeDiscordId(v: unknown): string {
   return String(v ?? "").trim().replace(/[<@!>]/g, "").replace(/\D/g, "");
 }
 
-async function purgeExpired() {
-  await pool.query(
-    `DELETE FROM S9.live_matchups WHERE started_at < NOW() - INTERVAL 2 HOUR`
-  );
-}
-
 export async function GET(request: Request) {
   try {
     await ensureTable();
-    await purgeExpired();
+    await purgeExpiredLiveMatchups();
 
     const { searchParams } = new URL(request.url);
     const week = searchParams.get("week");
@@ -269,11 +271,30 @@ export async function POST(request: Request) {
         const content =
           `🔴 **LIVE NOW** — ${weekLabel} — GAME ${game} — ${awaySide} vs ${homeSide} — ${streamUrl}`;
         try {
-          await fetch(webhook, {
+          // ?wait=true makes Discord respond with the message object so we
+          // can capture its id for later deletion when the live ends.
+          const sep = webhook.includes("?") ? "&" : "?";
+          const res = await fetch(`${webhook}${sep}wait=true`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ content }),
           });
+          if (res.ok) {
+            const msg = await res.json().catch(() => null);
+            const msgId = msg?.id ? String(msg.id) : "";
+            if (msgId) {
+              try {
+                await pool.query(
+                  `UPDATE S9.live_matchups
+                      SET discord_message_id = ?
+                    WHERE week_label = ? AND game = ?`,
+                  [msgId, weekLabel, game]
+                );
+              } catch (e) {
+                console.warn("⚠️ saving discord_message_id failed:", e);
+              }
+            }
+          }
         } catch (e) {
           console.warn("⚠️ Live webhook post failed:", e);
         }
@@ -356,10 +377,7 @@ export async function DELETE(request: Request) {
       }
     }
 
-    await pool.query(
-      `DELETE FROM S9.live_matchups WHERE week_label = ? AND game = ?`,
-      [weekLabel, game]
-    );
+    await endLiveMatchupRow(weekLabel, game);
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {

@@ -705,6 +705,20 @@ export async function POST(req: NextRequest) {
       writeLists(),
     ]);
 
+    // If a score was successfully reported, auto-end any live stream marker
+    // for this game: delete the S9.live_matchups row + the CL-4W webhook
+    // announcement message from the #live channel.
+    if (didMainUpdate && hasScoreInputs && gameNo) {
+      void (async () => {
+        try {
+          const { endLiveMatchupRow } = await import("@/lib/liveMatchups");
+          await endLiveMatchupRow(canonicalWeekLabel, gameNo);
+        } catch (e) {
+          console.warn("⚠️ auto-end live on report-game failed:", e);
+        }
+      })();
+    }
+
     // ---- Fire-and-forget: enforce score-cell number format ----
     // Cosmetic only; the values themselves are already numeric. Don't block
     // the response on this round-trip.
