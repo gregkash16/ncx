@@ -149,16 +149,7 @@ export async function POST(request: NextRequest) {
     const res = await reportGamePost(forwardReq);
     const forwarded = await res.json().catch(() => ({}));
     return NextResponse.json(
-      {
-        ok: res.ok,
-        upstream: forwarded,
-        weekLabel,
-        game: gameRaw,
-        rowIndex,
-        // Echo what we received so the Lua can confirm the URLs made it.
-        receivedAwayList: awayList,
-        receivedHomeList: homeList,
-      },
+      { ok: res.ok, upstream: forwarded, weekLabel, game: gameRaw, rowIndex },
       { status: res.status }
     );
   } catch (err: any) {
