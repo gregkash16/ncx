@@ -11,6 +11,8 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"] as const;
+
 let ensured = false;
 let ensuredClickLog = false;
 
@@ -360,18 +362,20 @@ export async function DELETE(request: Request) {
       );
     }
 
+    const isAdmin = (ADMIN_DISCORD_IDS as readonly string[]).includes(discordId);
+
     const [existing] = await pool.query<any[]>(
       `SELECT started_by_discord_id FROM S9.live_matchups WHERE week_label = ? AND game = ?`,
       [weekLabel, game]
     );
-    if (Array.isArray(existing) && existing.length > 0) {
+    if (Array.isArray(existing) && existing.length > 0 && !isAdmin) {
       const owner = existing[0]?.started_by_discord_id
         ? String(existing[0].started_by_discord_id)
         : null;
       // Allow legacy rows (no owner recorded) to be ended by any signed-in user.
       if (owner && owner !== discordId) {
         return NextResponse.json(
-          { error: "Only the user who started this stream can end it" },
+          { error: "Only the user who started this stream (or an admin) can end it" },
           { status: 403 }
         );
       }

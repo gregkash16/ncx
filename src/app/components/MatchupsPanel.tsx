@@ -674,6 +674,8 @@ export default function MatchupsPanel({
   const myDiscordId =
     ((authSession?.user as any)?.discordId as string | undefined) ?? "";
   const isDiscordSignedIn = Boolean(myDiscordId);
+  const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"];
+  const isAdmin = ADMIN_DISCORD_IDS.includes(myDiscordId);
 
   const activeNum = useMemo(() => parseWeekNum(activeWeek ?? null), [activeWeek]);
   const selectedNum = useMemo(
@@ -1154,7 +1156,8 @@ export default function MatchupsPanel({
                   {isCurrentWeek &&
                   isLive &&
                   isDiscordSignedIn &&
-                  (!live?.startedByDiscordId ||
+                  (isAdmin ||
+                    !live?.startedByDiscordId ||
                     live.startedByDiscordId === myDiscordId) ? (
                     <button
                       type="button"
