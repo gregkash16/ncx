@@ -6,7 +6,8 @@
 // /api/report-game POST handler so all downstream side effects (Google Sheet
 // write, FCM push, Discord webhook, series-clinch, live-matchups auto-clear)
 // still fire as if a captain reported from the website.
-// Split-point fields and round are accepted but not yet forwarded downstream.
+// Split-point fields and round are logged to S9.adv_stats_t6 for later analysis
+// but not forwarded to /api/report-game.
 //
 // No auth — TTS scripts are visible to anyone with the mod so a shared secret
 // buys nothing. Endpoint is unadvertised; we trust players to report honestly.
@@ -82,12 +83,11 @@ export async function POST(request: NextRequest) {
     const weekRaw = norm(body?.week);
     const awayList = norm(body?.awayList);
     const homeList = norm(body?.homeList);
-    const awayShipPts = Number(body?.awayShipPts);
-    const awayObjPts = Number(body?.awayObjPts);
-    const homeShipPts = Number(body?.homeShipPts);
-    const homeObjPts = Number(body?.homeObjPts);
-    const round = Number(body?.round);
-    void awayShipPts; void awayObjPts; void homeShipPts; void homeObjPts; void round;
+    const awayShipPts = Number(body?.awayShipPts) || 0;
+    const awayObjPts = Number(body?.awayObjPts) || 0;
+    const homeShipPts = Number(body?.homeShipPts) || 0;
+    const homeObjPts = Number(body?.homeObjPts) || 0;
+    const round = Number(body?.round) || 0;
 
     if (!gameRaw) {
       return NextResponse.json(
@@ -156,6 +156,40 @@ export async function POST(request: NextRequest) {
 
     const res = await reportGamePost(forwardReq);
     const forwarded = await res.json().catch(() => ({}));
+
+    // Log to adv_stats_t6 only when every field is populated — round started,
+    // both list URLs provided, and both sides have non-zero split points.
+    // Partial data isn't useful for later analysis. Wrapped in try/catch so
+    // any DB hiccup can't break the primary report flow above.
+    const allFieldsFilled =
+      round > 0 &&
+      awayList !== "" &&
+      homeList !== "" &&
+      awayShipPts + awayObjPts > 0 &&
+      homeShipPts + homeObjPts > 0;
+    if (allFieldsFilled) {
+      try {
+        await pool.query(
+          `INSERT INTO S9.adv_stats_t6
+             (week_label, game, row_index, scenario, round,
+              away_pts, home_pts,
+              away_ship_pts, away_obj_pts,
+              home_ship_pts, home_obj_pts,
+              away_list, home_list)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            weekLabel, gameRaw, rowIndex, scenario, round,
+            awayPts, homePts,
+            awayShipPts, awayObjPts,
+            homeShipPts, homeObjPts,
+            awayList, homeList,
+          ]
+        );
+      } catch (logErr: any) {
+        console.error("adv_stats_t6 insert failed:", logErr?.message);
+      }
+    }
+
     return NextResponse.json(
       { ok: res.ok, upstream: forwarded, weekLabel, game: gameRaw, rowIndex },
       { status: res.status }
