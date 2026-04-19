@@ -32,7 +32,8 @@ type TabKey =
   | "arcade"
   | "stream"
   | "playoffs"
-  | "builder";
+  | "builder"
+  | "xzone";
 
 const row1Base: Array<{ key: TabKey; label: string; href: string }> = [
   { key: "home",      label: "Home",         href: "/" },
@@ -60,7 +61,7 @@ export default function DesktopNavTabs({ showBuilder = false }: { showBuilder?: 
   const rawTab = (searchParams.get("tab") as TabKey | null) ?? "home";
   const preSeasonEnabled = process.env.NEXT_PUBLIC_PRE_SEASON === "true";
 
-  const row1 = showBuilder
+  const row1WithBuilder = showBuilder
     ? [...row1Base, { key: "builder" as TabKey, label: "Builder", href: "/?tab=builder" }]
     : row1Base;
 
@@ -71,6 +72,14 @@ export default function DesktopNavTabs({ showBuilder = false }: { showBuilder?: 
   const active: TabKey | null = pathname === "/" ? rawTab : null;
 
   const [hasLive, setHasLive] = useState(false);
+
+  const row1 = hasLive
+    ? row1WithBuilder.flatMap((tab) =>
+        tab.key === "matchups"
+          ? [tab, { key: "xzone" as TabKey, label: "X-ZONE", href: "/?tab=xzone" }]
+          : [tab]
+      )
+    : row1WithBuilder;
 
   useEffect(() => {
     let cancelled = false;
@@ -109,7 +118,7 @@ export default function DesktopNavTabs({ showBuilder = false }: { showBuilder?: 
       !(!preSeasonEnabled && key === "prefs") &&
       active === key;
 
-    const isLiveTab = key === "matchups" && hasLive;
+    const isLiveTab = (key === "matchups" || key === "xzone") && hasLive;
 
     return (
       <Link

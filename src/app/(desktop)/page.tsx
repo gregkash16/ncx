@@ -24,6 +24,7 @@ import PrevSeasonsPanel from "../components/PrevSeasonsPanel";
 import ArcadePanel from "../components/ArcadePanel";
 import StreamPanel from "../components/StreamPanel";
 import MatchupBuilder from "../components/MatchupBuilder";
+import XZonePanel from "../components/XZonePanel";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -381,6 +382,7 @@ export default async function HomePage({
             arcadePanel={<ArcadePanel key="arcade" />}
             streamPanel={<StreamPanel key="stream" />}
             builderPanel={showBuilder ? <MatchupBuilder key="builder" /> : undefined}
+            xzonePanel={<XZonePanel key="xzone" />}
           />
         </div>
       </section>

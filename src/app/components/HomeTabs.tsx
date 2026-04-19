@@ -20,7 +20,8 @@ export type TabKey =
   | "prevseasons"
   | "arcade"
   | "stream"
-  | "builder";
+  | "builder"
+  | "xzone";
 
 const MATCHUPS: TabKey = "matchups";
 function isMatchups(k: TabKey): k is "matchups" {
@@ -48,6 +49,7 @@ type HomeTabsProps = {
   arcadePanel?: React.ReactNode;
   streamPanel?: React.ReactNode;
   builderPanel?: React.ReactNode;
+  xzonePanel?: React.ReactNode;
   hideButtons?: boolean;
   preSeasonEnabled?: boolean;
 };
@@ -69,6 +71,7 @@ export default function HomeTabs({
   arcadePanel,
   streamPanel,
   builderPanel,
+  xzonePanel,
   hideButtons = false,
   preSeasonEnabled = false,
 }: HomeTabsProps) {
@@ -182,7 +185,7 @@ export default function HomeTabs({
 
       <div
         className={`relative mx-auto px-2 sm:px-4 ${
-          active === "indstats" || active === "advstats" || active === "prevseasons" || active === "stream" || active === "playoffs" || active === "builder"
+          active === "indstats" || active === "advstats" || active === "prevseasons" || active === "stream" || active === "playoffs" || active === "builder" || active === "xzone"
             ? "w-full max-w-[115rem]"
             : "max-w-6xl"
         }`}
@@ -203,6 +206,7 @@ export default function HomeTabs({
         {active === "arcade" && arcadePanel}
         {active === "stream" && streamPanel}
         {active === "builder" && builderPanel}
+        {active === "xzone" && xzonePanel}
       </div>
     </div>
   );
