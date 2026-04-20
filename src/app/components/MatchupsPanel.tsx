@@ -689,10 +689,10 @@ export default function MatchupsPanel({
     return Boolean(a) && a === w;
   }, [activeWeek, weekLabel]);
 
+  const TOTAL_WEEKS = 10;
   const weeksPills = useMemo(() => {
-    if (!activeNum || activeNum <= 0) return [] as string[];
-    return Array.from({ length: activeNum }, (_, i) => formatWeekLabel(i + 1));
-  }, [activeNum]);
+    return Array.from({ length: TOTAL_WEEKS }, (_, i) => formatWeekLabel(i + 1));
+  }, []);
 
   const cleaned = useMemo(() => {
     return (data || []).filter((m) => /^\d+$/.test((m.game || "").trim()));
@@ -968,46 +968,70 @@ export default function MatchupsPanel({
         ) : null}
       </h2>
 
-      {activeNum && activeNum > 0 && (
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-2 justify-center mb-5 max-w-fit mx-auto">
-          {weeksPills.map((wk) => {
-            const isActive = wk.toUpperCase() === (activeWeek || "").toUpperCase();
-            const selected =
-              (!selectedWeekRaw && isActive) ||
-              wk.toUpperCase() === (selectedWeekRaw || "").toUpperCase();
-
-            const href = mobile
-              ? (isActive ? "/m/matchups" : `/m/matchups?w=${encodeURIComponent(wk)}`)
-              : (isActive ? "?tab=matchups" : `?tab=matchups&w=${encodeURIComponent(wk)}`);
-
-            return (
-              <a
-                key={wk}
-                href={href}
-                className={[
-                  btnBase,
-                  isActive
-                    ? "border-yellow-400/70"
-                    : selected
-                    ? "border-cyan-400/60"
-                    : "border-purple-500/40",
-                ].join(" ")}
-              >
-                <span
-                  className={[
-                    gradient,
-                    isActive
-                      ? "bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20"
-                      : "bg-gradient-to-r from-pink-600/20 via-purple-500/20 to-cyan-500/20",
-                    selected ? "opacity-100" : "",
-                  ].join(" ")}
-                />
-                <span className="relative z-10">{wk}</span>
-              </a>
-            );
-          })}
+      {activeNum && activeNum > 0 && !isCurrentWeek && (
+        <div className="flex justify-center mb-3">
+          <a
+            href={mobile ? "/m/matchups" : "?tab=matchups"}
+            className={[
+              btnBase,
+              "border-yellow-400/70",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                gradient,
+                "bg-gradient-to-r from-yellow-400/30 via-amber-400/30 to-yellow-300/30 opacity-100",
+              ].join(" ")}
+            />
+            <span className="relative z-10 inline-flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-yellow-300 shadow-[0_0_8px_rgba(253,224,71,0.9)]" />
+              Jump to Current Week
+              {activeWeek ? (
+                <span className="text-yellow-300">• {activeWeek}</span>
+              ) : null}
+            </span>
+          </a>
         </div>
       )}
+
+      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-2 justify-center mb-5 max-w-fit mx-auto">
+        {weeksPills.map((wk) => {
+          const isActive = wk.toUpperCase() === (activeWeek || "").toUpperCase();
+          const selected =
+            (!selectedWeekRaw && isActive) ||
+            wk.toUpperCase() === (selectedWeekRaw || "").toUpperCase();
+
+          const href = mobile
+            ? (isActive ? "/m/matchups" : `/m/matchups?w=${encodeURIComponent(wk)}`)
+            : (isActive ? "?tab=matchups" : `?tab=matchups&w=${encodeURIComponent(wk)}`);
+
+          return (
+            <a
+              key={wk}
+              href={href}
+              className={[
+                btnBase,
+                isActive
+                  ? "border-yellow-400/70"
+                  : selected
+                  ? "border-cyan-400/60"
+                  : "border-purple-500/40",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  gradient,
+                  isActive
+                    ? "bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-yellow-300/20"
+                    : "bg-gradient-to-r from-pink-600/20 via-purple-500/20 to-cyan-500/20",
+                  selected ? "opacity-100" : "",
+                ].join(" ")}
+              />
+              <span className="relative z-10">{wk}</span>
+            </a>
+          );
+        })}
+      </div>
 
       {/* Search + toggles */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-6">
