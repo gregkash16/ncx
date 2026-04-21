@@ -189,11 +189,14 @@ export default function HomeLanding({
             NCX App for iOS
           </a>
 
-          <span
-            className="flex items-center justify-center rounded-xl border border-green-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-400 cursor-default"
+          <a
+            href="https://play.google.com/store/apps/details?id=com.nickelcityxwing.ncx"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center rounded-xl border border-green-500/40 bg-zinc-950/60 px-4 py-3 text-sm font-semibold hover:bg-green-500/20 hover:border-green-400 transition"
           >
-            NCX App for Android (Coming Soon)
-          </span>
+            NCX App for Android
+          </a>
 
         </div>
 
