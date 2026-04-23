@@ -3,6 +3,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { getSheets } from "@/lib/googleSheets";
+import { rebuildStreamDiscordPost } from "@/lib/streamDiscord";
+
+async function syncDiscord(week: string) {
+  try {
+    await rebuildStreamDiscordPost(week);
+  } catch (err) {
+    console.error("stream-signup: Discord rebuild failed:", err);
+  }
+}
 
 const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"];
 const SPREADSHEET_ID = "1x4_rfPq-fPnJ2IT6WbNzBxVmomqU36fU24pnKuPaObw";
@@ -303,6 +312,8 @@ export async function POST(request: NextRequest) {
       [currentWeek, slotDay, slotGame, ncxid, opponentNcxid]
     );
 
+    await syncDiscord(currentWeek);
+
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     if (err.code === "ER_DUP_ENTRY") {
@@ -396,6 +407,8 @@ export async function PUT(request: NextRequest) {
       [currentWeek, slotDay, slotGame, awayId, homeId]
     );
 
+    await syncDiscord(currentWeek);
+
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     console.error("PUT /api/stream-signup error:", err);
@@ -434,6 +447,9 @@ export async function DELETE(request: NextRequest) {
     }
 
     await pool.query(`DELETE FROM S9.stream_signups WHERE id = ?`, [id]);
+
+    const currentWeek = await getSetupWeek();
+    await syncDiscord(currentWeek);
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
