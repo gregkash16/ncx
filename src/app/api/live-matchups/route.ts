@@ -15,6 +15,30 @@ const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"] as const;
 
 let ensured = false;
 let ensuredClickLog = false;
+let ensuredBanList = false;
+
+async function ensureBanTable() {
+  if (ensuredBanList) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS S9.live_bans (
+      discord_id VARCHAR(32) NOT NULL PRIMARY KEY,
+      discord_name VARCHAR(255),
+      banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  ensuredBanList = true;
+}
+
+export async function isDiscordIdBanned(discordId: string): Promise<boolean> {
+  if (!discordId) return false;
+  if ((ADMIN_DISCORD_IDS as readonly string[]).includes(discordId)) return false;
+  await ensureBanTable();
+  const [rows] = await pool.query<any[]>(
+    `SELECT 1 FROM S9.live_bans WHERE discord_id = ? LIMIT 1`,
+    [discordId]
+  );
+  return Array.isArray(rows) && rows.length > 0;
+}
 
 async function ensureTable() {
   if (ensured) return;
@@ -128,6 +152,16 @@ export async function POST(request: Request) {
       (session.user as any)?.name != null
         ? String((session.user as any).name)
         : null;
+
+    if (await isDiscordIdBanned(discordId)) {
+      return NextResponse.json(
+        {
+          error: "You are banned from going live. Appeal to gregkash.",
+          banned: true,
+        },
+        { status: 403 }
+      );
+    }
 
     await ensureTable();
 

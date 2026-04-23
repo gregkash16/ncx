@@ -794,6 +794,19 @@ export default function MatchupsPanel({
       }
     }
 
+    const matchupLine =
+      meta?.awayTeam && meta?.homeTeam
+        ? `${meta.awayTeam} vs ${meta.homeTeam}`
+        : `Game ${game}`;
+    const confirmMsg =
+      `Go LIVE for ${matchupLine}?\n\n` +
+      `Stream: ${streamName ?? provider}\n` +
+      `${streamUrl}\n\n` +
+      `This will post a LIVE announcement in Discord and ping both team roles.`;
+    if (typeof window !== "undefined" && !window.confirm(confirmMsg)) {
+      return;
+    }
+
     setLiveSubmitting(game);
     setLiveError((p) => ({ ...p, [game]: "" }));
 
@@ -816,7 +829,16 @@ export default function MatchupsPanel({
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || "Failed");
+      if (!res.ok) {
+        if (res.status === 403 && json?.banned) {
+          setOpenLivePopover(null);
+          alert(
+            "You are banned from hitting LIVE.\n\nAppeal to gregkash."
+          );
+          return;
+        }
+        throw new Error(json?.error || "Failed");
+      }
       setOpenLivePopover(null);
       await refreshLive();
       window.dispatchEvent(new CustomEvent(LIVE_CHANGED_EVENT));
@@ -1196,10 +1218,26 @@ export default function MatchupsPanel({
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           if (!isDiscordSignedIn) {
                             signIn("discord");
                             return;
+                          }
+                          try {
+                            const res = await fetch(
+                              "/api/live-matchups/ban-check",
+                              { cache: "no-store" }
+                            );
+                            const json = await res.json().catch(() => ({}));
+                            if (json?.banned) {
+                              alert(
+                                "You are banned from hitting LIVE.\n\nAppeal to gregkash."
+                              );
+                              return;
+                            }
+                          } catch {
+                            // If the check fails, fall through — the server
+                            // POST will enforce the ban anyway.
                           }
                           setOpenLivePopover((cur) =>
                             cur === row.game ? null : row.game
