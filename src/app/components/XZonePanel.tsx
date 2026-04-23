@@ -224,6 +224,21 @@ function embedSrc(embed: Embed, parent: string): string | null {
   }
 }
 
+function chatSrc(embed: Embed, parent: string): string | null {
+  switch (embed.kind) {
+    case "twitch":
+      return `https://www.twitch.tv/embed/${encodeURIComponent(
+        embed.channel
+      )}/chat?parent=${encodeURIComponent(parent)}&darkpopout`;
+    case "youtube":
+      return `https://www.youtube.com/live_chat?v=${encodeURIComponent(
+        embed.videoId
+      )}&embed_domain=${encodeURIComponent(parent)}`;
+    default:
+      return null;
+  }
+}
+
 function gridClassForCount(n: number): string {
   if (n <= 1) return "grid-cols-1";
   if (n === 2) return "grid-cols-1 lg:grid-cols-2";
@@ -437,9 +452,11 @@ function StreamTile({
   parent: string;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const embed = parseEmbed(entry.streamUrl);
   const src = parent ? embedSrc(embed, parent) : null;
+  const chatUrl = parent ? chatSrc(embed, parent) : null;
   const title =
     entry.streamName?.trim() || entry.provider || "Live stream";
   const label = `${entry.weekLabel} • GAME ${entry.game}`;
@@ -457,6 +474,22 @@ function StreamTile({
           <span className="text-[11px] uppercase tracking-wider text-zinc-400">
             {label}
           </span>
+          {chatUrl && (
+            <button
+              type="button"
+              onClick={() => setChatOpen((v) => !v)}
+              aria-label={chatOpen ? "Hide chat" : "Show chat"}
+              title={chatOpen ? "Hide chat" : "Show chat"}
+              aria-pressed={chatOpen}
+              className={`text-[11px] font-semibold px-1.5 py-0.5 rounded border transition-colors ${
+                chatOpen
+                  ? "text-white border-purple-400 bg-purple-500/20 hover:bg-purple-500/30"
+                  : "text-zinc-300 hover:text-white border-zinc-700 hover:border-zinc-500"
+              }`}
+            >
+              {chatOpen ? "Chat ›" : "‹ Chat"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setSidebarOpen((v) => !v)}
@@ -501,6 +534,16 @@ function StreamTile({
             </div>
           )}
         </div>
+
+        {chatOpen && chatUrl && (
+          <div className="w-full lg:w-80 shrink-0 border-t lg:border-t-0 lg:border-l border-zinc-800 bg-black">
+            <iframe
+              src={chatUrl}
+              className="w-full h-[360px] lg:h-full block"
+              title={`${title} — chat`}
+            />
+          </div>
+        )}
 
         {sidebarOpen && (
           <MatchupSidebar
