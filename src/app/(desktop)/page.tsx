@@ -251,8 +251,7 @@ export default async function HomePage({
   const requestedWeekRaw = (sp?.w as string | undefined) || undefined;
   const reqNum = parseWeekNum(requestedWeekRaw);
   const activeNum = parseWeekNum(activeWeek);
-  const selectedWeek =
-    reqNum && activeNum && reqNum <= activeNum ? requestedWeekRaw : undefined;
+  const selectedWeek = reqNum ? requestedWeekRaw : undefined;
 
   // Only re-fetch matchups if the selected week is actually different from
   // the active week we already loaded. Previously this would re-fetch even
