@@ -85,8 +85,10 @@ export async function GET(req: NextRequest) {
       // Explicit params (admin or direct link)
       awayTeam = awayParam;
       homeTeam = homeParam;
-    } else if (!forceSelection) {
-      // Auto-detect from captain's team
+    } else if (!forceSelection || weekParam) {
+      // Auto-detect from captain's team. `selection=true` is ignored when a
+      // specific week was requested — clicking a week button should resolve
+      // straight to that week's draft, not stop at another selection screen.
       for (const s of schedList) {
         const away = norm(s.away_team);
         const home = norm(s.home_team);
