@@ -114,6 +114,7 @@ export default function MatchupBuilder() {
   const [forceSelection, setForceSelection] = useState(false);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const esRef = useRef<EventSource | null>(null);
 
   const buildUrl = useCallback(() => {
     const params = new URLSearchParams();
@@ -154,23 +155,109 @@ export default function MatchupBuilder() {
     }
   }, [buildUrl]);
 
-  // Initial fetch + polling
+  // Merge a light /state payload into the existing DraftState, recomputing
+  // each roster player's `assigned` flag from assignedAwayIds/assignedHomeIds.
+  const applyLightState = useCallback((state: any) => {
+    setData((prev) => {
+      if (!prev || prev.needsSelection) return prev;
+      const assignedAway = new Set<string>(state.assignedAwayIds ?? []);
+      const assignedHome = new Set<string>(state.assignedHomeIds ?? []);
+      return {
+        ...prev,
+        series: state.series,
+        slots: state.slots,
+        isMyTurn: state.isMyTurn,
+        myRole: state.myRole ?? prev.myRole,
+        awayRoster: prev.awayRoster.map((p) => ({ ...p, assigned: assignedAway.has(p.ncxid) })),
+        homeRoster: prev.homeRoster.map((p) => ({ ...p, assigned: assignedHome.has(p.ncxid) })),
+      };
+    });
+  }, []);
+
+  // Light state fetch — used after actions for immediate feedback and as a
+  // polling fallback if SSE is unavailable.
+  const fetchLightState = useCallback(async (week: string, away: string, home: string) => {
+    try {
+      const params = new URLSearchParams({ week, away, home });
+      const res = await fetch(`/api/matchup-builder/state?${params}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      applyLightState(json);
+    } catch {
+      /* ignore — SSE or next poll will catch up */
+    }
+  }, [applyLightState]);
+
+  // Initial full fetch (rosters + weeks + series + slots).
   useEffect(() => {
     setLoading(true);
     fetchData();
-
-    pollingRef.current = setInterval(fetchData, 4000);
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
   }, [fetchData]);
 
-  // Stop polling when finalized
+  // Collapse the live-draft identity into a single string for effect deps.
+  // null while in selection / finalized state, so the SSE effect no-ops.
+  const streamKey =
+    data && !data.needsSelection && !data.series.finalized
+      ? `${data.weekLabel}|${data.awayTeam}|${data.homeTeam}`
+      : null;
+
+  // SSE stream for live state updates once we have an active draft.
   useEffect(() => {
-    if (data && !data.needsSelection && data.series.finalized) {
-      if (pollingRef.current) clearInterval(pollingRef.current);
+    if (!streamKey) return;
+    const [weekLabel, awayTeam, homeTeam] = streamKey.split("|") as [string, string, string];
+    const params = new URLSearchParams({ week: weekLabel, away: awayTeam, home: homeTeam });
+
+    // Prefer SSE; fall back to polling /state every 4s if EventSource isn't
+    // available (old browsers) or consistently errors.
+    if (typeof window !== "undefined" && "EventSource" in window) {
+      const es = new EventSource(`/api/matchup-builder/stream?${params}`);
+      esRef.current = es;
+      let errorCount = 0;
+
+      es.onmessage = (ev) => {
+        errorCount = 0;
+        try {
+          const state = JSON.parse(ev.data);
+          applyLightState(state);
+        } catch {
+          /* malformed message — ignore */
+        }
+      };
+      es.onerror = () => {
+        errorCount += 1;
+        // If it keeps erroring, drop SSE and poll instead.
+        if (errorCount >= 3) {
+          es.close();
+          esRef.current = null;
+          pollingRef.current = setInterval(
+            () => fetchLightState(weekLabel, awayTeam, homeTeam),
+            4000
+          );
+        }
+      };
+
+      return () => {
+        es.close();
+        esRef.current = null;
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
     }
-  }, [data]);
+
+    // No EventSource support — poll /state.
+    pollingRef.current = setInterval(
+      () => fetchLightState(weekLabel, awayTeam, homeTeam),
+      4000
+    );
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [streamKey, applyLightState, fetchLightState]);
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -192,8 +279,11 @@ export default function MatchupBuilder() {
       if (!res.ok) {
         setToast({ msg: json.error ?? "Action failed", type: "err" });
       } else {
-        // Re-fetch immediately
-        await fetchData();
+        // Refresh via light /state for instant feedback; SSE will also push
+        // an event within ~2s and reconcile.
+        if (data && !data.needsSelection) {
+          await fetchLightState(data.weekLabel, data.awayTeam, data.homeTeam);
+        }
       }
     } catch (e: any) {
       setToast({ msg: e.message ?? "Network error", type: "err" });

@@ -56,12 +56,18 @@ export async function GET(req: NextRequest) {
       weekLabel = cw?.week_label ?? "WEEK 1";
     }
 
-    // Find the team schedule entry for this captain's team in this week
-    const [schedRows] = await pool.query(
-      "SELECT away_team, home_team FROM S9.team_schedule WHERE week_label = ?",
-      [weekLabel]
-    );
+    // Fetch this week's schedule + all weeks in parallel (both branches below need allWeeks)
+    const [[schedRows], [weekRows]] = await Promise.all([
+      pool.query(
+        "SELECT away_team, home_team FROM S9.team_schedule WHERE week_label = ?",
+        [weekLabel]
+      ),
+      pool.query(
+        "SELECT DISTINCT week_label FROM S9.team_schedule ORDER BY CAST(SUBSTRING(week_label, 6) AS UNSIGNED)"
+      ),
+    ]);
     const schedList = schedRows as any[];
+    const allWeeks = (weekRows as any[]).map((r: any) => r.week_label);
 
     // Figure out which series this captain is involved in
     // Admin can specify away/home via query params
@@ -96,14 +102,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!awayTeam || !homeTeam) {
-      // Return available weeks and series for this captain
-      const allWeeks: string[] = [];
-      const [weekRows] = await pool.query(
-        "SELECT DISTINCT week_label FROM S9.team_schedule ORDER BY CAST(SUBSTRING(week_label, 6) AS UNSIGNED)"
-      );
-      for (const r of weekRows as any[]) allWeeks.push(r.week_label);
-
-      // Return captain's series across all weeks
+      // Return captain's series for this week
       const mySeries: any[] = [];
       for (const s of schedList) {
         const away = norm(s.away_team);
@@ -143,17 +142,24 @@ export async function GET(req: NextRequest) {
     let series = (existingSeries as any[])[0];
 
     if (!series) {
-      // Create series + 7 slot rows
+      // Create series + 7 slot rows in two round-trips instead of nine
       await pool.query(
         "INSERT INTO S9.matchup_draft_series (week_label, away_team, home_team) VALUES (?, ?, ?)",
         [weekLabel, awayTeam, homeTeam]
       );
-      for (let slot = 1; slot <= 7; slot++) {
-        await pool.query(
-          "INSERT INTO S9.matchup_draft (week_label, away_team, home_team, slot) VALUES (?, ?, ?, ?)",
-          [weekLabel, awayTeam, homeTeam, slot]
-        );
-      }
+      await pool.query(
+        `INSERT INTO S9.matchup_draft (week_label, away_team, home_team, slot) VALUES
+         (?,?,?,1),(?,?,?,2),(?,?,?,3),(?,?,?,4),(?,?,?,5),(?,?,?,6),(?,?,?,7)`,
+        [
+          weekLabel, awayTeam, homeTeam,
+          weekLabel, awayTeam, homeTeam,
+          weekLabel, awayTeam, homeTeam,
+          weekLabel, awayTeam, homeTeam,
+          weekLabel, awayTeam, homeTeam,
+          weekLabel, awayTeam, homeTeam,
+          weekLabel, awayTeam, homeTeam,
+        ]
+      );
       const [newSeries] = await pool.query(
         "SELECT * FROM S9.matchup_draft_series WHERE week_label = ? AND away_team = ? AND home_team = ?",
         [weekLabel, awayTeam, homeTeam]
@@ -168,29 +174,23 @@ export async function GET(req: NextRequest) {
     );
     const slots = slotRows as any[];
 
-    // Get rosters from individual_stats + all_time_stats
-    const [awayRosterRows] = await pool.query(
-      `SELECT i.ncxid, i.first_name, i.last_name, i.faction,
+    // Both rosters in one round-trip; partition by team in JS
+    const [rosterRows] = await pool.query(
+      `SELECT i.team, i.ncxid, i.first_name, i.last_name, i.faction,
               i.wins, i.losses, i.points, i.ppg, i.war, i.winper, i.games, i.plms,
               a.wins AS at_wins, a.losses AS at_losses, a.points AS at_points,
               a.adj_ppg AS at_adjPpg, a.win_pct AS at_winPct, a.games AS at_games, a.plms AS at_plms,
               a.championships AS at_championships
        FROM S9.individual_stats i
        LEFT JOIN S9.all_time_stats a ON a.ncxid = i.ncxid
-       WHERE i.team = ? ORDER BY CAST(i.pick_no AS UNSIGNED)`,
-      [awayTeam]
+       WHERE i.team IN (?, ?)
+       ORDER BY i.team, CAST(i.pick_no AS UNSIGNED)`,
+      [awayTeam, homeTeam]
     );
-    const [homeRosterRows] = await pool.query(
-      `SELECT i.ncxid, i.first_name, i.last_name, i.faction,
-              i.wins, i.losses, i.points, i.ppg, i.war, i.winper, i.games, i.plms,
-              a.wins AS at_wins, a.losses AS at_losses, a.points AS at_points,
-              a.adj_ppg AS at_adjPpg, a.win_pct AS at_winPct, a.games AS at_games, a.plms AS at_plms,
-              a.championships AS at_championships
-       FROM S9.individual_stats i
-       LEFT JOIN S9.all_time_stats a ON a.ncxid = i.ncxid
-       WHERE i.team = ? ORDER BY CAST(i.pick_no AS UNSIGNED)`,
-      [homeTeam]
-    );
+    const awayKey = teamKey(awayTeam);
+    const homeKey = teamKey(homeTeam);
+    const awayRosterRows = (rosterRows as any[]).filter((r) => teamKey(r.team) === awayKey);
+    const homeRosterRows = (rosterRows as any[]).filter((r) => teamKey(r.team) === homeKey);
 
     // Determine assigned players
     const assignedAwayIds = new Set(
@@ -248,12 +248,6 @@ export async function GET(req: NextRequest) {
         isMyTurn = true;
       }
     }
-
-    // Get all weeks for the week selector
-    const [weekRows] = await pool.query(
-      "SELECT DISTINCT week_label FROM S9.team_schedule ORDER BY CAST(SUBSTRING(week_label, 6) AS UNSIGNED)"
-    );
-    const allWeeks = (weekRows as any[]).map((r: any) => r.week_label);
 
     return NextResponse.json({
       needsSelection: false,
