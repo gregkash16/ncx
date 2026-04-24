@@ -351,7 +351,7 @@ export default function MatchupBuilder() {
             {allWeeks.map((w) => (
               <button
                 key={w}
-                onClick={() => { setSelectedWeek(w); setSelectedAway(null); setSelectedHome(null); setData(null); setLoading(true); }}
+                onClick={() => { setSelectedWeek(w); setSelectedAway(null); setSelectedHome(null); setForceSelection(false); setData(null); setLoading(true); }}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
                   (selectedWeek ?? currentWeekLabel) === w
                     ? "bg-gradient-to-r from-pink-600 to-cyan-500 text-white"
