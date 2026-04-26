@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { getCaptainTeams } from "@/lib/captains";
+import { ensureMatchupDraftColumns } from "@/lib/matchupDraftMigration";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ function teamKey(s: string): string {
 
 export async function GET(req: NextRequest) {
   try {
+    await ensureMatchupDraftColumns();
     const session = await getServerSession(authOptions);
     const sessionId = session?.user
       ? normalizeDiscordId((session.user as any).discordId ?? (session.user as any).id)
@@ -272,6 +274,7 @@ export async function GET(req: NextRequest) {
         status: s.status,
         vetoed: !!s.vetoed,
         vetoedHomeNcxid: s.vetoed_home_ncxid ?? null,
+        pendingSub: !!s.pending_sub,
       })),
       awayRoster: formatRoster(awayRosterRows as any[], assignedAwayIds),
       homeRoster: formatRoster(homeRosterRows as any[], assignedHomeIds),

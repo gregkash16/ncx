@@ -98,13 +98,13 @@ export async function GET(req: NextRequest) {
       // Tell the browser to wait 5s before auto-reconnecting on disconnect.
       send(`retry: 5000\n\n`);
 
-      const pushIfChanged = async (): Promise<boolean> => {
-        if (closed) return true;
+      const pushIfChanged = async (): Promise<void> => {
+        if (closed) return;
         try {
           const state = await buildLightState(week!, awayTeam!, homeTeam!, myRole);
           if (!state) {
             send(`event: error\ndata: ${JSON.stringify({ error: "Draft not initialized" })}\n\n`);
-            return false;
+            return;
           }
           const json = JSON.stringify(state);
           const hash = createHash("sha1").update(json).digest("hex");
@@ -112,25 +112,18 @@ export async function GET(req: NextRequest) {
             lastHash = hash;
             send(`data: ${json}\n\n`);
           }
-          return state.series.finalized;
         } catch (err: any) {
           console.error("[matchup-builder/stream]", err);
           send(`event: error\ndata: ${JSON.stringify({ error: err.message ?? "poll error" })}\n\n`);
-          return false;
         }
       };
 
-      const finalizedNow = await pushIfChanged();
-      if (finalizedNow) {
-        cleanup();
-        return;
-      }
+      // Stream stays open across finalize so post-finalize substitutions
+      // still propagate live between the two captains. Closes on
+      // req.signal.abort (client unmount) only.
+      await pushIfChanged();
 
-      pollTimer = setInterval(async () => {
-        if (closed) return;
-        const finalized = await pushIfChanged();
-        if (finalized) cleanup();
-      }, POLL_MS);
+      pollTimer = setInterval(pushIfChanged, POLL_MS);
 
       heartbeatTimer = setInterval(() => {
         send(`: heartbeat\n\n`);

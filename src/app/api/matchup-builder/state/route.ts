@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { getCaptainTeams } from "@/lib/captains";
+import { ensureMatchupDraftColumns } from "@/lib/matchupDraftMigration";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export type LightDraftState = {
     status: "awaiting_away" | "awaiting_home" | "awaiting_veto_window" | "locked";
     vetoed: boolean;
     vetoedHomeNcxid: string | null;
+    pendingSub: boolean;
   }>;
   myRole: "away_captain" | "home_captain" | "admin";
   isMyTurn: boolean;
@@ -48,13 +50,14 @@ export async function buildLightState(
   homeTeam: string,
   myRole: "away_captain" | "home_captain" | "admin"
 ): Promise<LightDraftState | null> {
+  await ensureMatchupDraftColumns();
   const [[seriesRows], [slotRows]] = await Promise.all([
     pool.query(
       "SELECT current_slot, veto_used, finalized, finalized_at FROM S9.matchup_draft_series WHERE week_label = ? AND away_team = ? AND home_team = ?",
       [week, awayTeam, homeTeam]
     ),
     pool.query(
-      "SELECT slot, away_ncxid, away_name, home_ncxid, home_name, status, vetoed, vetoed_home_ncxid FROM S9.matchup_draft WHERE week_label = ? AND away_team = ? AND home_team = ? ORDER BY slot",
+      "SELECT slot, away_ncxid, away_name, home_ncxid, home_name, status, vetoed, vetoed_home_ncxid, pending_sub FROM S9.matchup_draft WHERE week_label = ? AND away_team = ? AND home_team = ? ORDER BY slot",
       [week, awayTeam, homeTeam]
     ),
   ]);
@@ -70,6 +73,7 @@ export async function buildLightState(
     status: s.status,
     vetoed: !!s.vetoed,
     vetoedHomeNcxid: s.vetoed_home_ncxid ?? null,
+    pendingSub: !!s.pending_sub,
   }));
 
   const currentSlot = slots.find((s) => s.slot === seriesRow.current_slot);
