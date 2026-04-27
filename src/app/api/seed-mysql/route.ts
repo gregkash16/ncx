@@ -446,15 +446,38 @@ async function loadSubs(sheets: any, pool: mysql.Pool) {
   return { tabName, inserted };
 }
 
+async function ensureCurrentWeekScheduleColumn(pool: mysql.Pool): Promise<void> {
+  const [cols] = await pool.query<any[]>(
+    `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'current_week'
+       AND COLUMN_NAME = 'schedule_week'`
+  );
+  if (!cols || cols.length === 0) {
+    await pool.query(
+      `ALTER TABLE current_week ADD COLUMN schedule_week VARCHAR(32) NULL AFTER week_label`
+    );
+  }
+}
+
 async function loadCurrentWeek(sheets: any, pool: mysql.Pool) {
-  const rows = await getSheetValues(sheets, NCX_LEAGUE_SHEET_ID, "SCHEDULE!U2:U2");
-  const value = rows[0]?.[0] ?? "WEEK 1";
-  const weekLabel = normalizeWeekLabel(value);
+  await ensureCurrentWeekScheduleColumn(pool);
+
+  const [u2Rows, j3Rows] = await getSheetValuesBatch(
+    sheets,
+    NCX_LEAGUE_SHEET_ID,
+    ["SCHEDULE!U2:U2", "SCHEDULE!J3:J3"]
+  );
+  const weekLabel = normalizeWeekLabel(u2Rows[0]?.[0] ?? "WEEK 1");
+  const scheduleWeek = normalizeWeekLabel(j3Rows[0]?.[0] ?? "WEEK 1");
 
   await pool.query("DELETE FROM current_week");
-  await pool.query("INSERT INTO current_week (week_label) VALUES (?)", [weekLabel]);
+  await pool.query(
+    "INSERT INTO current_week (week_label, schedule_week) VALUES (?, ?)",
+    [weekLabel, scheduleWeek]
+  );
 
-  return { weekLabel };
+  return { weekLabel, scheduleWeek };
 }
 
 async function ensureWeeklyMatchupsRowIndexColumn(pool: mysql.Pool): Promise<void> {

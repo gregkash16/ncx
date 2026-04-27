@@ -94,18 +94,22 @@ export async function syncCurrentWeek(
   spreadsheetId: string,
   conn: mysql.Connection
 ) {
-  const weekRes = await sheets.spreadsheets.values.get({
+  const batchRes = await sheets.spreadsheets.values.batchGet({
     spreadsheetId,
-    range: "SCHEDULE!U2",
+    ranges: ["SCHEDULE!U2", "SCHEDULE!J3"],
     valueRenderOption: "FORMATTED_VALUE",
-  });
-  const raw = weekRes.data.values?.[0]?.[0] ?? "WEEK 1";
-  const weekLabel = normalizeWeekLabel(String(raw));
+  } as any);
+  const valueRanges: any[] = (batchRes as any).data?.valueRanges ?? [];
+  const u2Raw = valueRanges[0]?.values?.[0]?.[0] ?? "WEEK 1";
+  const j3Raw = valueRanges[1]?.values?.[0]?.[0] ?? "WEEK 1";
+  const weekLabel = normalizeWeekLabel(String(u2Raw));
+  const scheduleWeek = normalizeWeekLabel(String(j3Raw));
 
   await conn.execute("DELETE FROM current_week");
-  await conn.execute("INSERT INTO current_week (week_label) VALUES (?)", [
-    weekLabel,
-  ]);
+  await conn.execute(
+    "INSERT INTO current_week (week_label, schedule_week) VALUES (?, ?)",
+    [weekLabel, scheduleWeek]
+  );
 
   return weekLabel;
 }

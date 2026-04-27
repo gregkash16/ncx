@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { pool } from "@/lib/db";
-import { getSheets } from "@/lib/googleSheets";
 import { rebuildStreamDiscordPost } from "@/lib/streamDiscord";
 
 async function syncDiscord(week: string) {
@@ -14,7 +13,6 @@ async function syncDiscord(week: string) {
 }
 
 const ADMIN_DISCORD_IDS = ["349349801076195329", "986330724212801557"];
-const SPREADSHEET_ID = "1x4_rfPq-fPnJ2IT6WbNzBxVmomqU36fU24pnKuPaObw";
 
 function normalizeDiscordId(v: unknown): string {
   return String(v ?? "")
@@ -28,48 +26,16 @@ function isAdmin(discordId: string): boolean {
 }
 
 /**
- * Read the setup week from Google Sheets SCHEDULE!J3.
- *
- * Cached in-memory for 60s because this cell is independent from current_week
- * (it's the *signup* week, which can be ahead of the active match week) and
- * isn't synced by seed-mysql — so we have to keep the Sheets read, but we
- * don't need to do it on every GET.
+ * Setup/signup week from `S9.current_week.schedule_week`. Synced from
+ * SCHEDULE!J3 by seed-mysql; falls back to `week_label` (active match week)
+ * if the column hasn't been populated yet.
  */
-type SetupWeekCache = { value: string; ts: number };
-const SETUP_WEEK_TTL_MS = 60_000;
-const globalForSetupWeek = globalThis as unknown as {
-  __ncxSetupWeekCache?: SetupWeekCache;
-};
-
 async function getSetupWeek(): Promise<string> {
-  const now = Date.now();
-  const cached = globalForSetupWeek.__ncxSetupWeekCache;
-  if (cached && now - cached.ts < SETUP_WEEK_TTL_MS) {
-    return cached.value;
-  }
-
-  let value: string;
-  try {
-    const sheets = getSheets();
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: "SCHEDULE!J3",
-      valueRenderOption: "FORMATTED_VALUE",
-    });
-    const raw = String(res.data.values?.[0]?.[0] ?? "").trim();
-    if (!raw) value = "WEEK 1";
-    else if (/^\d+$/.test(raw)) value = `WEEK ${raw}`;
-    else value = raw.toUpperCase();
-  } catch (err) {
-    console.error("Failed to read setup week from sheet, falling back to DB:", err);
-    const [weekRows] = await pool.query<any[]>(
-      `SELECT week_label FROM S9.current_week LIMIT 1`
-    );
-    value = weekRows?.[0]?.week_label || "WEEK 1";
-  }
-
-  globalForSetupWeek.__ncxSetupWeekCache = { value, ts: now };
-  return value;
+  const [rows] = await pool.query<any[]>(
+    `SELECT schedule_week, week_label FROM S9.current_week LIMIT 1`
+  );
+  const r = rows?.[0];
+  return r?.schedule_week || r?.week_label || "WEEK 1";
 }
 
 /* ─── GET: fetch signups for current (or specified) week ─── */
