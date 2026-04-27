@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/push/podcast-check",
+      "schedule": "30 14 * * *"
+    }
+  ]
+}
